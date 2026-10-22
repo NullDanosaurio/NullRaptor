@@ -1,0 +1,26 @@
+# Ruflo local secrets and runtime data
+.env
+.env.local
+.env.*.local
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
+
+# Codex local configuration
+.codex/
+# Claude Flow runtime data
+# Environment variables
+
+node_modules/
+.tools/
+.swarm/
+.claude-flow/dual-mode-memory.db*
+.env
+.env.*
+!.env.example
+.worktrees/
+.runs/
+# Salida de build y estado local que cambia en cada sesión
+dist/
+.claude/memory.db
+.claude-flow/metrics/

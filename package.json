@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.308",
+    "@claude-flow/codex": "3.0.5",
+    "ruflo": "3.59.17"
+  },
+  "name": "ruflo-web-trial",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/slug.test.mjs",
+    "check:mcp": "node scripts/check-mcp.mjs",
+    "workflow": "node scripts/flujo-demo.mjs"
+  }
+}
