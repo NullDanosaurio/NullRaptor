@@ -50,7 +50,7 @@ Los tokens solo existen en la memoria de los procesos: git los recibe por variab
 
 ```powershell
 npm ci --ignore-scripts; node node_modules/@anthropic-ai/claude-code/install.cjs
-node --test tests/
+npm test
 docker compose run --rm agente        # construye desde este repo
 ```
 
