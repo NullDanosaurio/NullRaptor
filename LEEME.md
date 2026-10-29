@@ -19,6 +19,14 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 | Proyectos | Un repo privado cada uno | Deben funcionar sin IA: el agente no deja archivos suyos en ellos |
 | Tareas | GitHub Issues + Projects | Etiqueta `agente` para las tareas del agente. Sustituye a Notion |
 
+## Arranque en Windows sin Docker (doble clic)
+
+`Nullraptor.cmd` (o un acceso directo a él en el escritorio). Necesita Node 24, git y `npm ci` hecho en esta
+carpeta, y el cofre en `~/.nullraptor/`. La clave se pide **solo la primera vez** en cada equipo: se recuerda en
+`%LOCALAPPDATA%\Nullraptor\clave.dpapi`, cifrada con DPAPI (solo tu usuario de Windows en ese equipo puede leerla;
+no se sube a ninguna parte). Si deja de abrir el cofre, se olvida y se vuelve a pedir. Para olvidarla a mano,
+borra ese archivo. Contrapartida: quien entre en tu sesión de Windows puede abrir el agente sin la clave.
+
 ## Arranque en cualquier equipo con Docker
 
 ```powershell
