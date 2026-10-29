@@ -43,3 +43,25 @@
 1. Daniel instala WSL 2 + Docker Desktop (requiere administrador y reinicio).
 2. `docker compose build` y `docker compose run --rm agente` dos veces; anotar tamaño de imagen, tiempos y digest.
 3. `docker compose run --rm agente claude` → `/login`; probar MCP `ruflo` y Notion dentro del contenedor.
+
+## 29/10/2026 (tarde) — Arquitectura GitHub y arranque opaco 0.3.0
+
+### Decisiones [U]
+- Tareas: GitHub Issues + Projects (sustituye a Notion). Repos en una organización nueva.
+- La memoria (vault) va en un repo; el agente escribe en la rama `agente` y Daniel fusiona.
+- Arranque: una clave abre el cofre, se baja la memoria, menú de proyectos (descargar o crear).
+
+### Hecho
+- `scripts/credenciales.mjs` (cofre scrypt + AES-256-GCM), `scripts/menu.mjs`, `scripts/ruflo-mcp.mjs`.
+- `preparar.mjs`: cofre → memoria → menú → Claude Code en el proyecto con el MCP de Ruflo y la memoria.
+- Un solo volumen `/estado`; `ENTRYPOINT` = arranque. Flujo de GitHub Actions para publicar en GHCR (sin probar).
+
+### Pruebas [O]
+- `node --test tests/credenciales.test.mjs`: 5/5.
+- e2e con remotos locales y API de GitHub simulada: 13/13 (ver LEEME, «Estado de las pruebas»).
+- Fallos encontrados y corregidos: rutas largas de la tienda en Windows (`core.longpaths`), rama `agente` sin
+  seguimiento (no recibía `main`), argumentos con espacios partidos al lanzar con `shell` en Windows.
+
+### Pendiente
+- Dónde vive el cofre (decisión de Daniel), organización y token reales, Docker, `claude setup-token`.
+- Sacar de TuRinconDeLectura las dependencias de IA y el orquestador `flujo`.

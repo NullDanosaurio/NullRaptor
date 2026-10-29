@@ -1,27 +1,13 @@
-# Uso: copiar .env.example a .env, ajustar rutas y ejecutar `docker compose run --rm agente`.
+# Para desarrollar el agente en local: `docker compose run --rm agente` (construye desde este repositorio).
+# En cualquier otro equipo basta: docker run -it --rm -v agente:/estado ghcr.io/<org>/agente
 services:
   agente:
     build: .
-    image: ruflo-portable:0.2.0
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      BOVEDA_DIR: /boveda
+    image: ruflo-portable:dev
     volumes:
-      # Memoria documental de Obsidian: solo lectura.
-      - ${BOVEDA_RUTA:?Define BOVEDA_RUTA en .env}:/boveda:ro
-      # Estado de Ruflo por equipo. La política y su ancla de confianza deben viajar juntas.
-      - ruflo-memoria:/agente/.swarm
-      - ruflo-politica:/agente/.claude-flow/policy
-      - ruflo-confianza:/home/node/.config/ruflo
-      # Sesión de Claude Code (OAuth). Se inicia en cada equipo; nunca se copia.
-      - claude-cuenta:/home/node/.claude
+      - agente:/estado
     stdin_open: true
     tty: true
 
 volumes:
-  ruflo-memoria:
-  ruflo-politica:
-  ruflo-confianza:
-  claude-cuenta:
+  agente:

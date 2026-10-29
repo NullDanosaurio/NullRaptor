@@ -1,8 +1,9 @@
 # Agente portátil: Ruflo 3.59.17 + Claude Code 2.1.308 (versiones fijadas en package-lock.json).
+# Arranque: docker run -it --rm -v agente:/estado ghcr.io/<org>/agente   → clave → memoria → menú de proyectos.
 # shortcut: imagen base fijada por etiqueta exacta, sin digest; añadir @sha256 tras el primer pull verificado.
 FROM node:24.22.1-bookworm-slim
 
-# git para worktrees. Sin compiladores: no se construyen módulos nativos.
+# git para memoria y proyectos. Sin compiladores: no se construyen módulos nativos.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
  && rm -rf /var/lib/apt/lists/*
@@ -17,18 +18,19 @@ RUN npm ci --ignore-scripts --no-audit --no-fund \
 
 COPY . .
 
-# Todo el estado por equipo vive en volúmenes (ver compose.yaml); la imagen no lleva credenciales.
-ENV HOME=/home/node \
-    CLAUDE_CONFIG_DIR=/home/node/.claude \
-    CLAUDE_FLOW_MODE=v3 \
-    CLAUDE_FLOW_MAX_AGENTS=3 \
-    CLAUDE_FLOW_TOPOLOGY=hierarchical \
+# Todo el estado de cada equipo vive en un único volumen /estado: memoria y proyectos clonados,
+# memoria y política de Ruflo (junto a su ancla en ~/.config/ruflo) y la configuración de Claude.
+ENV HOME=/estado/home \
+    CLAUDE_CONFIG_DIR=/estado/home/.claude \
+    TRABAJO_DIR=/estado/trabajo \
     DISABLE_AUTOUPDATER=1 \
     npm_config_update_notifier=false \
     PATH=/agente/node_modules/.bin:$PATH
-
-RUN mkdir -p /agente/.swarm /agente/.claude-flow/policy /home/node/.config/ruflo /home/node/.claude \
- && chown -R node:node /agente /home/node
+RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/ruflo/swarm /estado/ruflo/policy \
+ && ln -s /estado/ruflo/swarm /agente/.swarm \
+ && ln -s /estado/ruflo/policy /agente/.claude-flow/policy \
+ && chown -R node:node /agente /estado
 USER node
+VOLUME /estado
 
-CMD ["node", "scripts/verificar.mjs"]
+ENTRYPOINT ["node", "/agente/scripts/preparar.mjs"]
