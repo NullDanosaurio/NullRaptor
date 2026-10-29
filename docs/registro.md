@@ -65,3 +65,6 @@
 ### Pendiente
 - Dónde vive el cofre (decisión de Daniel), organización y token reales, Docker, `claude setup-token`.
 - Sacar de TuRinconDeLectura las dependencias de IA y el orquestador `flujo`.
+
+### Decisión [U] 29/10/2026
+- El cofre `credenciales.cifrado` se versiona y va dentro de la imagen. Clave mínima subida a 20 caracteres (6 palabras al azar).

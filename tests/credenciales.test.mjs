@@ -22,7 +22,7 @@ test('rechaza un cofre alterado', () => {
 });
 
 test('exige una clave mínima', () => {
-  assert.throws(() => cifrar(texto, 'corta'), /12 caracteres/);
+  assert.throws(() => cifrar(texto, 'diecinueve-caracter'), /20 caracteres/);
 });
 
 test('lee formato .env con comentarios y comillas', () => {

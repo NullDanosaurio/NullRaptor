@@ -41,7 +41,13 @@ Un archivo `credenciales.cifrado` (scrypt + AES-256-GCM, solo con `node:crypto`)
 
 Crear o renovar: escribir esas líneas en `.env.credenciales` (no se versiona), ejecutar
 `node scripts/credenciales.mjs crear .env.credenciales credenciales.cifrado` y **borrar** `.env.credenciales`.
-`listar` muestra los nombres guardados, nunca los valores. Clave mínima de 12 caracteres; recomendada: 6 palabras al azar.
+`listar` muestra los nombres guardados, nunca los valores.
+
+**Decisión [U] 29/10/2026: el cofre se versiona y viaja dentro de la imagen** para arrancar con una sola orden y la
+clave. Consecuencia: cualquiera con la imagen puede intentar adivinar la clave sin conexión. Por eso:
+- clave de al menos 20 caracteres; usar **6 palabras al azar** (no frases conocidas ni reutilizadas);
+- tokens con el mínimo permiso (solo la organización) y con caducidad; renovarlos rehaciendo el cofre;
+- si se sospecha que la clave se ha filtrado: revocar los tokens en GitHub y en Claude, y crear un cofre nuevo.
 
 Los tokens solo existen en la memoria de los procesos: git los recibe por variables de entorno (ni en disco ni en
 `.git/config`) y la clave no pasa a los procesos hijos.
