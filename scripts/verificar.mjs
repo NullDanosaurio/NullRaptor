@@ -4,6 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const proyecto = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,17 +44,15 @@ try {
   await cliente.close().catch(() => {});
 }
 
-// Vault de Obsidian: debe poder leerse y no debe poder escribirse.
+// Memoria (vault de Obsidian clonado por preparar.mjs): debe tener notas y estar en la rama del agente.
 const boveda = process.env.BOVEDA_DIR;
 if (!boveda) {
   anotar('boveda', true, { omitida: 'BOVEDA_DIR no definida' });
 } else {
-  let notas = 0;
+  let notas = 0, rama = null, error = null;
   const contar = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (e.name.startsWith('.')) continue; const p = path.join(d, e.name); if (e.isDirectory()) contar(p); else if (e.name.endsWith('.md')) notas++; } };
-  let lectura = null, soloLectura = false;
-  try { contar(boveda); } catch (e) { lectura = String(e.message); }
-  try { fs.writeFileSync(path.join(boveda, '.prueba-escritura'), 'x'); fs.rmSync(path.join(boveda, '.prueba-escritura')); } catch { soloLectura = true; }
-  anotar('boveda', !lectura && notas > 0 && soloLectura, { notas, soloLectura, error: lectura ?? undefined });
+  try { contar(boveda); rama = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: boveda, encoding: 'utf8' }).trim(); } catch (e) { error = String(e.message); }
+  anotar('boveda', !error && notas > 0 && rama === 'agente', { notas, rama, error: error ?? undefined });
 }
 
 console.log(JSON.stringify(informe, null, 2));
