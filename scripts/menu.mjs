@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { guardarEstado, leerEstado } from './mcp.mjs';
+import { buscarPorDescripcion, guardarEstado, leerEstado } from './mcp.mjs';
 
 export function proyectosConocidos(memoria) {
   const dir = path.join(memoria, 'Proyectos');
@@ -83,13 +83,24 @@ export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
   lista.forEach((p, i) => console.error(`  ${i + 1}. ${p.nombre}${fs.existsSync(destino(p.nombre)) ? '' : '  (se descargará)'}`));
   const { hoy: mcpHoy = [], ultimaExploracion } = leerEstado(memoria);
   const cuando = ultimaExploracion === new Date().toISOString().slice(0, 10) ? 'hoy' : `el ${ultimaExploracion}`;
-  console.error(`  n. Proyecto nuevo${mcpHoy.length ? `\n  m. Servidores MCP recomendados ${cuando} (${mcpHoy.length})` : ''}\n  s. Salir`);
+  console.error(`  n. Proyecto nuevo${mcpHoy.length ? `\n  m. Servidores MCP recomendados ${cuando} (${mcpHoy.length})` : ''}\n  b. Buscar un servidor MCP por descripción\n  s. Salir`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
   try {
     for (;;) {
       const r = (await rl.question('Elige: ')).trim().toLowerCase();
       if (r === 's') return null;
       if (r === 'm' && mcpHoy.length) { await revisarMcp(rl, memoria, mcpHoy, git); continue; }
+      if (r === 'b') {
+        const descripcion = await rl.question('Describe con tus palabras qué necesitas: ');
+        try {
+          console.error('Buscando en el registro oficial de MCP…');
+          const { terminos, elegidos } = await buscarPorDescripcion(descripcion, memoria);
+          console.error(`Busqué: ${terminos.join(', ')}`);
+          if (elegidos.length) await revisarMcp(rl, memoria, elegidos, git);
+          else console.error('No hay servidores instalables para eso en el registro. Prueba a describirlo de otra forma.');
+        } catch (e) { console.error(`No se pudo buscar: ${e.message}`); }
+        continue;
+      }
       if (r === 'n') {
         const nombre = (await rl.question('Nombre del repositorio: ')).trim();
         if (!NOMBRE_VALIDO.test(nombre)) { console.error('Nombre no válido (letras, números, . _ -).'); continue; }

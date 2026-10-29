@@ -67,6 +67,10 @@ Los tokens solo existen en la memoria de los procesos: git los recibe por variab
   `instalar`. Solo se admiten paquetes npm con versión exacta (`npx -y paquete@x.y.z`) o remotos `https` sin
   cabeceras; pypi/docker aún no. Las variables secretas van al cofre; si falta una obligatoria, el servidor no se
   activa. Se aplican al abrir un proyecto.
+- **Buscar por descripción** (menú → `b`): describes en español lo que necesitas; Claude (sin herramientas) saca de
+  1 a 6 términos en inglés, se busca en el registro y Claude devuelve **de 0 a 3** que de verdad encajen (si nada
+  sirve, lo dice). Se instalan igual que los del día. Ejemplo real: «calendario y recordatorios» → 3 servidores de
+  calendario; «vigilar mi impresora Elegoo» → ninguno instalable hoy.
 - A mano: `node scripts/preparar.mjs node scripts/mcp.mjs explorar [--forzar]`.
 
 ## Flujo automático sobre un proyecto
