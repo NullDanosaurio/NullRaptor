@@ -157,7 +157,8 @@ Piezas: `scripts/preparar.mjs` (arranque), `scripts/credenciales.mjs` (cofre), `
 | Menú: descarga un proyecto conocido; crea uno nuevo (API simulada), nota en la memoria y rama subida | [O] e2e con GitHub falso |
 | MCP lanzado dentro de un proyecto no deja archivos en él | [O] |
 | API real de GitHub, organización y token | [?] falta la organización |
-| Construir y arrancar la imagen; publicar en GHCR | [?] Docker no instalado |
+| Construir la imagen y arrancarla con el cofre (Docker 29.9.2 en Windows) | [O] |
+| Publicar en GHCR (workflow `imagen`) | [?] sin comprobar |
 | `claude setup-token` dentro del contenedor | [?] requiere a Daniel |
 | Otro equipo | [?] pendiente |
 
