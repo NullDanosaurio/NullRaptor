@@ -9,6 +9,8 @@ import path from 'node:path';
 import { buscar, enlaces, frontmatter, leerNota, listarNotas, rutaSegura } from '../panel/lib/boveda.mjs';
 import { Chats } from '../panel/lib/chats.mjs';
 import { crearServidor, escrituraPermitida, hostPermitido } from '../panel/servidor.mjs';
+import { BOVEDA, listarProyectos, rutaProyecto } from '../panel/lib/trabajo.mjs';
+import { AGENTE_REPO, opcionesDelMenu } from '../scripts/menu.mjs';
 
 function entorno() {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-'));
@@ -129,4 +131,18 @@ test('API del panel', async (t) => {
   assert.equal((await pedir(port, 'POST', `/api/chats/${creado.datos.id}/mensajes`, { cuerpo: { texto: '   ' }, cab })).estado, 400);
   assert.equal((await pedir(port, 'POST', `/api/chats/${creado.datos.id}/cerrar`, { cab })).estado, 200);
   assert.equal((await pedir(port, 'POST', `/api/chats/${creado.datos.id}/cerrar`, { cab })).estado, 404);
+});
+
+test('Nullraptor y la bóveda salen primero (menú y panel); la bóveda abre la memoria', () => {
+  const { memoria, trabajo } = entorno();
+  const menu = opcionesDelMenu(memoria);
+  assert.deepEqual(menu.map((p) => p.nombre), ['Nullraptor', 'Bóveda', 'Demo']);
+  assert.equal(menu[0].repo, AGENTE_REPO);
+  fs.mkdirSync(path.join(trabajo, 'proyectos', 'Nullraptor'));
+  const lista = listarProyectos(trabajo, memoria);
+  assert.deepEqual(lista.map((p) => p.nombre), ['Nullraptor', 'Bóveda', 'Demo']);
+  assert.ok(lista[1].local);
+  assert.equal(rutaProyecto(trabajo, BOVEDA, memoria), memoria);
+  assert.equal(rutaProyecto(trabajo, BOVEDA), null); // sin bóveda configurada
+  assert.deepEqual(listarProyectos(trabajo, null).map((p) => p.nombre), ['Nullraptor', 'Demo']);
 });

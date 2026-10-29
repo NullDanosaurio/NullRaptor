@@ -89,7 +89,7 @@ export function crearServidor({ trabajo, memoria }) {
       hoy: new Date().toISOString().slice(0, 10),
     }),
     'GET /api/proyectos': () => listarProyectos(trabajo, memoria),
-    'GET /api/proyecto': (q) => detalleProyecto(trabajo, q.get('nombre')) ?? [404, { error: 'Proyecto no encontrado en este equipo.' }],
+    'GET /api/proyecto': (q) => detalleProyecto(trabajo, q.get('nombre'), memoria) ?? [404, { error: 'Proyecto no encontrado en este equipo.' }],
     'GET /api/boveda/notas': () => (memoria ? listarNotas(memoria) : [503, sinBoveda()]),
     'GET /api/boveda/nota': (q) => (memoria ? leerNota(memoria, q.get('ruta')) ?? [404, { error: 'Nota no encontrada.' }] : [503, sinBoveda()]),
     'GET /api/boveda/buscar': (q) => (memoria ? buscar(memoria, q.get('q')) : [503, sinBoveda()]),
@@ -97,7 +97,7 @@ export function crearServidor({ trabajo, memoria }) {
     'GET /api/chats': () => ({ abiertos: chats.lista(), guardados: chats.guardados() }),
     'GET /api/chats/guardado': (q) => chats.leerGuardado(q.get('archivo')) ?? [404, { error: 'Chat no encontrado.' }],
     'POST /api/chats': async (_q, cuerpo) => {
-      const ruta = rutaProyecto(trabajo, cuerpo.proyecto);
+      const ruta = rutaProyecto(trabajo, cuerpo.proyecto, memoria);
       if (!ruta) return [404, { error: 'Proyecto no encontrado en este equipo.' }];
       return [201, { id: chats.crear(ruta) }];
     },

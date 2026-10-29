@@ -15,7 +15,17 @@ export function proyectosConocidos(memoria) {
   });
 }
 
-const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+// Repositorio del propio agente: siempre sale primero en el menú, aunque la memoria no tenga su nota.
+export const AGENTE_REPO = 'https://github.com/NullDanosaurio/NullRaptor.git';
+
+// Menú: 1 = el agente (Nullraptor), 2 = la bóveda (la memoria, rama agente), después el resto de la memoria.
+export function opcionesDelMenu(memoria, agenteRepo = AGENTE_REPO) {
+  const conocidos = proyectosConocidos(memoria);
+  const agente = conocidos.find((p) => p.nombre.toLowerCase() === 'nullraptor') ?? { nombre: 'Nullraptor', repo: agenteRepo };
+  return [agente, { nombre: 'Bóveda', boveda: true }, ...conocidos.filter((p) => p !== agente)];
+}
+
+const NOMBRE_VALIDO =/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
 async function crearRepositorio(nombre, env) {
   const { GITHUB_TOKEN: token, GITHUB_ORG: org } = env;
@@ -77,10 +87,11 @@ async function revisarMcp(rl, memoria, elegidos, git) {
 
 // Devuelve la carpeta del proyecto elegido (clonado si hacía falta) o null para salir.
 export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
-  const lista = proyectosConocidos(memoria);
+  const lista = opcionesDelMenu(memoria, env.AGENTE_REPO);
   const destino = (nombre) => path.join(trabajo, 'proyectos', nombre);
-  console.error('\nProyectos conocidos:');
-  lista.forEach((p, i) => console.error(`  ${i + 1}. ${p.nombre}${fs.existsSync(destino(p.nombre)) ? '' : '  (se descargará)'}`));
+  const nota = (p) => (p.boveda ? '  (memoria, rama agente)' : fs.existsSync(destino(p.nombre)) ? '' : '  (se descargará)');
+  console.error('\nProyectos:');
+  lista.forEach((p, i) => console.error(`  ${i + 1}. ${p.nombre}${nota(p)}`));
   const { hoy: mcpHoy = [], ultimaExploracion } = leerEstado(memoria);
   const cuando = ultimaExploracion === new Date().toISOString().slice(0, 10) ? 'hoy' : `el ${ultimaExploracion}`;
   console.error(`  n. Proyecto nuevo${mcpHoy.length ? `\n  m. Servidores MCP recomendados ${cuando} (${mcpHoy.length})` : ''}\n  b. Buscar un servidor MCP por descripción\n  s. Salir`);
@@ -111,6 +122,7 @@ export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
         return destino(nombre);
       }
       const p = lista[Number(r) - 1];
+      if (p?.boveda) return memoria;
       if (p) { clonar(p.repo, destino(p.nombre)); return destino(p.nombre); }
       console.error('Opción no válida.');
     }

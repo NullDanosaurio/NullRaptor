@@ -19,20 +19,31 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 | Proyectos | Un repo privado cada uno | Deben funcionar sin IA: el agente no deja archivos suyos en ellos |
 | Tareas | GitHub Issues + Projects | Etiqueta `agente` para las tareas del agente. Sustituye a Notion |
 
-## Arranque en Windows sin Docker (doble clic)
+## Arranque en Windows (doble clic, siempre en Docker)
 
-`Nullraptor.cmd` (o un acceso directo a él en el escritorio). Necesita Node 24, git y `npm ci` hecho en esta
-carpeta, y el cofre en `~/.nullraptor/`. La clave se pide **solo la primera vez** en cada equipo: se recuerda en
-`%LOCALAPPDATA%\Nullraptor\clave.dpapi`, cifrada con DPAPI (solo tu usuario de Windows en ese equipo puede leerla;
-no se sube a ninguna parte). Si deja de abrir el cofre, se olvida y se vuelve a pedir. Para olvidarla a mano,
-borra ese archivo. Contrapartida: quien entre en tu sesión de Windows puede abrir el agente sin la clave.
+Decisión [U] 29/10/2026: Nullraptor **nunca corre sobre el sistema**, solo en Docker, para que funcione igual en
+cualquier equipo con Docker. Flujo: lanzador → Docker (se instala y arranca si hace falta) → imagen de GitHub
+(`ghcr.io/nulldanosaurio/nullraptor:main`) → contenedor con el servidor y el panel → navegador en
+`http://localhost:4321`. El contenedor (`nullraptor`) sigue en marcha al cerrar la ventana; si ya lo está, el
+lanzador solo abre el navegador. Pararlo: `docker stop nullraptor`.
 
 **Equipo nuevo desde el USB:** doble clic en `Instalar Nullraptor.cmd` (raíz del USB), que ejecuta
-`Nullraptor\instalar.ps1`, copia de `scripts/instalar.ps1`. Instala git y Node con winget si faltan, copia el
-cofre del USB a `~/.nullraptor/` (si ya hay uno distinto, pregunta), clona o actualiza el agente en
-`%USERPROFILE%\nullraptor-trabajo\agente`, hace `npm ci`, crea el acceso directo y lo arranca. Al terminar refresca
-la copia del USB. El `.cmd` es una línea:
-`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Nullraptor\instalar.ps1"`.
+`Nullraptor\instalar.ps1`, copia de `scripts/instalar.ps1`. Instala Docker Desktop con winget si falta (pide
+administrador; si Windows pide reiniciar por WSL 2, reinicia y repite) y lo arranca, copia el cofre del USB a
+`~/.nullraptor/` (si ya hay uno distinto, pregunta), descarga la imagen (si el registro pide sesión, la pide una
+vez: usuario de GitHub y token clásico con `read:packages`), deja el lanzador en `%LOCALAPPDATA%\Nullraptor`
+(sacado de la imagen), crea el acceso directo y arranca. Al terminar refresca la copia del USB desde la imagen.
+
+**Lanzador** (`scripts/arrancar.ps1`; acceso directo «Nullraptor» o `Nullraptor.cmd` en el repo): actualiza la
+imagen (sin red, usa la que haya), prueba la clave con un contenedor de un solo uso y levanta el panel. La clave se
+pide **solo la primera vez** en cada equipo: se recuerda en `%LOCALAPPDATA%\Nullraptor\clave.dpapi`, cifrada con
+DPAPI (solo tu usuario de Windows en ese equipo puede leerla). Si deja de abrir el cofre, se olvida y se vuelve a
+pedir. Contrapartidas: quien entre en tu sesión de Windows puede abrir el agente sin la clave, y la clave va en
+`AGENTE_CLAVE` del contenedor mientras está en marcha (`docker inspect` la muestra a quien controle Docker en el
+equipo). Otra imagen: variable `NULLRAPTOR_IMAGEN` (p. ej. `nullraptor:dev`).
+
+**Proyectos:** el menú y el panel muestran primero **Nullraptor** (el propio agente, descargado en el primer
+arranque) y la **Bóveda** (se trabaja sobre la memoria, rama `agente`), y después el resto de la memoria.
 
 ## Arranque en cualquier equipo con Docker
 

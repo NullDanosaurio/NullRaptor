@@ -11,7 +11,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { abrirCofre } from './credenciales.mjs';
-import { elegirProyecto } from './menu.mjs';
+import { elegirProyecto, opcionesDelMenu } from './menu.mjs';
 import { aConfigMcp, explorarDelDia, leerEstado } from './mcp.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,6 +80,13 @@ if (env.AGENTE_GIT_EMAIL) git(['config', 'user.email', env.AGENTE_GIT_EMAIL], me
 console.error(`Memoria lista (rama ${RAMA_MEMORIA}).`);
 
 const ejecutar = (orden, args, cwd) => spawnSync(orden, args, { cwd, stdio: 'inherit', env: { ...env, BOVEDA_DIR: memoria, TRABAJO_DIR: trabajo }, shell: /\.(cmd|bat)$/i.test(orden) }).status ?? 1; // shell solo para .cmd (Windows)
+
+// El propio agente queda descargado como proyecto desde el primer arranque (menú y panel; no en la verificación).
+if (process.argv.length > 2 || process.stdin.isTTY) {
+  const [nullraptor] = opcionesDelMenu(memoria, env.AGENTE_REPO);
+  try { clonarOActualizar(nullraptor.repo, path.join(trabajo, 'proyectos', nullraptor.nombre)); }
+  catch (e) { console.warn(`Aviso: no se pudo descargar ${nullraptor.nombre} (${e.message.split('\n')[0]}).`); }
+}
 
 if (process.argv.length > 2) process.exit(ejecutar(process.argv[2], process.argv.slice(3), agente));
 if (!process.stdin.isTTY) process.exit(ejecutar(process.execPath, ['scripts/verificar.mjs'], agente));

@@ -9,9 +9,12 @@ const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 }).trim();
 
 export const carpetaProyectos = (trabajo) => path.join(trabajo, 'proyectos');
+/** La bóveda también es un proyecto: se trabaja sobre la memoria (rama agente). */
+export const BOVEDA = 'Bóveda';
 
 /** Carpeta de un proyecto del equipo por su nombre; null si el nombre no es válido o no existe. */
-export function rutaProyecto(trabajo, nombre) {
+export function rutaProyecto(trabajo, nombre, memoria = null) {
+  if (nombre === BOVEDA) return memoria;
   if (typeof nombre !== 'string' || !NOMBRE_VALIDO.test(nombre)) return null;
   const ruta = path.join(carpetaProyectos(trabajo), nombre);
   try { return fs.statSync(ruta).isDirectory() ? ruta : null; } catch { return null; }
@@ -41,9 +44,12 @@ export function listarProyectos(trabajo, memoria) {
   })();
   const conocidos = memoria ? proyectosConocidos(memoria) : [];
   const notas = memoria ? (() => { try { return fs.readdirSync(path.join(memoria, 'Proyectos')).filter((f) => f.endsWith('.md')).map((f) => f.slice(0, -3)); } catch { return []; } })() : [];
-  const nombres = [...new Set([...locales, ...conocidos.map((c) => c.nombre)])].sort((a, b) => a.localeCompare(b, 'es'));
+  // Primero el propio agente y la bóveda; después el resto por orden alfabético.
+  const orden = (n) => (n.toLowerCase() === 'nullraptor' ? 0 : n === BOVEDA ? 1 : 2);
+  const nombres = [...new Set([...locales, ...conocidos.map((c) => c.nombre), ...(memoria ? [BOVEDA] : [])])]
+    .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, 'es'));
   return nombres.map((nombre) => {
-    const ruta = locales.includes(nombre) ? path.join(carpetaProyectos(trabajo), nombre) : null;
+    const ruta = nombre === BOVEDA ? memoria : locales.includes(nombre) ? path.join(carpetaProyectos(trabajo), nombre) : null;
     let flujo = null;
     if (ruta) {
       const f = estadoFlujo(ruta);
@@ -69,8 +75,8 @@ export function listarProyectos(trabajo, memoria) {
 }
 
 /** Detalle de un proyecto del equipo: git, flujo completo y registro en vivo. */
-export function detalleProyecto(trabajo, nombre) {
-  const ruta = rutaProyecto(trabajo, nombre);
+export function detalleProyecto(trabajo, nombre, memoria = null) {
+  const ruta = rutaProyecto(trabajo, nombre, memoria);
   if (!ruta) return null;
   return { nombre, git: datosGit(ruta), flujo: estadoFlujo(ruta) };
 }
