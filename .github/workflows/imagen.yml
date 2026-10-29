@@ -1,5 +1,5 @@
-# Construye la imagen y la publica en GitHub Container Registry al subir a main o crear una etiqueta v*.
-# Sin probar todavía: requiere el repositorio en GitHub.
+# Construye la imagen en GitHub, la arranca de verdad en Linux y, solo si todo pasa, la publica en
+# GitHub Container Registry (ghcr.io/<cuenta>/agente) al subir a main, crear una etiqueta v* o lanzarlo a mano.
 name: imagen
 on:
   push:
@@ -14,7 +14,33 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci --ignore-scripts && npm test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - name: Pruebas unitarias
+        run: npm ci --ignore-scripts && npm test
+
+      - name: Construir la imagen
+        run: docker build -t agente:prueba . && docker image ls agente:prueba
+
+      - name: Arrancar el contenedor dos veces (memoria, MCP de Ruflo y persistencia)
+        run: |
+          set -euo pipefail
+          # Memoria mínima de prueba, servida desde un repositorio local montado en solo lectura.
+          mem=$(mktemp -d)
+          mkdir -p "$mem/Proyectos"
+          printf -- '---\ntipo: proyecto\n---\n# Prueba\n' > "$mem/Proyectos/Prueba.md"
+          git -C "$mem" init -q -b main
+          git -C "$mem" add .
+          git -C "$mem" -c user.name=ci -c user.email=ci@local commit -qm base
+          git clone -q --bare "$mem" /tmp/memoria.git
+          sudo chown -R 1000:1000 /tmp/memoria.git   # usuario node del contenedor: evita «dubious ownership»
+          arrancar() { docker run --rm -v agente-prueba:/estado -v /tmp/memoria.git:/memoria.git:ro -e MEMORIA_REPO=/memoria.git agente:prueba; }
+          arrancar | tee primero.json
+          arrancar | tee segundo.json
+          grep -q '"ok": true' segundo.json
+          grep -q '"arranques": 2' segundo.json   # la memoria de Ruflo persiste en el volumen
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -28,7 +54,8 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha
-      - uses: docker/build-push-action@v6
+      - name: Publicar
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
