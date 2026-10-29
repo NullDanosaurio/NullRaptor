@@ -19,6 +19,7 @@ const transporte = new StdioClientTransport({
   args: [path.join(proyecto, 'node_modules/ruflo/bin/ruflo.js'), 'mcp', 'start'],
   cwd: proyecto,
   stderr: 'pipe',
+  env: process.env, // el SDK solo pasa PATH/HOME…; Ruflo necesita sus CLAUDE_FLOW_* (ruta de memoria, motor)
 });
 const limite = setTimeout(() => { console.error('Tiempo agotado conectando con el MCP'); process.exit(1); }, 60000);
 
