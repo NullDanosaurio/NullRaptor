@@ -1,5 +1,5 @@
 // Inicio: todo de un vistazo — proyectos y su flujo, cambios de la bóveda, chats y MCP del día.
-import { ArrowUpRight, BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, Plug, Sparkles } from 'lucide-react';
+import { ArrowUpRight, BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Sparkles } from 'lucide-react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
 import { Cabecera, Cargando, Fallo, Insignia, Punto, Tarjeta, Vacio } from '../componentes/ui.jsx';
 
@@ -56,7 +56,7 @@ export default function Inicio() {
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
-  const { proyectos, boveda, mcp, chats, guardados } = datos;
+  const { proyectos, boveda, mcp, chats, guardados, remoto = [] } = datos;
   const enCurso = proyectos.filter((p) => p.flujo?.bloqueo?.vivo);
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -65,6 +65,15 @@ export default function Inicio() {
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
         <Cabecera titulo={`${saludo()}, Dano`} subtitulo={<span className="capitalize">{fecha}</span>} />
         <Fallo error={error} className="mb-4" />
+        {remoto.length > 0 && (
+          <a href="#/remoto" className="mb-4 flex items-center gap-2.5 rounded-xl border border-aviso/25 bg-aviso/10 px-3 py-2 text-[13px] text-aviso hover:bg-aviso/15">
+            <MonitorSmartphone className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {remoto.length === 1 ? '1 sesión remota abierta' : `${remoto.length} sesiones remotas abiertas`}: {remoto.map((s) => s.proyecto).join(', ')}
+            </span>
+            <span className="shrink-0">Ver →</span>
+          </a>
+        )}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Cifra etiqueta="Proyectos" valor={proyectos.length} detalle={`${proyectos.filter((p) => p.local).length} en este equipo`} icono={FolderGit2} href="#/trabajo" />

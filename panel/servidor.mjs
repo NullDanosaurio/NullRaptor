@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { crearAcceso, hostRed, leerOCrearCodigo, paginaEntrar } from './lib/acceso.mjs';
 import { buscar, cambiosRecientes, estadoGit, leerNota, listarNotas } from './lib/boveda.mjs';
 import { Chats } from './lib/chats.mjs';
+import { Remoto } from './lib/remoto.mjs';
 import { detalleProyecto, estadoMcp, listarProyectos, rutaProyecto } from './lib/trabajo.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -108,7 +109,7 @@ async function entrar(req, res, url, acceso, permitido) {
   html(res, r === 'bloqueado' ? 429 : 401, paginaEntrar(r === 'bloqueado' ? 'Demasiados intentos: espera un minuto.' : 'Código incorrecto.'));
 }
 
-export function crearServidor({ trabajo, memoria, acceso = null }) {
+export function crearServidor({ trabajo, memoria, acceso = null, remoto = new Remoto({ trabajo, memoria }) }) {
   const permitido = acceso ? hostRed : hostPermitido;
   const chats = new Chats({ trabajo, memoria });
   const sinBoveda = () => ({ error: 'Sin bóveda: arranca el panel con preparar.mjs (BOVEDA_DIR).' });
@@ -120,8 +121,11 @@ export function crearServidor({ trabajo, memoria, acceso = null }) {
       mcp: estadoMcp(memoria),
       chats: chats.lista(),
       guardados: chats.guardados().slice(0, 5),
+      remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
       hoy: new Date().toISOString().slice(0, 10),
     }),
+    'GET /api/remoto': () => ({ sesiones: remoto.lista(), maxTotal: remoto.maxTotal, maxMs: remoto.maxMs }),
+    'POST /api/remoto/abrir': (_q, cuerpo) => [201, remoto.abrir(cuerpo.proyecto)],
     'GET /api/proyectos': () => listarProyectos(trabajo, memoria),
     'GET /api/proyecto': (q) => detalleProyecto(trabajo, q.get('nombre'), memoria) ?? [404, { error: 'Proyecto no encontrado en este equipo.' }],
     'GET /api/boveda/notas': () => (memoria ? listarNotas(memoria) : [503, sinBoveda()]),
@@ -174,6 +178,14 @@ export function crearServidor({ trabajo, memoria, acceso = null }) {
         return;
       }
 
+      const mr = p.match(/^\/api\/remoto\/([0-9a-f-]{36})\/cerrar$/);
+      if (mr) {
+        if (req.method !== 'POST') { json(res, 405, { error: 'Método no permitido.' }); return; }
+        if (remoto.cerrar(mr[1])) json(res, 200, { ok: true });
+        else json(res, 404, { error: 'Esa sesión remota ya no está abierta.' });
+        return;
+      }
+
       const manejador = rutas[`${req.method} ${p}`];
       if (!manejador) { json(res, 404, { error: 'No existe.' }); return; }
       const cuerpo = req.method === 'POST' ? await leerCuerpo(req) : null;
@@ -197,7 +209,11 @@ if (esPrincipal) {
   const red = process.env.PANEL_RED === '1';
   const archivoCodigo = process.env.PANEL_CODIGO ?? path.join(os.homedir(), '.nullraptor', 'panel-codigo');
   const acceso = red ? crearAcceso(leerOCrearCodigo(archivoCodigo)) : null;
-  crearServidor({ trabajo, memoria, acceso }).listen(puerto, host, () => {
+  // Las sesiones remotas mueren con el panel.
+  const remoto = new Remoto({ trabajo, memoria });
+  process.on('exit', () => remoto.cerrarTodas());
+  for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(senal, () => remoto.cerrarTodas().then(() => process.exit(0)));
+  crearServidor({ trabajo, memoria, acceso, remoto }).listen(puerto, host, () => {
     console.error(`Panel de Nullraptor en http://localhost:${puerto}  (Ctrl+C para cerrar)`);
     if (red) console.error(`Modo red: abierto a la red de casa con código de acceso (en ${archivoCodigo}).`);
     if (!memoria) console.warn('Aviso: sin BOVEDA_DIR, el panel no muestra la bóveda.');

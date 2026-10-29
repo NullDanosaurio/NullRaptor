@@ -1,10 +1,11 @@
 // Estructura del panel: barra lateral (abajo en el móvil) y la vista elegida por la ruta.
-import { BookOpen, FolderKanban, LayoutDashboard, MessagesSquare } from 'lucide-react';
+import { BookOpen, FolderKanban, LayoutDashboard, MessagesSquare, MonitorSmartphone } from 'lucide-react';
 import { useDatos, useRuta } from './api.js';
 import { cx, Punto } from './componentes/ui.jsx';
 import Boveda from './vistas/Boveda.jsx';
 import Chat from './vistas/Chat.jsx';
 import Inicio from './vistas/Inicio.jsx';
+import Remoto from './vistas/Remoto.jsx';
 import Trabajo from './vistas/Trabajo.jsx';
 
 const VISTAS = [
@@ -12,6 +13,7 @@ const VISTAS = [
   { id: 'chat', nombre: 'Chat', icono: MessagesSquare, componente: Chat },
   { id: 'trabajo', nombre: 'Trabajo', icono: FolderKanban, componente: Trabajo },
   { id: 'boveda', nombre: 'Bóveda', icono: BookOpen, componente: Boveda },
+  { id: 'remoto', nombre: 'Remoto', icono: MonitorSmartphone, componente: Remoto },
 ];
 
 function Logo() {

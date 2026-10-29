@@ -130,8 +130,16 @@ reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cu
 `panel/` (añadido el 29/10/2026). Servidor Node sin dependencias (`panel/servidor.mjs`) + web React/Vite/Tailwind
 (`panel/src`, diseño a partir de componentes de 21st.dev Magic). Secciones: **Inicio** (proyectos, flujo en curso,
 últimos cambios de la bóveda, MCP del día, chats), **Chat** (el mismo de `chat.mjs`: Claude y Codex en solo lectura,
-«Terminar y resumir» escribe en el Diario), **Trabajo** (tareas y fases del flujo en vivo, commits) y **Bóveda**
-(árbol, búsqueda, notas con `[[enlaces]]` y retroenlaces; solo lectura).
+«Terminar y resumir» escribe en el Diario), **Trabajo** (tareas y fases del flujo en vivo, commits), **Bóveda**
+(árbol, búsqueda, notas con `[[enlaces]]` y retroenlaces; solo lectura) y **Remoto**.
+
+**Remoto** (`panel/lib/remoto.mjs`): «Abrir sesión remota» lanza `claude remote-control --capacity 1` en
+`$TRABAJO_DIR/proyectos/<P>` con el entorno de `preparar.mjs` (tokens y `BOVEDA_DIR`, nunca `AGENTE_CLAVE`) para
+seguir desde claude.ai/code o la app del móvil (enlace y QR generado en el navegador). No es una terminal: el panel
+solo abre, enseña el enlace y cierra. Marca la carpeta como de confianza en `.claude.json` (sin eso Claude se niega).
+Una sesión por proyecto, 3 como mucho, se cierran solas a las 4 h y todas al parar el panel. Permisos de Claude por
+defecto: se aprueban desde la app. La primera vez Claude pregunta «Enable Remote Control?» y el panel contesta que
+sí. Si una sesión muere de golpe, la carpeta queda ocupada cerca de un minuto («espera un minuto y vuelve a abrirla»).
 
 ```powershell
 docker run -it --rm -p 127.0.0.1:4321:4321 -v nullraptor:/estado -v "$HOME\.nullraptor:/cofre:ro" ghcr.io/nulldanosaurio/nullraptor node panel/servidor.mjs
