@@ -14,7 +14,7 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Agente (este repo) | GitHub, cuenta personal `NullDano`; imagen en `ghcr.io/nulldano/nullraptor` | Sin credenciales dentro |
+| Agente (este repo) | GitHub, cuenta personal `NullDanosaurio`; imagen en `ghcr.io/nulldanosaurio/nullraptor` | Sin credenciales dentro |
 | Memoria | Repo privado con el vault de Obsidian | El agente escribe solo en la rama `agente`; Daniel fusiona en `main` |
 | Proyectos | Un repo privado cada uno | Deben funcionar sin IA: el agente no deja archivos suyos en ellos |
 | Tareas | GitHub Issues + Projects | Etiqueta `agente` para las tareas del agente. Sustituye a Notion |
@@ -22,13 +22,13 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 ## Arranque en cualquier equipo con Docker
 
 ```powershell
-docker run -it --rm -v nullraptor:/estado ghcr.io/nulldano/nullraptor
+docker run -it --rm -v nullraptor:/estado ghcr.io/nulldanosaurio/nullraptor
 ```
 
 Pide la clave, actualiza la memoria y muestra el menú. Elegido el proyecto, abre Claude Code dentro de él con
 la memoria accesible y el MCP de Ruflo. Todo lo del equipo queda en el volumen `nullraptor` (`/estado`).
 
-Otros modos: `... ghcr.io/nulldano/nullraptor claude` (orden concreta en `/nullraptor`); sin terminal, ejecuta la verificación.
+Otros modos: `... ghcr.io/nulldanosaurio/nullraptor claude` (orden concreta en `/nullraptor`); sin terminal, ejecuta la verificación.
 En un servidor sin terminal, la clave puede pasarse en `AGENTE_CLAVE`.
 
 ## Cofre de credenciales
@@ -38,8 +38,8 @@ Un archivo `credenciales.cifrado` (scrypt + AES-256-GCM, solo con `node:crypto`)
 | Variable | Qué es |
 |---|---|
 | `MEMORIA_REPO` | URL del repo de la memoria |
-| `GITHUB_ORG` | Opcional. Sin ella, los proyectos se crean en la cuenta personal del token (decisión 29/10: `NullDano`) |
-| `GITHUB_TOKEN` | Token *fine-grained* de `NullDano`, todos los repositorios: Contents RW, Administration RW (crear repos), Metadata R; con caducidad |
+| `GITHUB_ORG` | Opcional. Sin ella, los proyectos se crean en la cuenta personal del token (decisión 29/10: `NullDanosaurio`) |
+| `GITHUB_TOKEN` | Token *fine-grained* de `NullDanosaurio`, todos los repositorios: Contents RW, Administration RW (crear repos), Metadata R; con caducidad |
 | `CLAUDE_CODE_OAUTH_TOKEN` | De `claude setup-token` (suscripción de Claude, larga duración) |
 | `AGENTE_GIT_NOMBRE`, `AGENTE_GIT_EMAIL` | Autor de los commits del agente |
 

@@ -1,5 +1,5 @@
 # Para desarrollar el agente en local: `docker compose run --rm nullraptor` (construye desde este repositorio).
-# En cualquier otro equipo basta: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldano/nullraptor
+# En cualquier otro equipo basta: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldanosaurio/nullraptor
 services:
   nullraptor:
     build: .

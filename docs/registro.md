@@ -71,7 +71,7 @@
 
 ## 29/10/2026 (noche) — Tienda sin IA, cuenta personal y MCP diario (0.4.0)
 - Flujo automático movido desde TuRinconDeLectura (`flujo/`, `FLUJO_PROYECTO`); la tienda pasa `npm run check` sin IA.
-- [U] Cuenta personal `NullDano` (no es organización: la API de GitHub lo confirma). `GITHUB_ORG` pasa a opcional.
+- [U] Cuenta personal `NullDanosaurio` (no es organización: la API de GitHub lo confirma). `GITHUB_ORG` pasa a opcional.
 - [U] Recomendación diaria de 3 servidores MCP con instalación autorizada. Fuente: registro oficial; mcpmarket.com
   descartado por su robots.txt (prohíbe agentes de Claude).
 - Pruebas: 16/16 unitarias; exploración real (40 s, 3 recomendaciones coherentes); menú: cancelar no instala,
@@ -79,6 +79,8 @@
 - Fallo encontrado y corregido: el registro exige búsquedas de 3+ caracteres («3d» devolvía 422).
 
 ## 29/10/2026 — Rebranding: Ruflo Portable → Nullraptor
-- [U] Nombre elegido por Daniel. Repositorio `NullDano/Nullraptor`, imagen `ghcr.io/nulldano/nullraptor`,
+- [U] Nombre elegido por Daniel. Repositorio `NullDanosaurio/NullRaptor`, imagen `ghcr.io/nulldanosaurio/nullraptor`,
   carpeta `C:\Desarrollo\Nullraptor`, contenedor en `/nullraptor`, volumen `nullraptor`, banner al arrancar.
 - Se mantienen la rama `agente` de la memoria y las variables `AGENTE_*` del cofre (describen el papel, no la marca).
+- Corrección 29/10/2026: la cuenta de Daniel es **`NullDanosaurio`**; `NullDano` es otra persona (cuenta de 2019,
+  API de GitHub). Repositorio `NullDanosaurio/NullRaptor` (privado), imagen `ghcr.io/nulldanosaurio/nullraptor`.

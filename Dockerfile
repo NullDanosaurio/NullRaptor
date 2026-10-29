@@ -1,5 +1,5 @@
 # Nullraptor, agente personal portátil: Ruflo 3.59.17 + Claude Code 2.1.308 (versiones fijadas en package-lock.json).
-# Arranque: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldano/nullraptor   → clave → memoria → menú de proyectos.
+# Arranque: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldanosaurio/nullraptor   → clave → memoria → menú de proyectos.
 # shortcut: imagen base fijada por etiqueta exacta, sin digest; añadir @sha256 tras el primer pull verificado.
 FROM node:24.22.1-bookworm-slim
 
