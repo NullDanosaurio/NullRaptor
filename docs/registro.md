@@ -84,3 +84,13 @@
 - Se mantienen la rama `agente` de la memoria y las variables `AGENTE_*` del cofre (describen el papel, no la marca).
 - Corrección 29/10/2026: la cuenta de Daniel es **`NullDanosaurio`**; `NullDano` es otra persona (cuenta de 2019,
   API de GitHub). Repositorio `NullDanosaurio/NullRaptor` (privado), imagen `ghcr.io/nulldanosaurio/nullraptor`.
+
+## 29/10/2026 — Imagen publicada (CI en verde)
+- Ejecuciones #7 y #8 de «imagen» en verde: pruebas, build, contenedor arrancado dos veces en Linux con memoria
+  persistente (arranques 1 → 2), bóveda clonada en rama `agente`, MCP de Ruflo con 367 herramientas.
+- Paquete `ghcr.io/nulldanosaurio/nullraptor` publicado (privado).
+- Fallos encontrados por la CI: (1) el enlace `node_modules` del worktree es un symlink en Linux y contaba como
+  cambio fuera de alcance; (2) el SDK de MCP solo hereda PATH/HOME, así que Ruflo no recibía sus `CLAUDE_FLOW_*` y
+  guardaba la memoria con el motor AgentDB fuera del volumen. Ahora: `CLAUDE_FLOW_MEMORY_PATH=/estado/ruflo/swarm`,
+  `CLAUDE_FLOW_DISABLE_BRIDGE=1` (sql.js) y variables pasadas explícitamente. (3) La verificación de memoria era
+  laxa; ahora compara el JSON de Ruflo.
