@@ -1,7 +1,7 @@
 // Agentes del flujo: implementador (Codex o simulado para verificación) y revisor (Claude).
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTE, BIN, ErrorInfra, MIN, RAIZ, ejecutar, entornoSeguro } from './comun.mjs';
+import { AGENTE, BIN, ErrorInfra, MIN, RAIZ, ejecutar, entornoSeguro, git } from './comun.mjs';
 
 const PROYECTO = path.basename(RAIZ);
 
@@ -59,11 +59,23 @@ function promptRevisor(tarea, diff, comprobaciones) {
  * Ejecuta el implementador. `simulador` (opcional) es el nombre de un script en
  * tests/flujo/simuladores/ que sustituye a Codex para verificar los controles.
  */
-export async function implementar({ wt, dir, n, tarea, diagnostico, simulador }) {
+export async function implementar({ wt, dir, n, tarea, diagnostico, simulador, desdeRama }) {
   const log = path.join(dir, `intento-${n}-implementador.log`);
   const entrada = promptImplementador(tarea, diagnostico);
   let r;
   let agente;
+  if (desdeRama) {
+    // Turno de revisión: el trabajo ya lo hizo Codex en su turno; se trae de su rama (el alcance se comprueba después).
+    // Sin detección de renombrados: un renombrado llega como borrado + alta.
+    const base = git(['merge-base', 'HEAD', desdeRama], wt);
+    const cambios = git(['diff', '--name-status', '--no-renames', base, desdeRama], wt).split('\n').filter(Boolean).map((l) => l.split('\t'));
+    const traer = cambios.filter(([e]) => e !== 'D').map(([, f]) => f);
+    const borrar = cambios.filter(([e]) => e === 'D').map(([, f]) => f);
+    if (traer.length) git(['checkout', desdeRama, '--', ...traer], wt);
+    if (borrar.length) git(['rm', '-q', '--', ...borrar], wt);
+    fs.writeFileSync(log, `Trabajo traído de ${desdeRama}: ${cambios.map((c) => c.join(' ')).join(', ') || '(nada)'}\n`);
+    return { agente: `codex (${desdeRama})`, modelo: null, ms: 0 };
+  }
   if (simulador) {
     const script = path.join(DIR_SIMULADORES, `${simulador}.mjs`);
     if (!fs.existsSync(script)) throw new ErrorInfra(`Simulador desconocido: ${simulador}`);

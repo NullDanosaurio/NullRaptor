@@ -1,0 +1,2 @@
+# Ruflo reescribe sus helpers con LF al arrancar: así no aparecen como modificados.
+.claude/helpers/** text eol=lf

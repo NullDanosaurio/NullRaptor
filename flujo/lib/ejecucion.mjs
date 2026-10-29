@@ -113,7 +113,9 @@ function comprobarPrecondiciones(tarea) {
  * Ejecuta una tarea completa. Devuelve el resumen (resultado: integrado |
  * rechazado | no integrado | cancelado | error).
  */
-export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, e2e = true } = {}) {
+// sinRevision: turno de Codex (si pasan las comprobaciones, queda «listo para revisar» en su rama, sin tocar main).
+// desdeRama: turno de revisión de Claude sobre el trabajo que Codex dejó en esa rama.
+export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, e2e = true, sinRevision = false, desdeRama = null } = {}) {
   comprobarPrecondiciones(tarea);
   const base = git(['rev-parse', 'HEAD']);
   const id = `${marcaTiempo()}-${tarea.id}`.replace(/[^\w.-]/g, '_');
@@ -123,27 +125,29 @@ export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, 
   const rama = `flujo/${id}`;
   const resumen = {
     id, tareaId: tarea.id, tarea: tarea.ruta, titulo: tarea.titulo, base, permitidos: tarea.permitidos,
-    pruebas: tarea.pruebas, maxIntentos, implementador: simulador ? `simulado:${simulador}` : 'codex',
+    pruebas: tarea.pruebas, maxIntentos, implementador: desdeRama ? `codex (${desdeRama})` : simulador ? `simulado:${simulador}` : 'codex',
     inicio: new Date().toISOString(), intentos: [], resultado: 'en curso',
   };
   const guardarResumen = () => fs.writeFileSync(path.join(dir, 'resumen.json'), `${JSON.stringify(resumen, null, 2)}\n`);
   guardarResumen();
   guardarEstado(tarea.id, { estado: 'en curso', ejecucion: id });
   let integrado = false;
+  // El diagnóstico de una revisión anterior (p. ej. rechazo en el turno de Claude) llega al siguiente turno de Codex.
+  let diagnostico = desdeRama ? null : (leerEstado()[tarea.id]?.diagnostico ?? null);
 
   try {
     paso(`Ejecución ${id}: ${tarea.titulo}`);
     git(['worktree', 'add', '-b', rama, wt, base]);
     fs.symlinkSync(path.join(RAIZ, 'node_modules'), path.join(wt, 'node_modules'), 'junction');
 
-    let diagnostico = null;
     let aprobado = false;
+    let listo = false;
     for (let n = 1; n <= maxIntentos && !aprobado; n++) {
       comprobarCancelacion();
       const intento = { n, inicio: new Date().toISOString() };
       resumen.intentos.push(intento);
       paso(`Intento ${n}/${maxIntentos}: implementa ${resumen.implementador}`);
-      const impl = await implementar({ wt, dir, n, tarea, diagnostico, simulador });
+      const impl = await implementar({ wt, dir, n, tarea, diagnostico, simulador, desdeRama });
       intento.implementador = { agente: impl.agente, modelo: impl.modelo ?? null, ms: impl.ms };
       comprobarCancelacion();
 
@@ -191,9 +195,14 @@ export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, 
         continue;
       }
 
+      if (sinRevision) {
+        listo = true;
+        break;
+      }
       paso('Revisión de Claude en solo lectura');
-      git(['add', '-N', '--', ...dentro], wt);
-      const diff = git(['diff', '--', ...dentro], wt);
+      const existen = dentro.filter((f) => fs.existsSync(path.join(wt, f))); // los borrados no se pueden marcar con -N
+      if (existen.length) git(['add', '-N', '--', ...existen], wt);
+      const diff = git(['diff', 'HEAD', '--', ...dentro], wt); // contra HEAD: incluye borrados ya preparados
       const veredicto = await revisar({ wt, dir, n, tarea, diff, comprobaciones: comprobacion.superadas });
       comprobarCancelacion();
       intento.revision = veredicto;
@@ -208,6 +217,12 @@ export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, 
       paso('✔ Comprobaciones y revisión superadas');
     }
 
+    if (listo) {
+      resumen.resultado = 'listo para revisar';
+      diagnostico = null;
+      paso(`✔ Comprobaciones superadas. Queda en la rama ${rama} para el turno de revisión (npm run flujo -- revisar).`);
+      return resumen;
+    }
     if (!aprobado) {
       resumen.resultado = 'rechazado';
       paso(`✖ Sin éxito tras ${maxIntentos} intentos. El último intento queda en la rama ${rama}.`);
@@ -219,8 +234,8 @@ export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, 
       return resumen;
     }
     const finales = cambiosEn(wt).filter((c) => tarea.permitidos.includes(c));
-    resumen.hashes = Object.fromEntries(finales.map((f) => [f, sha256(path.join(wt, f))]));
-    git(['add', '--', ...finales], wt);
+    resumen.hashes = Object.fromEntries(finales.map((f) => [f, fs.existsSync(path.join(wt, f)) ? sha256(path.join(wt, f)) : 'borrado']));
+    git(['add', '-A', '--', ...finales], wt);
     git(['commit', '-m', `flujo: ${tarea.titulo}`, '-m', [
       `Tarea: ${tarea.id} (${tarea.ruta})`, `Ejecución: ${id}`, `Intentos: ${resumen.intentos.length}`,
       `Implementador: ${resumen.implementador}`, `Comprobaciones: ${resumen.intentos.at(-1).comprobaciones ? Object.keys(resumen.intentos.at(-1).comprobaciones).join(', ') : ''}`,
@@ -245,7 +260,7 @@ export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, 
     }
     guardarResumen();
     const estado = resumen.resultado === 'integrado' ? 'integrado' : resumen.resultado.split(':')[0];
-    guardarEstado(tarea.id, { estado, ejecucion: id, commit: resumen.commit ?? null });
+    guardarEstado(tarea.id, { estado, ejecucion: id, commit: resumen.commit ?? null, diagnostico: integrado ? null : diagnostico });
     registrarEnRuflo('flujo', id, {
       tarea: tarea.id, resultado: resumen.resultado, intentos: resumen.intentos.length,
       implementador: resumen.implementador, commit: resumen.commit ?? null, fin: resumen.fin,

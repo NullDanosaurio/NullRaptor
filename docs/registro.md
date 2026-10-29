@@ -68,3 +68,12 @@
 
 ### Decisión [U] 29/10/2026
 - El cofre `credenciales.cifrado` se versiona y va dentro de la imagen. Clave mínima subida a 20 caracteres (6 palabras al azar).
+
+## 29/10/2026 (noche) — Tienda sin IA, cuenta personal y MCP diario (0.4.0)
+- Flujo automático movido desde TuRinconDeLectura (`flujo/`, `FLUJO_PROYECTO`); la tienda pasa `npm run check` sin IA.
+- [U] Cuenta personal `NullDano` (no es organización: la API de GitHub lo confirma). `GITHUB_ORG` pasa a opcional.
+- [U] Recomendación diaria de 3 servidores MCP con instalación autorizada. Fuente: registro oficial; mcpmarket.com
+  descartado por su robots.txt (prohíbe agentes de Claude).
+- Pruebas: 16/16 unitarias; exploración real (40 s, 3 recomendaciones coherentes); menú: cancelar no instala,
+  «instalar» registra y hace commit, configuración con versión fijada, sin relanzar Claude el mismo día (7/7).
+- Fallo encontrado y corregido: el registro exige búsquedas de 3+ caracteres («3d» devolvía 422).

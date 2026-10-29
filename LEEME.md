@@ -1,8 +1,9 @@
-# Ruflo Portable 0.3.0
+# Ruflo Portable 0.4.0
 
 Agente personal portátil: Ruflo + Claude Code en un contenedor. Arranca con **una clave**, descarga su memoria
 (vault de Obsidian en GitHub) y muestra un menú con los proyectos que conoce: si el elegido no está en el equipo
-lo descarga, y si es nuevo crea su repositorio privado en la organización y lo registra en la memoria.
+lo descarga, y si es nuevo crea su repositorio privado y lo registra en la memoria. Una vez al día recomienda 3
+servidores MCP, que solo se instalan con autorización.
 
 Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 
@@ -10,7 +11,7 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Agente (este repo) | GitHub, organización propia; imagen en `ghcr.io/<org>/agente` | Sin credenciales dentro |
+| Agente (este repo) | GitHub, cuenta personal `NullDano`; imagen en `ghcr.io/nulldano/agente` | Sin credenciales dentro |
 | Memoria | Repo privado con el vault de Obsidian | El agente escribe solo en la rama `agente`; Daniel fusiona en `main` |
 | Proyectos | Un repo privado cada uno | Deben funcionar sin IA: el agente no deja archivos suyos en ellos |
 | Tareas | GitHub Issues + Projects | Etiqueta `agente` para las tareas del agente. Sustituye a Notion |
@@ -18,13 +19,13 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 ## Arranque en cualquier equipo con Docker
 
 ```powershell
-docker run -it --rm -v agente:/estado ghcr.io/<org>/agente
+docker run -it --rm -v agente:/estado ghcr.io/nulldano/agente
 ```
 
 Pide la clave, actualiza la memoria y muestra el menú. Elegido el proyecto, abre Claude Code dentro de él con
 la memoria accesible y el MCP de Ruflo. Todo lo del equipo queda en el volumen `agente` (`/estado`).
 
-Otros modos: `... ghcr.io/<org>/agente claude` (orden concreta en `/agente`); sin terminal, ejecuta la verificación.
+Otros modos: `... ghcr.io/nulldano/agente claude` (orden concreta en `/agente`); sin terminal, ejecuta la verificación.
 En un servidor sin terminal, la clave puede pasarse en `AGENTE_CLAVE`.
 
 ## Cofre de credenciales
@@ -34,8 +35,8 @@ Un archivo `credenciales.cifrado` (scrypt + AES-256-GCM, solo con `node:crypto`)
 | Variable | Qué es |
 |---|---|
 | `MEMORIA_REPO` | URL del repo de la memoria |
-| `GITHUB_ORG` | Organización donde se crean los proyectos |
-| `GITHUB_TOKEN` | Token *fine-grained* de la organización: Contents RW, Administration RW (crear repos), Metadata R |
+| `GITHUB_ORG` | Opcional. Sin ella, los proyectos se crean en la cuenta personal del token (decisión 29/10: `NullDano`) |
+| `GITHUB_TOKEN` | Token *fine-grained* de `NullDano`, todos los repositorios: Contents RW, Administration RW (crear repos), Metadata R; con caducidad |
 | `CLAUDE_CODE_OAUTH_TOKEN` | De `claude setup-token` (suscripción de Claude, larga duración) |
 | `AGENTE_GIT_NOMBRE`, `AGENTE_GIT_EMAIL` | Autor de los commits del agente |
 
@@ -51,6 +52,22 @@ clave. Consecuencia: cualquiera con la imagen puede intentar adivinar la clave s
 
 Los tokens solo existen en la memoria de los procesos: git los recibe por variables de entorno (ni en disco ni en
 `.git/config`) y la clave no pasa a los procesos hijos.
+
+## Servidores MCP: recomendación diaria e instalación con autorización
+
+- **Fuente**: registro oficial (`registry.modelcontextprotocol.io`), API pública pensada para uso automático.
+  mcpmarket.com **no**: su `robots.txt` prohíbe el acceso a los agentes de Claude.
+- **Hueco diario**: al arrancar en modo interactivo, si hoy no se ha hecho, busca por temas de nuestro trabajo
+  (`INTERESES` en `scripts/mcp.mjs`) y novedades desde la última vez. Claude, **sin herramientas ni red**, elige 3
+  (al menos uno útil; uno chulo o divertido si lo hay) con el contexto de `Proyectos/` de la memoria. Se validan
+  los ids contra la lista. Si algo falla, el arranque sigue sin recomendaciones.
+- **Dónde queda**: `MCP/Recomendaciones/AAAA-MM-DD.md` y `MCP/estado.json` en la memoria (rama `agente`).
+  No se repiten recomendaciones.
+- **Instalar**: menú → `m` → ver detalles (paquete y versión, repositorio, variables, riesgos) → escribir
+  `instalar`. Solo se admiten paquetes npm con versión exacta (`npx -y paquete@x.y.z`) o remotos `https` sin
+  cabeceras; pypi/docker aún no. Las variables secretas van al cofre; si falta una obligatoria, el servidor no se
+  activa. Se aplican al abrir un proyecto.
+- A mano: `node scripts/preparar.mjs node scripts/mcp.mjs explorar [--forzar]`.
 
 ## Flujo automático sobre un proyecto
 

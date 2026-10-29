@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
+import { guardarEstado, leerEstado } from './mcp.mjs';
 
 export function proyectosConocidos(memoria) {
   const dir = path.join(memoria, 'Proyectos');
@@ -44,18 +45,51 @@ function registrarEnMemoria(memoria, nombre, repo, git) {
   try { git(['push', '-u', 'origin', 'HEAD'], memoria); } catch { console.warn('Aviso: la nota se guardó, pero no se pudo subir la rama de la memoria.'); }
 }
 
+// Recomendaciones MCP del día: ver detalles e instalar solo si Daniel escribe «instalar».
+async function revisarMcp(rl, memoria, elegidos, git) {
+  const instalados = new Set(leerEstado(memoria).instalados.map((i) => i.id));
+  elegidos.forEach((e, n) => console.error(`  ${n + 1}. ${e.titulo} (${e.categoria})${instalados.has(e.id) ? ' [instalado]' : ''}\n     ${e.porque}`));
+  const e = elegidos[Number((await rl.question('¿Cuál quieres ver? (número o Intro para volver): ')).trim()) - 1];
+  if (!e) return;
+  const i = e.instalacion;
+  console.error([
+    `\n${e.titulo} — ${e.id}`, e.descripcion,
+    `Instalación: ${i.tipo === 'npm' ? `npx ${i.paquete}@${i.version} (código de terceros que se ejecuta en el contenedor)` : `${i.url} (servicio remoto: los datos que le pases salen del equipo)`}`,
+    `Repositorio: ${e.repo ?? 'no indicado'}`,
+    `Variables: ${i.variables.map((v) => `${v.nombre}${v.secreta ? ' (secreta)' : ''}${v.obligatoria ? ' (obligatoria)' : ''}`).join(', ') || 'ninguna'}`,
+    `Riesgos: ${e.riesgos}`,
+    'Se ejecutará con los permisos del agente (sus archivos y su red). Nunca recibe GITHUB_*, CLAUDE_* ni AGENTE_*.',
+  ].join('\n'));
+  if (instalados.has(e.id)) { console.error('Ya está instalado.'); return; }
+  if ((await rl.question('Escribe «instalar» para autorizarlo (cualquier otra cosa cancela): ')).trim().toLowerCase() !== 'instalar') {
+    console.error('Cancelado: no se ha instalado nada.');
+    return;
+  }
+  const estado = leerEstado(memoria);
+  estado.instalados.push({ id: e.id, instalacion: i, repo: e.repo, autorizado: new Date().toISOString() });
+  guardarEstado(memoria, estado);
+  git(['add', 'MCP'], memoria);
+  git(['commit', '-m', `MCP instalado con autorización: ${e.id}`], memoria);
+  try { git(['push', '-u', 'origin', 'HEAD'], memoria); } catch { console.warn('Aviso: guardado en local; no se pudo subir la memoria.'); }
+  const secretas = i.variables.filter((v) => v.obligatoria).map((v) => v.nombre);
+  console.error(`Instalado. Se activará la próxima vez que abras un proyecto.${secretas.length ? ` Antes añade al cofre: ${secretas.join(', ')}.` : ''}`);
+}
+
 // Devuelve la carpeta del proyecto elegido (clonado si hacía falta) o null para salir.
 export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
   const lista = proyectosConocidos(memoria);
   const destino = (nombre) => path.join(trabajo, 'proyectos', nombre);
   console.error('\nProyectos conocidos:');
   lista.forEach((p, i) => console.error(`  ${i + 1}. ${p.nombre}${fs.existsSync(destino(p.nombre)) ? '' : '  (se descargará)'}`));
-  console.error('  n. Proyecto nuevo\n  s. Salir');
+  const { hoy: mcpHoy = [], ultimaExploracion } = leerEstado(memoria);
+  const cuando = ultimaExploracion === new Date().toISOString().slice(0, 10) ? 'hoy' : `el ${ultimaExploracion}`;
+  console.error(`  n. Proyecto nuevo${mcpHoy.length ? `\n  m. Servidores MCP recomendados ${cuando} (${mcpHoy.length})` : ''}\n  s. Salir`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
   try {
     for (;;) {
       const r = (await rl.question('Elige: ')).trim().toLowerCase();
       if (r === 's') return null;
+      if (r === 'm' && mcpHoy.length) { await revisarMcp(rl, memoria, mcpHoy, git); continue; }
       if (r === 'n') {
         const nombre = (await rl.question('Nombre del repositorio: ')).trim();
         if (!NOMBRE_VALIDO.test(nombre)) { console.error('Nombre no válido (letras, números, . _ -).'); continue; }

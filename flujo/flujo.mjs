@@ -1,14 +1,16 @@
 // Coordinador del flujo automático. Trabaja sobre el proyecto de FLUJO_PROYECTO o del directorio actual.
 //
-//   node scripts/flujo.mjs tarea tareas/F1-01-....md   ejecuta una tarea
-//   node scripts/flujo.mjs plan                        ejecuta las pendientes en orden de dependencias
-//   node scripts/flujo.mjs estado                      muestra el estado de cada tarea
-//   node scripts/flujo.mjs cancelar                    pide detener la ejecución en curso
-//   node scripts/flujo.mjs recuperar                   limpia ejecuciones interrumpidas
+//   node flujo/flujo.mjs tarea tareas/F1-01-....md   ejecuta una tarea
+//   node flujo/flujo.mjs plan                        ejecuta las pendientes en orden de dependencias
+//   node flujo/flujo.mjs plan --turno-codex          Codex avanza sin revisión: deja ramas «listo para revisar»
+//   node flujo/flujo.mjs revisar [Id]                turno de Claude: revisa e integra lo que dejó Codex
+//   node flujo/flujo.mjs estado                      muestra el estado de cada tarea
+//   node flujo/flujo.mjs cancelar                    pide detener la ejecución en curso
+//   node flujo/flujo.mjs recuperar                   limpia ejecuciones interrumpidas
 //
-// Opciones: --intentos=N (1-5, por defecto 3), --sin-e2e,
+// Opciones: --intentos=N (1-5, por defecto 3), --sin-e2e, --turno-codex,
 //           --simulador=<nombre> (tests/flujo/simuladores; sustituye a Codex para verificar controles)
-import { adquirirBloqueo, leerBloqueo, liberarBloqueo, paso, procesoVivo, solicitarCancelacion } from './lib/comun.mjs';
+import { adquirirBloqueo, git, leerBloqueo, liberarBloqueo, paso, procesoVivo, solicitarCancelacion } from './lib/comun.mjs';
 import { ejecutarTarea, recuperarInterrumpidas } from './lib/ejecucion.mjs';
 import { leerEstado, leerTarea, listarTareas, ordenar } from './lib/tareas.mjs';
 
@@ -19,7 +21,8 @@ const opciones = Object.fromEntries(resto.filter((a) => a.startsWith('--')).map(
 }));
 const posicionales = resto.filter((a) => !a.startsWith('--'));
 const maxIntentos = Math.min(5, Math.max(1, Number(opciones.intentos ?? 3)));
-const ajustes = { maxIntentos, simulador: opciones.simulador ?? null, e2e: !opciones['sin-e2e'] };
+const ajustes = { maxIntentos, simulador: opciones.simulador ?? null, e2e: !opciones['sin-e2e'], sinRevision: !!opciones['turno-codex'] };
+const LISTO = 'listo para revisar';
 
 function conBloqueo(id, fn) {
   const huerfano = adquirirBloqueo(id, process.argv.slice(2).join(' '));
@@ -37,7 +40,7 @@ async function ejecutarPlan() {
   const fallidas = new Set();
   const informe = [];
   for (const tarea of tareas) {
-    if (estado[tarea.id]?.estado === 'integrado') continue;
+    if (estado[tarea.id]?.estado === 'integrado' || estado[tarea.id]?.estado === LISTO) continue; // lo listo espera a «revisar»
     const bloqueadaPor = tarea.dependencias.filter((d) => fallidas.has(d) || (estado[d]?.estado !== 'integrado' && !informe.some((i) => i.id === d && i.resultado === 'integrado')));
     if (bloqueadaPor.length) {
       fallidas.add(tarea.id);
@@ -50,8 +53,26 @@ async function ejecutarPlan() {
     if (resumen.resultado !== 'integrado') fallidas.add(tarea.id);
   }
   paso('Resultado del plan:');
-  for (const { id, resultado } of informe) paso(`  ${resultado === 'integrado' ? '✔' : '✖'} ${id}: ${resultado}`);
+  const bien = (r) => r === 'integrado' || r === LISTO;
+  for (const { id, resultado } of informe) paso(`  ${bien(resultado) ? '✔' : '✖'} ${id}: ${resultado}`);
   if (informe.length === 0) paso('  No hay tareas pendientes.');
+  return informe.every((i) => bien(i.resultado)) ? 0 : 1;
+}
+
+/** Turno de Claude: cada tarea «listo para revisar» pasa por alcance, comprobaciones (sobre el main actual) y revisión. */
+async function revisarListas() {
+  const estado = leerEstado();
+  const listas = ordenar(listarTareas()).filter((t) => estado[t.id]?.estado === LISTO && (!posicionales[0] || t.id === posicionales[0]));
+  if (listas.length === 0) { paso('No hay trabajo de Codex pendiente de revisar.'); return 0; }
+  const informe = [];
+  for (const tarea of listas) {
+    const rama = `flujo/${estado[tarea.id].ejecucion}`;
+    const resumen = await ejecutarTarea(tarea, { ...ajustes, sinRevision: false, maxIntentos: 1, desdeRama: rama });
+    if (resumen.resultado === 'integrado') git(['branch', '-D', rama]); // su contenido ya está en main
+    informe.push({ id: tarea.id, resultado: resumen.resultado });
+    if (resumen.resultado === 'cancelado') break;
+  }
+  for (const { id, resultado } of informe) paso(`  ${resultado === 'integrado' ? '✔' : '✖'} ${id}: ${resultado}`);
   return informe.every((i) => i.resultado === 'integrado') ? 0 : 1;
 }
 
@@ -75,6 +96,8 @@ async function principal() {
       const tarea = leerTarea(posicionales[0]);
       return conBloqueo(tarea.id, async () => ((await ejecutarTarea(tarea, ajustes)).resultado === 'integrado' ? 0 : 1));
     }
+    case 'revisar':
+      return conBloqueo('revisar', revisarListas);
     case 'plan':
       return conBloqueo('plan', ejecutarPlan);
     case 'estado':
@@ -90,7 +113,7 @@ async function principal() {
         return 0;
       });
     default:
-      console.log('Uso: FLUJO_PROYECTO=<carpeta> node flujo/flujo.mjs <tarea RUTA | plan | estado | cancelar | recuperar> [--intentos=N] [--sin-e2e] [--simulador=NOMBRE]');
+      console.log('Uso: FLUJO_PROYECTO=<carpeta> node flujo/flujo.mjs <tarea RUTA | plan [--turno-codex] | revisar [Id] | estado | cancelar | recuperar> [--intentos=N] [--sin-e2e] [--simulador=NOMBRE]');
       return comando === 'ayuda' ? 0 : 2;
   }
 }

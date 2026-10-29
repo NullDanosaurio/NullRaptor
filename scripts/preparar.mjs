@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { abrirCofre } from './credenciales.mjs';
 import { elegirProyecto } from './menu.mjs';
+import { aConfigMcp, explorarDelDia, leerEstado } from './mcp.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAMA_MEMORIA = 'agente'; // el agente nunca escribe en main: Daniel fusiona.
@@ -18,6 +19,9 @@ const rutaCofre = process.env.CREDENCIALES ?? path.join(agente, 'credenciales.ci
 const cofre = fs.existsSync(rutaCofre) ? await abrirCofre(rutaCofre).catch((e) => { console.error(e.message); process.exit(1); }) : {};
 const env = { ...cofre, ...process.env, GIT_TERMINAL_PROMPT: '0' };
 delete env.AGENTE_CLAVE; // la clave no pasa a los procesos hijos
+// Autor de los commits del agente en memoria y proyectos (el flujo hace commits en los proyectos).
+if (env.AGENTE_GIT_NOMBRE) env.GIT_AUTHOR_NAME = env.GIT_COMMITTER_NAME = env.AGENTE_GIT_NOMBRE;
+if (env.AGENTE_GIT_EMAIL) env.GIT_AUTHOR_EMAIL = env.GIT_COMMITTER_EMAIL = env.AGENTE_GIT_EMAIL;
 
 const trabajo = path.resolve(env.TRABAJO_DIR ?? '/trabajo');
 if (!env.MEMORIA_REPO) { console.error('Falta MEMORIA_REPO (URL del repositorio de la memoria).'); process.exit(1); }
@@ -65,6 +69,19 @@ const ejecutar = (orden, args, cwd) => spawnSync(orden, args, { cwd, stdio: 'inh
 if (process.argv.length > 2) process.exit(ejecutar(process.argv[2], process.argv.slice(3), agente));
 if (!process.stdin.isTTY) process.exit(ejecutar(process.execPath, ['scripts/verificar.mjs'], agente));
 
+// Hueco diario: recomendar 3 servidores MCP (una vez al día; si falla, se sigue sin ellos).
+try {
+  const yaHoy = leerEstado(memoria).ultimaExploracion === new Date().toISOString().slice(0, 10);
+  if (!yaHoy) console.error('Buscando los servidores MCP recomendados de hoy…');
+  const elegidos = await explorarDelDia(memoria);
+  if (elegidos && !yaHoy) {
+    git(['add', 'MCP'], memoria);
+    git(['commit', '-m', `MCP recomendados ${new Date().toISOString().slice(0, 10)}`], memoria);
+    try { git(['push', '-u', 'origin', 'HEAD'], memoria); } catch { console.warn('Aviso: recomendaciones guardadas en local; no se pudo subir la memoria.'); }
+    console.error('Hoy tienes 3 servidores MCP recomendados: opción «m» del menú.');
+  }
+} catch (e) { console.warn(`Aviso: sin recomendaciones MCP hoy (${e.message}).`); }
+
 const proyecto = await elegirProyecto({ memoria, trabajo, env, git, clonar: clonarOActualizar });
 if (!proyecto) process.exit(0);
 
@@ -76,6 +93,7 @@ if (env.CLAUDE_CONFIG_DIR) {
 const mcp = path.join(trabajo, '.mcp-agente.json');
 const mcpBase = JSON.parse(fs.readFileSync(path.join(agente, '.mcp.json'), 'utf8'));
 mcpBase.mcpServers.ruflo.args = [path.join(agente, 'scripts', 'ruflo-mcp.mjs')];
+Object.assign(mcpBase.mcpServers, aConfigMcp(leerEstado(memoria).instalados, env)); // los autorizados por Daniel
 fs.writeFileSync(mcp, JSON.stringify(mcpBase, null, 2));
 
 const claude = path.join(agente, 'node_modules', '.bin', process.platform === 'win32' ? 'claude.cmd' : 'claude');
