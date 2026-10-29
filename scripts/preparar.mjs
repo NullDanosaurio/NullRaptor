@@ -118,5 +118,8 @@ const modo = (await rl.question('\nIntro = Claude Code · c = chat con Claude y 
 rl.close();
 if (modo === 'c') process.exit(ejecutar(process.execPath, [path.join(agente, 'scripts', 'chat.mjs'), proyecto], proyecto));
 
+// Con sesión de claude.ai guardada (/login), se usa esa: el token de setup-token no carga los conectores de claude.ai.
+// shortcut: en macOS la sesión va en el llavero y no en este archivo, así que allí se sigue usando el token.
+if (fs.existsSync(path.join(env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), '.credentials.json'))) delete env.CLAUDE_CODE_OAUTH_TOKEN;
 const claude = path.join(agente, 'node_modules', '.bin', process.platform === 'win32' ? 'claude.cmd' : 'claude');
 process.exit(ejecutar(claude, ['--mcp-config', mcp, '--add-dir', memoria], proyecto));

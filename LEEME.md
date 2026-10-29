@@ -50,7 +50,7 @@ Un archivo `credenciales.cifrado` (scrypt + AES-256-GCM, solo con `node:crypto`)
 | `MEMORIA_REPO` | URL del repo de la memoria |
 | `GITHUB_ORG` | Opcional. Sin ella, los proyectos se crean en la cuenta personal del token (decisión 29/10: `NullDanosaurio`) |
 | `GITHUB_TOKEN` | Token *fine-grained* de `NullDanosaurio`, todos los repositorios: Contents RW, Administration RW (crear repos), Metadata R; con caducidad |
-| `CLAUDE_CODE_OAUTH_TOKEN` | De `claude setup-token` (suscripción de Claude, larga duración) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | De `claude setup-token` (suscripción de Claude, larga duración). Si el equipo ya tiene sesión (`/login`; en Docker se guarda en el volumen), Claude Code usa la sesión y no el token, porque con el token no se cargan los conectores de claude.ai (MCP conectados desde el navegador) |
 | `AGENTE_GIT_NOMBRE`, `AGENTE_GIT_EMAIL` | Autor de los commits del agente |
 
 Crear o renovar: escribir esas líneas en `.env.credenciales` (no se versiona), ejecutar
