@@ -42,6 +42,15 @@ pedir. Contrapartidas: quien entre en tu sesión de Windows puede abrir el agent
 `AGENTE_CLAVE` del contenedor mientras está en marcha (`docker inspect` la muestra a quien controle Docker en el
 equipo). Otra imagen: variable `NULLRAPTOR_IMAGEN` (p. ej. `nullraptor:dev`).
 
+**Red de casa** (lanzador con `-Red`, se recuerda; `-SoloEquipo` lo quita; el instalador lo pregunta): el panel
+se publica en todas las interfaces y el lanzador muestra las direcciones (`http://<IP>:4321`) y el **código de
+acceso**. Cada navegador lo escribe una vez en `/entrar` y queda con una cookie de sesión (HttpOnly, SameSite=Strict,
+30 días); este equipo entra solo. Solo se aceptan Host de casa (IP privada o nombre del equipo) y, como mucho, 10
+códigos fallidos por minuto. El código vive en el volumen (`/estado/home/.nullraptor/panel-codigo`): borrarlo y
+reiniciar cierra todas las sesiones. Abre una regla del firewall de Windows solo para redes **privadas** (si tu
+Wi-Fi está como pública en Windows, no llegará). Sin HTTPS: úsalo solo en tu red de confianza, no en Wi-Fi públicas;
+ojo con VPN tipo ZeroTier, cuyos miembros también son «red privada».
+
 **Proyectos:** el menú y el panel muestran primero **Nullraptor** (el propio agente, descargado en el primer
 arranque) y la **Bóveda** (se trabaja sobre la memoria, rama `agente`), y después el resto de la memoria.
 

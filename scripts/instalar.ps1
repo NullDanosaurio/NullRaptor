@@ -77,4 +77,6 @@ $lnk.WorkingDirectory = $casa; $lnk.Save()
 
 Write-Host "`nNullraptor listo (imagen $imagen). Acceso directo `"Nullraptor`" en el escritorio."
 Write-Host 'La primera vez, dentro de Claude, escribe /login para tener los conectores de claude.ai (21st, Notion...).'
-if ((Read-Host '¿Lo arranco ahora? (S/n)') -notmatch '^n') { & $lanzador }
+$red = (Read-Host '¿Abrir el panel a los navegadores de tu casa, con código de acceso? (s/N)') -match '^s'
+if ((Read-Host '¿Lo arranco ahora? (S/n)') -notmatch '^n') { if ($red) { & $lanzador -Red } else { & $lanzador -SoloEquipo } }
+elseif ($red) { New-Item -ItemType File -Force (Join-Path $casa 'red') | Out-Null } # se recuerda para el próximo arranque

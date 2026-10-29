@@ -1,12 +1,15 @@
 // Panel web de Nullraptor: chat con Claude y Codex, trabajo (proyectos y flujo) y bóveda, en un solo sitio.
 //   node scripts/preparar.mjs node panel/servidor.mjs     (o `npm run panel`): abre el cofre y la memoria antes.
-// Solo para este equipo: escucha en PANEL_HOST (127.0.0.1; en Docker 0.0.0.0 con el puerto publicado en 127.0.0.1)
-// y rechaza peticiones con otro Host (DNS rebinding) o sin la cabecera X-Nullraptor (CSRF desde otras webs).
+// Por defecto, solo para este equipo: escucha en PANEL_HOST (127.0.0.1; en Docker 0.0.0.0 con el puerto publicado en
+// 127.0.0.1) y rechaza peticiones con otro Host (DNS rebinding) o sin la cabecera X-Nullraptor (CSRF desde otras webs).
+// Con PANEL_RED=1 acepta también la red de casa (IP privada o nombre del equipo) y exige el código de acceso.
 // La web se construye con `npm run panel:construir` (panel/dist). Sin dependencias en tiempo de ejecución.
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { crearAcceso, hostRed, leerOCrearCodigo, paginaEntrar } from './lib/acceso.mjs';
 import { buscar, cambiosRecientes, estadoGit, leerNota, listarNotas } from './lib/boveda.mjs';
 import { Chats } from './lib/chats.mjs';
 import { detalleProyecto, estadoMcp, listarProyectos, rutaProyecto } from './lib/trabajo.mjs';
@@ -31,11 +34,11 @@ export function hostPermitido(host) {
 }
 
 /** Petición que cambia algo: misma procedencia (si hay Origin) y cabecera propia (fuerza preflight CORS, que no damos). */
-export function escrituraPermitida(req) {
+export function escrituraPermitida(req, permitido = hostPermitido) {
   if (req.headers['x-nullraptor'] !== '1') return false;
   const origen = req.headers.origin;
   if (!origen) return true;
-  try { return hostPermitido(new URL(origen).host) && new URL(origen).host === req.headers.host; } catch { return false; }
+  try { return permitido(new URL(origen).host) && new URL(origen).host === req.headers.host; } catch { return false; }
 }
 
 function json(res, codigo, datos) {
@@ -75,7 +78,38 @@ function servirEstatico(res, ruta) {
   fs.createReadStream(destino).pipe(res);
 }
 
-export function crearServidor({ trabajo, memoria }) {
+function html(res, codigo, cuerpo, extra = {}) {
+  res.writeHead(codigo, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEGURIDAD, ...extra });
+  res.end(cuerpo);
+}
+
+function leerFormulario(req) {
+  return new Promise((resolve, reject) => {
+    let datos = '';
+    req.on('data', (d) => { datos += d; if (datos.length > 4096) { reject(Object.assign(new Error('Petición demasiado grande.'), { codigo: 413 })); req.destroy(); } });
+    req.on('end', () => resolve(new URLSearchParams(datos)));
+    req.on('error', reject);
+  });
+}
+
+// /entrar: GET muestra el formulario (o entra con ?codigo=, lo usa el lanzador en este equipo); POST lo comprueba.
+async function entrar(req, res, url, acceso, permitido) {
+  const yaDentro = () => html(res, 303, '', { Location: '/', 'Set-Cookie': acceso.cookie });
+  let intento = url.searchParams.get('codigo');
+  if (req.method === 'POST') {
+    // Con Referrer-Policy no-referrer el navegador manda «Origin: null» en un formulario: se acepta aquí, porque
+    // entrar exige el código igualmente (lo peor sería meter a alguien en una sesión de quien ya lo conoce).
+    if (req.headers.origin && req.headers.origin !== 'null' && !escrituraPermitida({ headers: { ...req.headers, 'x-nullraptor': '1' } }, permitido)) { html(res, 403, paginaEntrar('Petición no permitida.')); return; }
+    intento = (await leerFormulario(req)).get('codigo');
+  } else if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
+  if (intento === null || intento === undefined) { if (acceso.autenticado(req)) { yaDentro(); return; } html(res, 200, paginaEntrar()); return; }
+  const r = acceso.probar(intento);
+  if (r === 'ok') { yaDentro(); return; }
+  html(res, r === 'bloqueado' ? 429 : 401, paginaEntrar(r === 'bloqueado' ? 'Demasiados intentos: espera un minuto.' : 'Código incorrecto.'));
+}
+
+export function crearServidor({ trabajo, memoria, acceso = null }) {
+  const permitido = acceso ? hostRed : hostPermitido;
   const chats = new Chats({ trabajo, memoria });
   const sinBoveda = () => ({ error: 'Sin bóveda: arranca el panel con preparar.mjs (BOVEDA_DIR).' });
 
@@ -105,15 +139,23 @@ export function crearServidor({ trabajo, memoria }) {
 
   return http.createServer(async (req, res) => {
     try {
-      if (!hostPermitido(req.headers.host)) { res.writeHead(421); res.end(); return; }
+      if (!permitido(req.headers.host)) { res.writeHead(421); res.end(); return; }
       const url = new URL(req.url, 'http://localhost');
       const { pathname: p, searchParams: q } = url;
+      if (acceso) {
+        if (p === '/entrar') { await entrar(req, res, url, acceso, permitido); return; }
+        if (!acceso.autenticado(req)) {
+          if (p.startsWith('/api/')) json(res, 401, { error: 'Hace falta el código de acceso.' });
+          else html(res, 303, '', { Location: '/entrar' });
+          return;
+        }
+      }
       if (!p.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
         servirEstatico(res, p);
         return;
       }
-      if (req.method !== 'GET' && !escrituraPermitida(req)) { json(res, 403, { error: 'Petición no permitida.' }); return; }
+      if (req.method !== 'GET' && !escrituraPermitida(req, permitido)) { json(res, 403, { error: 'Petición no permitida.' }); return; }
 
       // Chats abiertos: /api/chats/:id/(eventos|mensajes|cerrar)
       const m = p.match(/^\/api\/chats\/([0-9a-f-]{36})\/(eventos|mensajes|cerrar)$/);
@@ -151,8 +193,13 @@ if (esPrincipal) {
   const memoria = process.env.BOVEDA_DIR ? path.resolve(process.env.BOVEDA_DIR) : null;
   const host = process.env.PANEL_HOST ?? '127.0.0.1';
   const puerto = Number(process.env.PANEL_PUERTO ?? 4321);
-  crearServidor({ trabajo, memoria }).listen(puerto, host, () => {
+  // Modo red: el código se guarda en el volumen (en Docker, HOME=/estado/home) y no se escribe en el registro.
+  const red = process.env.PANEL_RED === '1';
+  const archivoCodigo = process.env.PANEL_CODIGO ?? path.join(os.homedir(), '.nullraptor', 'panel-codigo');
+  const acceso = red ? crearAcceso(leerOCrearCodigo(archivoCodigo)) : null;
+  crearServidor({ trabajo, memoria, acceso }).listen(puerto, host, () => {
     console.error(`Panel de Nullraptor en http://localhost:${puerto}  (Ctrl+C para cerrar)`);
+    if (red) console.error(`Modo red: abierto a la red de casa con código de acceso (en ${archivoCodigo}).`);
     if (!memoria) console.warn('Aviso: sin BOVEDA_DIR, el panel no muestra la bóveda.');
   });
 }

@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 async function respuesta(r) {
+  // Modo red: sin sesión (o con el código cambiado), a la página de entrada.
+  if (r.status === 401) { window.location.assign('/entrar'); throw new Error('Hace falta el código de acceso.'); }
   const datos = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(datos.error ?? `Error ${r.status}`);
   return datos;

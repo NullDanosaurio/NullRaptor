@@ -4,6 +4,8 @@
 # La clave del cofre se pide solo la primera vez y se recuerda cifrada con DPAPI (solo tu usuario de Windows en
 # este equipo puede leerla). Si deja de abrir el cofre, se olvida y se vuelve a pedir.
 # El instalador copia este archivo a %LOCALAPPDATA%\Nullraptor; tras cada actualización se refresca desde la imagen.
+# Modo red (otros navegadores de casa, con código de acceso): una vez con -Red y se recuerda; -SoloEquipo lo quita.
+param([switch]$Red, [switch]$SoloEquipo)
 $imagen = if ($env:NULLRAPTOR_IMAGEN) { $env:NULLRAPTOR_IMAGEN } else { 'ghcr.io/nulldanosaurio/nullraptor:main' }
 $cofre = if ($env:CREDENCIALES) { $env:CREDENCIALES } else { Join-Path $HOME '.nullraptor\credenciales.cifrado' }
 $guardada = Join-Path $env:LOCALAPPDATA 'Nullraptor\clave.dpapi'
@@ -14,13 +16,36 @@ function Docker-Listo { docker info *> $null; return $LASTEXITCODE -eq 0 }
 $nombre = 'nullraptor'
 $puerto = if ($env:PANEL_PUERTO) { $env:PANEL_PUERTO } else { '4321' }
 $url = "http://localhost:$puerto"
+$archivoRed = Join-Path $env:LOCALAPPDATA 'Nullraptor\red'
+New-Item -ItemType Directory -Force (Split-Path $archivoRed) | Out-Null
+if ($Red) { New-Item -ItemType File -Force $archivoRed | Out-Null } elseif ($SoloEquipo) { Remove-Item $archivoRed -ErrorAction SilentlyContinue }
+$enRed = if (Test-Path $archivoRed) { '1' } else { '0' }
 # 127.0.0.1 y no localhost: .NET prueba antes ::1, que no está publicado, y agota la espera.
 function Panel-Listo { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$puerto" | Out-Null; return $true } catch { return $false } }
 function Abrir-Panel {
-  Start-Process $url
-  Write-Host "`nNullraptor en marcha: $url (sigue funcionando aunque cierres esta ventana)."
-  Write-Host "Para pararlo: docker stop $nombre (o desde Docker Desktop)."
-  Start-Sleep -Seconds 5; exit 0
+  if ($enRed -eq '1') {
+    # Este navegador entra solo (el código va en la dirección una vez); los demás de casa lo escriben.
+    $codigo = (docker exec $nombre cat /estado/home/.nullraptor/panel-codigo).Trim()
+    Start-Process "$url/entrar?codigo=$codigo"
+    Write-Host "`nNullraptor en marcha, abierto a la red de casa. Desde otro navegador:"
+    Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
+      ForEach-Object { Write-Host "  http://$($_.IPv4Address.IPAddress):$puerto   ($($_.InterfaceAlias))" }
+    Write-Host "  Código de acceso: $codigo   (cada navegador lo pide una vez)"
+    Write-Host 'Para volver a solo este equipo: lanzador con -SoloEquipo.'
+  } else {
+    Start-Process $url
+    Write-Host "`nNullraptor en marcha: $url (solo este equipo; para la red de casa, lanzador con -Red)."
+  }
+  Write-Host "Sigue funcionando aunque cierres esta ventana. Para pararlo: docker stop $nombre (o desde Docker Desktop)."
+  if ($enRed -eq '1') { Read-Host 'Pulsa Intro para cerrar' | Out-Null } else { Start-Sleep -Seconds 5 }
+  exit 0
+}
+# Modo red: Windows bloquea por defecto las conexiones entrantes; una regla solo para redes privadas (pide administrador).
+function Abrir-Firewall {
+  if (Get-NetFirewallRule -DisplayName 'Nullraptor (panel)' -ErrorAction SilentlyContinue) { return }
+  Write-Host 'Abriendo el puerto del panel en el firewall de Windows, solo para redes privadas (acepta el aviso de administrador)...'
+  $orden = "New-NetFirewallRule -DisplayName 'Nullraptor (panel)' -Direction Inbound -Protocol TCP -LocalPort $puerto -Profile Private -Action Allow"
+  try { Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile', '-Command', $orden } catch { Write-Host 'Aviso: sin la regla, los otros equipos no llegarán al panel.' }
 }
 
 # 1. Docker en marcha.
@@ -38,7 +63,7 @@ if (-not (Docker-Listo)) {
 }
 
 # Si ya está en marcha, solo se abre el navegador.
-if ((docker inspect -f '{{.State.Running}}' $nombre 2>$null) -eq 'true' -and (Panel-Listo)) { Abrir-Panel }
+if ((docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}}' $nombre 2>$null) -eq "true $enRed" -and (Panel-Listo)) { Abrir-Panel }
 
 # 2. Imagen al día. Sin internet o sin acceso al registro, se usa la que ya haya en el equipo.
 Write-Host "Comprobando $imagen..."
@@ -83,9 +108,10 @@ if ($PSCommandPath -eq $instalado) {
 }
 
 # 5. Servidor y panel web dentro del contenedor, en segundo plano. Todo lo del equipo queda en el volumen
-#    nullraptor (/estado). El puerto solo se publica en este equipo (127.0.0.1).
+#    nullraptor (/estado). El puerto se publica solo en este equipo (127.0.0.1) o, en modo red, en la red de casa.
 docker rm -f $nombre *> $null
-docker run -d --name $nombre -e AGENTE_CLAVE -v nullraptor:/estado -v $montaCofre -p "127.0.0.1:${puerto}:4321" $imagen node panel/servidor.mjs | Out-Null
+$publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
+docker run -d --name $nombre --label "nullraptor.red=$enRed" -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -v nullraptor:/estado -v $montaCofre -p $publica $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE
 Remove-Item Env:AGENTE_CLAVE -ErrorAction SilentlyContinue
 if ($codigo) { Salir "No se pudo arrancar el contenedor ($codigo). ¿Está ocupado el puerto $puerto?" $codigo }
