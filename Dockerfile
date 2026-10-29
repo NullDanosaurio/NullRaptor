@@ -23,6 +23,7 @@ COPY . .
 ENV HOME=/estado/home \
     CLAUDE_CONFIG_DIR=/estado/home/.claude \
     TRABAJO_DIR=/estado/trabajo \
+    CLAUDE_FLOW_MEMORY_PATH=/estado/ruflo/swarm \
     DISABLE_AUTOUPDATER=1 \
     npm_config_update_notifier=false \
     PATH=/nullraptor/node_modules/.bin:$PATH
