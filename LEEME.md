@@ -22,8 +22,10 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 ## Arranque en cualquier equipo con Docker
 
 ```powershell
-docker run -it --rm -v nullraptor:/estado ghcr.io/nulldanosaurio/nullraptor
+docker run -it --rm -v nullraptor:/estado -v "$HOME\.nullraptor:/cofre:ro" ghcr.io/nulldanosaurio/nullraptor
 ```
+
+`$HOME\.nullraptor` es la carpeta del equipo con `credenciales.cifrado`; el contenedor la ve en solo lectura.
 
 Pide la clave, actualiza la memoria y muestra el menú. Elegido el proyecto, abre Claude Code dentro de él con
 la memoria accesible y el MCP de Ruflo. Todo lo del equipo queda en el volumen `nullraptor` (`/estado`).
@@ -44,13 +46,15 @@ Un archivo `credenciales.cifrado` (scrypt + AES-256-GCM, solo con `node:crypto`)
 | `AGENTE_GIT_NOMBRE`, `AGENTE_GIT_EMAIL` | Autor de los commits del agente |
 
 Crear o renovar: escribir esas líneas en `.env.credenciales` (no se versiona), ejecutar
-`node scripts/credenciales.mjs crear .env.credenciales credenciales.cifrado` y **borrar** `.env.credenciales`.
-`listar` muestra los nombres guardados, nunca los valores.
+`node scripts/credenciales.mjs crear .env.credenciales $HOME\.nullraptor\credenciales.cifrado` y **borrar**
+`.env.credenciales`. `listar` muestra los nombres guardados, nunca los valores.
 
-**Decisión [U] 29/10/2026: el cofre se versiona y viaja dentro de la imagen** para arrancar con una sola orden y la
-clave. Consecuencia: cualquiera con la imagen puede intentar adivinar la clave sin conexión. Por eso:
+**Decisión [U] 29/10/2026: las credenciales no se suben a ninguna parte.** El cofre vive solo en cada equipo, en
+`~/.nullraptor/credenciales.cifrado` (otra ruta: variable `CREDENCIALES`). `*.cifrado` está excluido de git y de la
+imagen; en Docker se monta en `/cofre`. Para otro equipo: llevarlo a mano (p. ej. USB) o crear allí uno nuevo.
+La imagen no contiene secretos. Aun así:
 - clave de al menos 20 caracteres; usar **6 palabras al azar** (no frases conocidas ni reutilizadas);
-- tokens con el mínimo permiso (solo la organización) y con caducidad; renovarlos rehaciendo el cofre;
+- tokens con el mínimo permiso y con caducidad; renovarlos rehaciendo el cofre;
 - si se sospecha que la clave se ha filtrado: revocar los tokens en GitHub y en Claude, y crear un cofre nuevo.
 
 Los tokens solo existen en la memoria de los procesos: git los recibe por variables de entorno (ni en disco ni en

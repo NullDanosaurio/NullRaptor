@@ -18,3 +18,6 @@ dist
 .claude-flow/policy
 .claude-flow/dual-mode-memory.db*
 .claude-flow/memory-package.json
+
+# Cofre de credenciales: solo en cada equipo, nunca en git ni en la imagen (decisión 29/10/2026)
+*.cifrado

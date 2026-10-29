@@ -22,7 +22,9 @@ COPY . .
 # memoria y política de Ruflo (junto a su ancla en ~/.config/ruflo) y la configuración de Claude.
 # shortcut: sin el motor nativo AgentDB (en Linux se carga y no guarda en el volumen); sql.js persiste en
 # CLAUDE_FLOW_MEMORY_PATH igual que en Windows. Reactivarlo cuando AgentDB acepte una ruta dentro del volumen.
+#   El cofre no va en la imagen: se monta desde el equipo en CREDENCIALES (ver LEEME).
 ENV HOME=/estado/home \
+    CREDENCIALES=/cofre/credenciales.cifrado \
     CLAUDE_CONFIG_DIR=/estado/home/.claude \
     TRABAJO_DIR=/estado/trabajo \
     CLAUDE_FLOW_MEMORY_PATH=/estado/ruflo/swarm \

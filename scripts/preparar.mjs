@@ -6,6 +6,7 @@
 // GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, AGENTE_GIT_NOMBRE, AGENTE_GIT_EMAIL, TRABAJO_DIR, CREDENCIALES.
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { abrirCofre } from './credenciales.mjs';
@@ -25,7 +26,8 @@ if (process.stdin.isTTY) console.error(String.raw`
 /__.-'|_|--|_|
 `);
 
-const rutaCofre = process.env.CREDENCIALES ?? path.join(agente, 'credenciales.cifrado');
+// El cofre nunca va en el repo ni en la imagen: vive en cada equipo (en Docker, montado en /cofre).
+const rutaCofre = process.env.CREDENCIALES ?? path.join(os.homedir(), '.nullraptor', 'credenciales.cifrado');
 const cofre = fs.existsSync(rutaCofre) ? await abrirCofre(rutaCofre).catch((e) => { console.error(e.message); process.exit(1); }) : {};
 const env = { ...cofre, ...process.env, GIT_TERMINAL_PROMPT: '0' };
 delete env.AGENTE_CLAVE; // la clave no pasa a los procesos hijos
@@ -34,7 +36,7 @@ if (env.AGENTE_GIT_NOMBRE) env.GIT_AUTHOR_NAME = env.GIT_COMMITTER_NAME = env.AG
 if (env.AGENTE_GIT_EMAIL) env.GIT_AUTHOR_EMAIL = env.GIT_COMMITTER_EMAIL = env.AGENTE_GIT_EMAIL;
 
 const trabajo = path.resolve(env.TRABAJO_DIR ?? '/trabajo');
-if (!env.MEMORIA_REPO) { console.error('Falta MEMORIA_REPO (URL del repositorio de la memoria).'); process.exit(1); }
+if (!env.MEMORIA_REPO) { console.error(`Falta MEMORIA_REPO. ¿Está el cofre en ${rutaCofre}? (ver «Cofre de credenciales» en LEEME.md)`); process.exit(1); }
 
 // El token va por variables de entorno de git: no queda en disco, en .git/config ni en los argumentos.
 if (env.GITHUB_TOKEN) {

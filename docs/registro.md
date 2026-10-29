@@ -67,7 +67,9 @@
 - Sacar de TuRinconDeLectura las dependencias de IA y el orquestador `flujo`.
 
 ### Decisión [U] 29/10/2026
-- El cofre `credenciales.cifrado` se versiona y va dentro de la imagen. Clave mínima subida a 20 caracteres (6 palabras al azar).
+- ~~El cofre se versiona y va dentro de la imagen.~~ Sustituida el mismo día: las credenciales no se suben a
+  ninguna parte. Cofre en `~/.nullraptor/` de cada equipo; `*.cifrado` fuera de git y de la imagen; en Docker se
+  monta en `/cofre`. Clave mínima de 20 caracteres (6 palabras al azar).
 
 ## 29/10/2026 (noche) — Tienda sin IA, cuenta personal y MCP diario (0.4.0)
 - Flujo automático movido desde TuRinconDeLectura (`flujo/`, `FLUJO_PROYECTO`); la tienda pasa `npm run check` sin IA.

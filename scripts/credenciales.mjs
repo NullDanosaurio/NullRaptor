@@ -11,7 +11,7 @@ const KDF = { N: 2 ** 17, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
 const derivar = (clave, sal, kdf) => crypto.scryptSync(clave.normalize('NFC'), sal, 32, { ...KDF, ...kdf });
 
 export function cifrar(texto, clave) {
-  // El cofre viaja dentro de la imagen (descargable): la clave es la única defensa ante ataques sin conexión.
+  // El cofre no sale del equipo, pero si alguien lo copia, la clave es la única defensa sin conexión.
   if (clave.length < 20) throw new Error('La clave debe tener al menos 20 caracteres (mejor 6 palabras al azar).');
   const sal = crypto.randomBytes(16), iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', derivar(clave, sal, KDF), iv);
