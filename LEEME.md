@@ -81,6 +81,16 @@ npm run flujo -- estado | plan | tarea tareas\<archivo>.md | cancelar | recupera
 npm run monitor                                 # panel en vivo (q para salir)
 ```
 
+**Turnos** (para que Codex avance mientras Claude está ocupado):
+
+```powershell
+npm run flujo -- plan --turno-codex   # Codex implementa + comprobaciones; deja «listo para revisar» (main intacto)
+npm run flujo -- revisar [Id]         # turno de Claude: comprobaciones sobre el main actual, revisión, integración
+```
+
+Si Claude rechaza, su diagnóstico se guarda y Codex lo recibe en su siguiente turno. Requiere `main` limpio al
+empezar (no trabajar a la vez en la misma carpeta del proyecto). Codex usa la cuota de la suscripción de ChatGPT.
+
 Las tareas, sus pruebas y los registros (`.runs/`, `.worktrees/`, fuera de git) viven en el proyecto; Claude,
 Ruflo y su memoria, en el agente. Las comprobaciones son las de un proyecto Next.js + TypeScript + Playwright
 (la tienda); habrá que generalizarlas con el segundo tipo de proyecto. Codex no va en la imagen todavía.
