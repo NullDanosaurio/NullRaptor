@@ -103,6 +103,8 @@ if (env.CLAUDE_CONFIG_DIR) {
 const mcp = path.join(trabajo, '.mcp-agente.json');
 const mcpBase = JSON.parse(fs.readFileSync(path.join(agente, '.mcp.json'), 'utf8'));
 mcpBase.mcpServers.ruflo.args = [path.join(agente, 'scripts', 'ruflo-mcp.mjs')];
+// Explícitas: un cliente MCP puede no heredar el entorno, y sin ellas Ruflo guarda la memoria fuera del volumen.
+Object.assign(mcpBase.mcpServers.ruflo.env, Object.fromEntries(Object.entries(env).filter(([k]) => k.startsWith('CLAUDE_FLOW_'))));
 Object.assign(mcpBase.mcpServers, aConfigMcp(leerEstado(memoria).instalados, env)); // los autorizados por Daniel
 fs.writeFileSync(mcp, JSON.stringify(mcpBase, null, 2));
 
