@@ -1,13 +1,14 @@
 {
   "mcpServers": {
     "ruflo": {
-      "command": "C:/Users/danoa/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+      "command": "node",
       "args": [
-        "C:/Users/danoa/Documents/Codex/2026-10-22/co/outputs/ruflo-web/node_modules/ruflo/bin/ruflo.js",
+        "node_modules/ruflo/bin/ruflo.js",
         "mcp",
         "start"
       ],
       "env": {
+        "npm_config_update_notifier": "false",
         "CLAUDE_FLOW_MODE": "v3",
         "CLAUDE_FLOW_MAX_AGENTS": "3",
         "CLAUDE_FLOW_TOPOLOGY": "hierarchical"

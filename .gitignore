@@ -24,3 +24,7 @@ node_modules/
 dist/
 .claude/memory.db
 .claude-flow/metrics/
+
+# Estado de política de Ruflo: por equipo, ligado a ~/.config/ruflo (va en volumen)
+.claude-flow/policy/
+.claude-flow/memory-package.json
