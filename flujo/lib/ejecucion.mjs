@@ -29,7 +29,9 @@ export function cambiosEn(wt) {
     cambios.push(entrada.slice(3));
     if (entrada[0] === 'R' || entrada[0] === 'C') i++;
   }
-  return cambios;
+  // El enlace a node_modules lo crea el flujo. En Linux es un symlink que git ve como archivo
+  // (la regla «node_modules/» de .gitignore solo cubre carpetas), así que nunca cuenta como cambio.
+  return cambios.filter((c) => c !== 'node_modules');
 }
 
 function restaurar(wt, archivos) {
