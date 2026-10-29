@@ -12,6 +12,12 @@
 - Keep files under 500 lines
 - Validate input at system boundaries
 
+## Bóveda (memoria compartida)
+
+La bóveda es `$BOVEDA_DIR` (clon de la memoria en la rama `agente`; Dano fusiona en `main`). Las rutas cambian
+según el equipo: usa `$BOVEDA_DIR`, `$TRABAJO_DIR` (proyectos en `$TRABAJO_DIR/proyectos/<P>`) y `$CREDENCIALES`,
+nunca rutas fijas. Sin `$BOVEDA_DIR` (fuera de Nullraptor), no escribas en la bóveda.
+
 ## Ruflo Capability Brain & Implementation Loop
 
 Ruflo is the coordination ledger and policy decision point. Claude Code is the
