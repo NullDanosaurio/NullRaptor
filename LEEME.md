@@ -89,6 +89,15 @@ Los tokens solo existen en la memoria de los procesos: git los recibe por variab
   calendario; «vigilar mi impresora Elegoo» → ninguno instalable hoy.
 - A mano: `node scripts/preparar.mjs node scripts/mcp.mjs explorar [--forzar]`.
 
+## Chat con Claude y Codex a la vez
+
+Tras elegir proyecto: `c` en vez de Intro (`scripts/chat.mjs`). Sin destinatario contestan las dos, alternando quién
+empieza, y cada una lee lo que dijo la otra; `@claude …` o `@codex …` habla con una; `/fin` cierra. Las dos **solo
+leen** el proyecto (los cambios, por el flujo automático). Decisión [U] 29/10/2026: la bóveda es conocimiento, no un
+registro de chats → la conversación completa queda solo en el equipo (`$TRABAJO_DIR/chats`, se borra a los 30 días) y
+al cerrar Claude escribe en `Diario/AAAA-MM-DD.md` de la memoria un resumen de 2-5 viñetas; si ve una lección
+reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cuota de ambas suscripciones.
+
 ## Flujo automático sobre un proyecto
 
 Movido desde la tienda el 29/10/2026 (los proyectos ya no llevan IA). Codex implementa en un worktree del proyecto,

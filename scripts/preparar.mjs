@@ -8,6 +8,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { abrirCofre } from './credenciales.mjs';
 import { elegirProyecto } from './menu.mjs';
@@ -29,7 +30,9 @@ if (process.stdin.isTTY) console.error(String.raw`
 // El cofre nunca va en el repo ni en la imagen: vive en cada equipo (en Docker, montado en /cofre).
 const rutaCofre = process.env.CREDENCIALES ?? path.join(os.homedir(), '.nullraptor', 'credenciales.cifrado');
 const cofre = fs.existsSync(rutaCofre) ? await abrirCofre(rutaCofre).catch((e) => { console.error(e.message); process.exit(1); }) : {};
-const env = { ...cofre, ...process.env, GIT_TERMINAL_PROMPT: '0' };
+// Sin autoactualización: la versión de Claude va fijada en package.json, y en Windows el actualizador aparta
+// claude.exe (claude.exe.old.*) sin dejar el nuevo, así que el siguiente arranque fallaba.
+const env = { ...cofre, ...process.env, GIT_TERMINAL_PROMPT: '0', DISABLE_AUTOUPDATER: '1' };
 delete env.AGENTE_CLAVE; // la clave no pasa a los procesos hijos
 // Autor de los commits del agente en memoria y proyectos (el flujo hace commits en los proyectos).
 if (env.AGENTE_GIT_NOMBRE) env.GIT_AUTHOR_NAME = env.GIT_COMMITTER_NAME = env.AGENTE_GIT_NOMBRE;
@@ -109,6 +112,11 @@ mcpBase.mcpServers.ruflo.args = [path.join(agente, 'scripts', 'ruflo-mcp.mjs')];
 Object.assign(mcpBase.mcpServers.ruflo.env, Object.fromEntries(Object.entries(env).filter(([k]) => k.startsWith('CLAUDE_FLOW_'))));
 Object.assign(mcpBase.mcpServers, aConfigMcp(leerEstado(memoria).instalados, env)); // los autorizados por Daniel
 fs.writeFileSync(mcp, JSON.stringify(mcpBase, null, 2));
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+const modo = (await rl.question('\nIntro = Claude Code · c = chat con Claude y Codex: ')).trim().toLowerCase();
+rl.close();
+if (modo === 'c') process.exit(ejecutar(process.execPath, [path.join(agente, 'scripts', 'chat.mjs'), proyecto], proyecto));
 
 const claude = path.join(agente, 'node_modules', '.bin', process.platform === 'win32' ? 'claude.cmd' : 'claude');
 process.exit(ejecutar(claude, ['--mcp-config', mcp, '--add-dir', memoria], proyecto));
