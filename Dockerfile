@@ -20,10 +20,13 @@ COPY . .
 
 # Todo el estado de cada equipo vive en un único volumen /estado: memoria y proyectos clonados,
 # memoria y política de Ruflo (junto a su ancla en ~/.config/ruflo) y la configuración de Claude.
+# shortcut: sin el motor nativo AgentDB (en Linux se carga y no guarda en el volumen); sql.js persiste en
+# CLAUDE_FLOW_MEMORY_PATH igual que en Windows. Reactivarlo cuando AgentDB acepte una ruta dentro del volumen.
 ENV HOME=/estado/home \
     CLAUDE_CONFIG_DIR=/estado/home/.claude \
     TRABAJO_DIR=/estado/trabajo \
     CLAUDE_FLOW_MEMORY_PATH=/estado/ruflo/swarm \
+    CLAUDE_FLOW_DISABLE_BRIDGE=1 \
     DISABLE_AUTOUPDATER=1 \
     npm_config_update_notifier=false \
     PATH=/nullraptor/node_modules/.bin:$PATH
