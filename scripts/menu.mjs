@@ -18,15 +18,17 @@ const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
 async function crearRepositorio(nombre, env) {
   const { GITHUB_TOKEN: token, GITHUB_ORG: org } = env;
-  if (!token || !org) throw new Error('Para crear proyectos hacen falta GITHUB_TOKEN y GITHUB_ORG en el cofre.');
+  if (!token) throw new Error('Para crear proyectos hace falta GITHUB_TOKEN en el cofre.');
   const api = env.GITHUB_API ?? 'https://api.github.com';
-  const r = await fetch(`${api}/orgs/${encodeURIComponent(org)}/repos`, {
+  // Con GITHUB_ORG, en la organización; sin ella, en la cuenta personal dueña del token.
+  const destino = org ? `/orgs/${encodeURIComponent(org)}/repos` : '/user/repos';
+  const r = await fetch(`${api}${destino}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
     body: JSON.stringify({ name: nombre, private: true, auto_init: true }),
   });
   const cuerpo = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(`GitHub rechazó crear ${org}/${nombre}: ${r.status} ${cuerpo.message ?? ''}`);
+  if (!r.ok) throw new Error(`GitHub rechazó crear ${org ?? 'tu cuenta'}/${nombre}: ${r.status} ${cuerpo.message ?? ''}`);
   return cuerpo.clone_url;
 }
 

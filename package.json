@@ -8,8 +8,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test \"tests/*.test.mjs\"",
+    "test": "node --test \"tests/**/*.test.mjs\"",
     "verificar": "node scripts/verificar.mjs",
-    "arrancar": "node scripts/preparar.mjs"
+    "arrancar": "node scripts/preparar.mjs",
+    "flujo": "node flujo/flujo.mjs",
+    "monitor": "node flujo/monitor.mjs"
   }
 }

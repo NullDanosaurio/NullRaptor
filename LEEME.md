@@ -52,6 +52,22 @@ clave. Consecuencia: cualquiera con la imagen puede intentar adivinar la clave s
 Los tokens solo existen en la memoria de los procesos: git los recibe por variables de entorno (ni en disco ni en
 `.git/config`) y la clave no pasa a los procesos hijos.
 
+## Flujo automático sobre un proyecto
+
+Movido desde la tienda el 29/10/2026 (los proyectos ya no llevan IA). Codex implementa en un worktree del proyecto,
+el coordinador comprueba integridad, typecheck, unitarias, build y e2e, Claude revisa en solo lectura y, si todo
+pasa, hace commit y avance rápido de `main` (nunca push).
+
+```powershell
+$env:FLUJO_PROYECTO = 'C:\ruta\al\proyecto'    # o ejecutar desde la carpeta del proyecto
+npm run flujo -- estado | plan | tarea tareas\<archivo>.md | cancelar | recuperar
+npm run monitor                                 # panel en vivo (q para salir)
+```
+
+Las tareas, sus pruebas y los registros (`.runs/`, `.worktrees/`, fuera de git) viven en el proyecto; Claude,
+Ruflo y su memoria, en el agente. Las comprobaciones son las de un proyecto Next.js + TypeScript + Playwright
+(la tienda); habrá que generalizarlas con el segundo tipo de proyecto. Codex no va en la imagen todavía.
+
 ## Desarrollo del agente
 
 ```powershell
