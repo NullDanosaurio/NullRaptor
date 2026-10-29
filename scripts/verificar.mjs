@@ -28,15 +28,15 @@ try {
   anotar('mcp', tools.length > 0, { herramientas: tools.length });
 
   // Operación representativa: leer, incrementar y guardar un contador en la memoria de Ruflo.
+  // Ruflo responde JSON: { found, value } al leer y { success, backend } al guardar.
+  const json = (r) => { try { return JSON.parse(texto(r)); } catch { return { crudo: texto(r).slice(0, 300) }; } };
   const clave = { key: 'verificacion/arranques', namespace: 'portable' };
-  const previo = await cliente.callTool({ name: 'memory_retrieve', arguments: clave });
-  const previoTexto = texto(previo);
-  const errorLectura = previo.isError ? previoTexto : null;
-  const n = Number(/"value"\s*:\s*"?(\d+)/.exec(previoTexto)?.[1] ?? 0) + 1;
-  const guardado = await cliente.callTool({ name: 'memory_store', arguments: { ...clave, value: String(n), provenance_type: 'system_observation' } });
-  const leido = texto(await cliente.callTool({ name: 'memory_retrieve', arguments: clave }));
-  const ok = !errorLectura && !guardado.isError && leido.includes(String(n));
-  anotar('memoria', ok, { arranques: n, error: errorLectura ?? (guardado.isError ? texto(guardado) : undefined) });
+  const previo = json(await cliente.callTool({ name: 'memory_retrieve', arguments: clave }));
+  const n = (previo.found ? Number(previo.value) : 0) + 1;
+  const guardado = json(await cliente.callTool({ name: 'memory_store', arguments: { ...clave, value: String(n), provenance_type: 'system_observation' } }));
+  const leido = json(await cliente.callTool({ name: 'memory_retrieve', arguments: clave }));
+  const ok = guardado.success === true && leido.found === true && String(leido.value) === String(n); // Ruflo devuelve número
+  anotar('memoria', ok, { arranques: n, backend: guardado.backend, ...(ok ? {} : { previo, guardado, leido }) });
 } catch (e) {
   anotar('mcp', false, { error: String(e?.message ?? e) });
 } finally {
