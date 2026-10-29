@@ -27,6 +27,13 @@ carpeta, y el cofre en `~/.nullraptor/`. La clave se pide **solo la primera vez*
 no se sube a ninguna parte). Si deja de abrir el cofre, se olvida y se vuelve a pedir. Para olvidarla a mano,
 borra ese archivo. Contrapartida: quien entre en tu sesión de Windows puede abrir el agente sin la clave.
 
+**Equipo nuevo desde el USB:** doble clic en `Instalar Nullraptor.cmd` (raíz del USB), que ejecuta
+`Nullraptor\instalar.ps1`, copia de `scripts/instalar.ps1`. Instala git y Node con winget si faltan, copia el
+cofre del USB a `~/.nullraptor/` (si ya hay uno distinto, pregunta), clona o actualiza el agente en
+`%USERPROFILE%\nullraptor-trabajo\agente`, hace `npm ci`, crea el acceso directo y lo arranca. Al terminar refresca
+la copia del USB. El `.cmd` es una línea:
+`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Nullraptor\instalar.ps1"`.
+
 ## Arranque en cualquier equipo con Docker
 
 ```powershell
