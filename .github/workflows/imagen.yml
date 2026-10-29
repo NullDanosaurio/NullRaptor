@@ -41,6 +41,16 @@ jobs:
           grep -q '"ok": true' segundo.json
           grep -q '"arranques": 2' segundo.json   # la memoria de Ruflo persiste en el volumen
 
+      - name: Diagnóstico de la memoria de Ruflo (solo si algo falla)
+        if: failure()
+        run: |
+          docker run --rm -v agente-prueba:/estado --entrypoint sh agente:prueba -c '
+            echo "== CLAUDE_FLOW_MEMORY_PATH=$CLAUDE_FLOW_MEMORY_PATH"
+            ls -la /nullraptor/.swarm /nullraptor/.claude-flow /estado/ruflo/swarm /estado/ruflo/policy 2>&1
+            echo "== memory.db en el contenedor:"; find / -name "memory.db" -not -path "/proc/*" 2>/dev/null
+            echo "== memoria portable:"; node node_modules/ruflo/bin/ruflo.js memory retrieve --key verificacion/arranques --namespace portable 2>&1 | tail -15
+            echo "== política:"; node node_modules/ruflo/bin/ruflo.js policy verify 2>&1 | tail -10'
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
