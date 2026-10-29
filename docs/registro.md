@@ -77,3 +77,8 @@
 - Pruebas: 16/16 unitarias; exploración real (40 s, 3 recomendaciones coherentes); menú: cancelar no instala,
   «instalar» registra y hace commit, configuración con versión fijada, sin relanzar Claude el mismo día (7/7).
 - Fallo encontrado y corregido: el registro exige búsquedas de 3+ caracteres («3d» devolvía 422).
+
+## 29/10/2026 — Rebranding: Ruflo Portable → Nullraptor
+- [U] Nombre elegido por Daniel. Repositorio `NullDano/Nullraptor`, imagen `ghcr.io/nulldano/nullraptor`,
+  carpeta `C:\Desarrollo\Nullraptor`, contenedor en `/nullraptor`, volumen `nullraptor`, banner al arrancar.
+- Se mantienen la rama `agente` de la memoria y las variables `AGENTE_*` del cofre (describen el papel, no la marca).

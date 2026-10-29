@@ -4,7 +4,7 @@
     "@claude-flow/codex": "3.0.5",
     "ruflo": "3.59.17"
   },
-  "name": "ruflo-web-trial",
+  "name": "nullraptor",
   "private": true,
   "type": "module",
   "scripts": {

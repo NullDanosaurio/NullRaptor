@@ -1,5 +1,5 @@
 # Construye la imagen en GitHub, la arranca de verdad en Linux y, solo si todo pasa, la publica en
-# GitHub Container Registry (ghcr.io/<cuenta>/agente) al subir a main, crear una etiqueta v* o lanzarlo a mano.
+# GitHub Container Registry (ghcr.io/<cuenta>/nullraptor) al subir a main, crear una etiqueta v* o lanzarlo a mano.
 name: imagen
 on:
   push:
@@ -49,7 +49,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/agente
+          images: ghcr.io/${{ github.repository_owner }}/nullraptor
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}

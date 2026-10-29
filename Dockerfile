@@ -1,5 +1,5 @@
-# Agente portátil: Ruflo 3.59.17 + Claude Code 2.1.308 (versiones fijadas en package-lock.json).
-# Arranque: docker run -it --rm -v agente:/estado ghcr.io/<org>/agente   → clave → memoria → menú de proyectos.
+# Nullraptor, agente personal portátil: Ruflo 3.59.17 + Claude Code 2.1.308 (versiones fijadas en package-lock.json).
+# Arranque: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldano/nullraptor   → clave → memoria → menú de proyectos.
 # shortcut: imagen base fijada por etiqueta exacta, sin digest; añadir @sha256 tras el primer pull verificado.
 FROM node:24.22.1-bookworm-slim
 
@@ -8,7 +8,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /agente
+WORKDIR /nullraptor
 COPY package.json package-lock.json ./
 # Sin scripts de instalación (igual que la prueba nativa con npm 12): Ruflo funciona sin módulos nativos.
 # Solo se ejecuta el de Claude Code, que coloca su binario de plataforma (leído y revisado).
@@ -25,12 +25,12 @@ ENV HOME=/estado/home \
     TRABAJO_DIR=/estado/trabajo \
     DISABLE_AUTOUPDATER=1 \
     npm_config_update_notifier=false \
-    PATH=/agente/node_modules/.bin:$PATH
+    PATH=/nullraptor/node_modules/.bin:$PATH
 RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/ruflo/swarm /estado/ruflo/policy \
- && ln -s /estado/ruflo/swarm /agente/.swarm \
- && ln -s /estado/ruflo/policy /agente/.claude-flow/policy \
- && chown -R node:node /agente /estado
+ && ln -s /estado/ruflo/swarm /nullraptor/.swarm \
+ && ln -s /estado/ruflo/policy /nullraptor/.claude-flow/policy \
+ && chown -R node:node /nullraptor /estado
 USER node
 VOLUME /estado
 
-ENTRYPOINT ["node", "/agente/scripts/preparar.mjs"]
+ENTRYPOINT ["node", "/nullraptor/scripts/preparar.mjs"]

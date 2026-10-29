@@ -72,7 +72,7 @@ export function guardarEstado(memoria, estado) {
 
 async function pedir(params) {
   const r = await fetch(`${API}/v0/servers?${new URLSearchParams({ version: 'latest', limit: '50', ...params })}`, {
-    headers: { 'User-Agent': 'RufloPortable/0.3 (agente personal)' },
+    headers: { 'User-Agent': 'Nullraptor/0.4 (agente personal)' },
   });
   if (!r.ok) throw new Error(`Registro MCP: ${r.status}`);
   return (await r.json()).servers ?? [];

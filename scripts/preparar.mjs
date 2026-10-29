@@ -1,5 +1,5 @@
 // Arranque del agente: abre el cofre con una clave, clona o actualiza su memoria (Obsidian) y, según el modo:
-//  - con orden:              node scripts/preparar.mjs <orden...>   → la ejecuta en /agente
+//  - con orden:              node scripts/preparar.mjs <orden...>   → la ejecuta en /nullraptor
 //  - en terminal, sin orden: menú de proyectos → Claude Code dentro del proyecto elegido
 //  - sin terminal ni orden:  scripts/verificar.mjs
 // Configuración (en el cofre o en el entorno; el entorno manda): MEMORIA_REPO (obligatoria), GITHUB_ORG,
@@ -14,6 +14,16 @@ import { aConfigMcp, explorarDelDia, leerEstado } from './mcp.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAMA_MEMORIA = 'agente'; // el agente nunca escribe en main: Daniel fusiona.
+
+// Bienvenida, solo en terminal.
+if (process.stdin.isTTY) console.error(String.raw`
+               __
+              / _)     N U L L R A P T O R
+     _.----._/ /       agente personal · memoria + proyectos
+    /         /
+ __/ (  | (  |
+/__.-'|_|--|_|
+`);
 
 const rutaCofre = process.env.CREDENCIALES ?? path.join(agente, 'credenciales.cifrado');
 const cofre = fs.existsSync(rutaCofre) ? await abrirCofre(rutaCofre).catch((e) => { console.error(e.message); process.exit(1); }) : {};

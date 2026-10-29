@@ -1,4 +1,7 @@
-# Ruflo Portable 0.4.0
+# Nullraptor 0.4.0
+
+> Velocirráptor listo y rápido que caza en manada: tu agente personal, con su memoria a cuestas.
+> Antes «Ruflo Portable» (renombrado el 29/10/2026).
 
 Agente personal portátil: Ruflo + Claude Code en un contenedor. Arranca con **una clave**, descarga su memoria
 (vault de Obsidian en GitHub) y muestra un menú con los proyectos que conoce: si el elegido no está en el equipo
@@ -11,7 +14,7 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Agente (este repo) | GitHub, cuenta personal `NullDano`; imagen en `ghcr.io/nulldano/agente` | Sin credenciales dentro |
+| Agente (este repo) | GitHub, cuenta personal `NullDano`; imagen en `ghcr.io/nulldano/nullraptor` | Sin credenciales dentro |
 | Memoria | Repo privado con el vault de Obsidian | El agente escribe solo en la rama `agente`; Daniel fusiona en `main` |
 | Proyectos | Un repo privado cada uno | Deben funcionar sin IA: el agente no deja archivos suyos en ellos |
 | Tareas | GitHub Issues + Projects | Etiqueta `agente` para las tareas del agente. Sustituye a Notion |
@@ -19,13 +22,13 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 ## Arranque en cualquier equipo con Docker
 
 ```powershell
-docker run -it --rm -v agente:/estado ghcr.io/nulldano/agente
+docker run -it --rm -v nullraptor:/estado ghcr.io/nulldano/nullraptor
 ```
 
 Pide la clave, actualiza la memoria y muestra el menú. Elegido el proyecto, abre Claude Code dentro de él con
-la memoria accesible y el MCP de Ruflo. Todo lo del equipo queda en el volumen `agente` (`/estado`).
+la memoria accesible y el MCP de Ruflo. Todo lo del equipo queda en el volumen `nullraptor` (`/estado`).
 
-Otros modos: `... ghcr.io/nulldano/agente claude` (orden concreta en `/agente`); sin terminal, ejecuta la verificación.
+Otros modos: `... ghcr.io/nulldano/nullraptor claude` (orden concreta en `/nullraptor`); sin terminal, ejecuta la verificación.
 En un servidor sin terminal, la clave puede pasarse en `AGENTE_CLAVE`.
 
 ## Cofre de credenciales
@@ -104,14 +107,14 @@ Ruflo y su memoria, en el agente. Las comprobaciones son las de un proyecto Next
 ```powershell
 npm ci --ignore-scripts; node node_modules/@anthropic-ai/claude-code/install.cjs
 npm test
-docker compose run --rm agente        # construye desde este repo
+docker compose run --rm nullraptor        # construye desde este repo
 ```
 
 `--ignore-scripts`: npm 12 bloquea los scripts de instalación y Ruflo funciona sin sus módulos nativos. Claude
 Code sí necesita el suyo (`install.cjs`), que solo coloca el binario de la plataforma.
 
 Piezas: `scripts/preparar.mjs` (arranque), `scripts/credenciales.mjs` (cofre), `scripts/menu.mjs` (proyectos),
-`scripts/ruflo-mcp.mjs` (MCP con raíz en `/agente`), `scripts/verificar.mjs` (comprobación),
+`scripts/ruflo-mcp.mjs` (MCP con raíz en `/nullraptor`), `scripts/verificar.mjs` (comprobación),
 `.github/workflows/imagen.yml` (publica la imagen).
 
 ## Estado de las pruebas (29/10/2026)
