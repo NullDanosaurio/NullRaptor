@@ -18,6 +18,9 @@ export const INTERESES = ['obsidian', 'github', 'postgres', 'playwright', 'nextj
 const PAQUETE = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i;
 const VERSION_EXACTA = /^\d+\.\d+\.\d+(-[\w.]+)?$/; // sin rangos: lo instalado es lo revisado
 const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
+const CABECERA = /^[A-Za-z0-9-]+$/;
+// Variable del cofre con el valor de una cabecera de un remoto: dev.21st/mcp + x-api-key → MCP_DEV_21ST_MCP_X_API_KEY.
+export const variableDeCabecera = (id, cabecera) => `MCP_${id}_${cabecera}`.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
 // Credenciales del agente: nunca se entregan a un MCP de terceros aunque las pida.
 export const RESERVADAS = /^(GITHUB_|GIT_|CLAUDE_|ANTHROPIC_|OPENAI_|AGENTE_|MEMORIA_REPO$|CREDENCIALES$)/;
 // Texto de terceros: una línea corta, para que no entre en la memoria como si fueran instrucciones.
@@ -28,8 +31,9 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 export function aCandidato({ server: s }) {
   const npm = (s.packages ?? []).find((p) => p.registryType === 'npm' && (p.transport?.type ?? 'stdio') === 'stdio'
     && PAQUETE.test(p.identifier ?? '') && VERSION_EXACTA.test(p.version ?? ''));
-  // shortcut: remotos con cabeceras de autenticación y paquetes pypi/docker fuera hasta que la imagen tenga uvx/docker.
-  const remoto = (s.remotes ?? []).find((r) => /^https:\/\//.test(r.url ?? '') && ['streamable-http', 'sse'].includes(r.type) && !(r.headers ?? []).length);
+  // shortcut: pypi/docker fuera hasta que la imagen tenga uvx/docker; cabeceras con plantilla («Bearer {x}») fuera hasta que un servidor útil las pida.
+  const remoto = (s.remotes ?? []).find((r) => /^https:\/\//.test(r.url ?? '') && ['streamable-http', 'sse'].includes(r.type)
+    && (r.headers ?? []).every((h) => CABECERA.test(h.name ?? '') && h.value === undefined));
   if (!npm && !remoto) return null;
   const variables = (npm?.environmentVariables ?? []).filter((e) => VARIABLE.test(e.name ?? ''))
     .map((e) => ({ nombre: e.name, secreta: !!e.isSecret, obligatoria: !!e.isRequired }));
@@ -37,7 +41,8 @@ export function aCandidato({ server: s }) {
     id: s.name, titulo: limpiar(s.title ?? s.name, 80), descripcion: limpiar(s.description),
     repo: s.repository?.url ?? null,
     instalacion: npm ? { tipo: 'npm', paquete: npm.identifier, version: npm.version, variables }
-      : { tipo: 'remoto', url: remoto.url, transporte: remoto.type, variables: [] },
+      : { tipo: 'remoto', url: remoto.url, transporte: remoto.type, variables: (remoto.headers ?? []).map((h) => (
+        { nombre: variableDeCabecera(s.name, h.name), cabecera: h.name, secreta: !!h.isSecret, obligatoria: !!h.isRequired })) },
   };
 }
 
@@ -55,7 +60,12 @@ export function aConfigMcp(instalados, env = process.env) {
       const variables = Object.fromEntries(propias.filter((v) => env[v.nombre]).map((v) => [v.nombre, env[v.nombre]]));
       servidores[clave] = { command: 'npx', args: ['-y', `${i.paquete}@${i.version}`], env: variables };
     } else if (i.tipo === 'remoto' && /^https:\/\//.test(i.url)) {
-      servidores[clave] = { type: i.transporte === 'sse' ? 'sse' : 'http', url: i.url };
+      // Solo cabeceras con su nombre de variable canónico: un estado manipulado no puede pedir GITHUB_TOKEN.
+      const cabeceras = (i.variables ?? []).filter((v) => CABECERA.test(v.cabecera ?? '') && v.nombre === variableDeCabecera(id, v.cabecera));
+      const faltan = cabeceras.filter((v) => v.obligatoria && !env[v.nombre]).map((v) => v.nombre);
+      if (faltan.length) { console.warn(`MCP ${id} desactivado: faltan ${faltan.join(', ')} en el cofre.`); continue; }
+      const headers = Object.fromEntries(cabeceras.filter((v) => env[v.nombre]).map((v) => [v.cabecera, env[v.nombre]]));
+      servidores[clave] = { type: i.transporte === 'sse' ? 'sse' : 'http', url: i.url, ...(Object.keys(headers).length && { headers }) };
     } else console.warn(`MCP ${id} ignorado: instalación no válida.`);
   }
   return servidores;

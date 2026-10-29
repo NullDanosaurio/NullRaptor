@@ -79,8 +79,9 @@ Los tokens solo existen en la memoria de los procesos: git los recibe por variab
 - **Dónde queda**: `MCP/Recomendaciones/AAAA-MM-DD.md` y `MCP/estado.json` en la memoria (rama `agente`).
   No se repiten recomendaciones.
 - **Instalar**: menú → `m` → ver detalles (paquete y versión, repositorio, variables, riesgos) → escribir
-  `instalar`. Solo se admiten paquetes npm con versión exacta (`npx -y paquete@x.y.z`) o remotos `https` sin
-  cabeceras; pypi/docker aún no. Las variables secretas van al cofre; si falta una obligatoria, el servidor no se
+  `instalar`. Solo se admiten paquetes npm con versión exacta (`npx -y paquete@x.y.z`) o remotos `https`
+  (si piden una cabecera como `x-api-key`, su valor va al cofre como `MCP_<ID>_<CABECERA>`, p. ej.
+  `MCP_DEV_21ST_MCP_X_API_KEY`; cabeceras con plantilla tipo `Bearer {x}` aún no); pypi/docker aún no. Las variables secretas van al cofre; si falta una obligatoria, el servidor no se
   activa. Se aplican al abrir un proyecto.
 - **Buscar por descripción** (menú → `b`): describes en español lo que necesitas; Claude (sin herramientas) saca de
   1 a 6 términos en inglés, se busca en el registro y Claude devuelve **de 0 a 3** que de verdad encajen (si nada

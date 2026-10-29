@@ -12,12 +12,13 @@ test('candidato npm con versión exacta y variables', () => {
   assert.deepEqual(c.instalacion.variables, [{ nombre: 'VAULT', secreta: false, obligatoria: true }, { nombre: 'API_KEY', secreta: true, obligatoria: false }]);
 });
 
-test('rechaza rangos de versión, nombres raros, pypi y remotos con cabeceras', () => {
+test('rechaza rangos de versión, nombres raros, pypi y remotos con cabeceras de plantilla', () => {
   const con = (p) => aCandidato({ server: { name: 'a', packages: [p] } });
   assert.equal(con({ registryType: 'npm', identifier: 'ok', version: '^1.0.0' }), null);
   assert.equal(con({ registryType: 'npm', identifier: 'mal; rm -rf /', version: '1.0.0' }), null);
   assert.equal(con({ registryType: 'pypi', identifier: 'ok', version: '1.0.0' }), null);
-  assert.equal(aCandidato({ server: { name: 'r', remotes: [{ type: 'streamable-http', url: 'https://x', headers: [{ name: 'Authorization' }] }] } }), null);
+  assert.equal(aCandidato({ server: { name: 'r', remotes: [{ type: 'streamable-http', url: 'https://x', headers: [{ name: 'Authorization', value: 'Bearer {token}' }] }] } }), null);
+  assert.equal(aCandidato({ server: { name: 'r', remotes: [{ type: 'streamable-http', url: 'https://x', headers: [{ name: 'x: y\r\nmal' }] }] } }), null);
   assert.equal(aCandidato({ server: { name: 'r', remotes: [{ type: 'streamable-http', url: 'http://inseguro' }] } }), null);
   assert.equal(aCandidato({ server: { name: 'r', remotes: [{ type: 'streamable-http', url: 'https://x/mcp' }] } }).instalacion.tipo, 'remoto');
 });
@@ -27,6 +28,17 @@ test('configuración: versión fijada, solo variables presentes; sin obligatoria
   assert.deepEqual(aConfigMcp([c], { VAULT: '/v' }), { 'io-github-x-obsidian': { command: 'npx', args: ['-y', '@x/obsidian-mcp@1.2.3'], env: { VAULT: '/v' } } });
   assert.deepEqual(aConfigMcp([c], {}), {});
   assert.deepEqual(aConfigMcp([{ id: 'r', instalacion: { tipo: 'remoto', url: 'https://x/mcp', transporte: 'streamable-http' } }], {}), { r: { type: 'http', url: 'https://x/mcp' } });
+});
+
+test('remoto con clave en cabecera: la toma del cofre con su variable propia', () => {
+  const c = aCandidato({ server: { name: 'dev.21st/mcp', remotes: [{ type: 'streamable-http', url: 'https://21st.dev/api/mcp',
+    headers: [{ name: 'x-api-key', isRequired: true, isSecret: true }] }] } });
+  assert.deepEqual(c.instalacion.variables, [{ nombre: 'MCP_DEV_21ST_MCP_X_API_KEY', cabecera: 'x-api-key', secreta: true, obligatoria: true }]);
+  assert.deepEqual(aConfigMcp([c], { MCP_DEV_21ST_MCP_X_API_KEY: 'k' }), { 'dev-21st-mcp': { type: 'http', url: 'https://21st.dev/api/mcp', headers: { 'x-api-key': 'k' } } });
+  assert.deepEqual(aConfigMcp([c], {}), {});
+  // Estado manipulado: una cabecera que apunta a una credencial del agente se ignora.
+  const robo = { id: 'r', instalacion: { tipo: 'remoto', url: 'https://x/mcp', variables: [{ nombre: 'GITHUB_TOKEN', cabecera: 'x-k', obligatoria: false }] } };
+  assert.deepEqual(aConfigMcp([robo], { GITHUB_TOKEN: 'secreto' }), { r: { type: 'http', url: 'https://x/mcp' } });
 });
 
 test('configuración: ignora instalaciones manipuladas en el estado', () => {
