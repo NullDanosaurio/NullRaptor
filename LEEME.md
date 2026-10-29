@@ -105,6 +105,23 @@ registro de chats → la conversación completa queda solo en el equipo (`$TRABA
 al cerrar Claude escribe en `Diario/AAAA-MM-DD.md` de la memoria un resumen de 2-5 viñetas; si ve una lección
 reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cuota de ambas suscripciones.
 
+## Panel web: chat, trabajo y bóveda en un solo sitio
+
+`panel/` (añadido el 29/10/2026). Servidor Node sin dependencias (`panel/servidor.mjs`) + web React/Vite/Tailwind
+(`panel/src`, diseño a partir de componentes de 21st.dev Magic). Secciones: **Inicio** (proyectos, flujo en curso,
+últimos cambios de la bóveda, MCP del día, chats), **Chat** (el mismo de `chat.mjs`: Claude y Codex en solo lectura,
+«Terminar y resumir» escribe en el Diario), **Trabajo** (tareas y fases del flujo en vivo, commits) y **Bóveda**
+(árbol, búsqueda, notas con `[[enlaces]]` y retroenlaces; solo lectura).
+
+```powershell
+docker run -it --rm -p 127.0.0.1:4321:4321 -v nullraptor:/estado -v "$HOME\.nullraptor:/cofre:ro" ghcr.io/nulldanosaurio/nullraptor node panel/servidor.mjs
+npm run panel:construir; npm run panel     # sin Docker (la primera vez construye la web en panel/dist)
+```
+
+Abre `http://localhost:4321`. Seguridad: solo `localhost` (rechaza otro `Host`), las escrituras exigen la cabecera
+`X-Nullraptor` y misma procedencia, y las rutas de la bóveda y los chats no pueden salir de su carpeta.
+Desarrollo de la web: `npm run dev --prefix panel` con el servidor en marcha (proxy de `/api`).
+
 ## Flujo automático sobre un proyecto
 
 Movido desde la tienda el 29/10/2026 (los proyectos ya no llevan IA). Codex implementa en un worktree del proyecto,

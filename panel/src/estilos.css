@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* Paleta de Nullraptor: fondo casi negro con un punto verde, acento lima (el raptor), un color por participante. */
+@theme {
+  --font-sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --color-fondo: #0a0c0b;
+  --color-panel: #111412;
+  --color-elevado: #171b18;
+  --color-borde: #232924;
+  --color-borde-fuerte: #2f3731;
+  --color-texto: #e8ece9;
+  --color-tenue: #9aa39d;
+  --color-apagado: #6b746e;
+
+  --color-raptor: #b5f23d;
+  --color-raptor-oscuro: #7fae1f;
+  --color-claude: #e8946f;
+  --color-codex: #7fa8ff;
+  --color-ok: #4ade80;
+  --color-aviso: #fbbf24;
+  --color-fallo: #f87171;
+
+  --ease-salida: cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-entrar: entrar 220ms var(--ease-salida) both;
+  --animate-brillo: brillo 1.6s linear infinite;
+  --animate-latido: latido 1.4s ease-in-out infinite;
+
+  @keyframes entrar {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes brillo {
+    from { background-position: 150% 0; }
+    to { background-position: -50% 0; }
+  }
+  @keyframes latido {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+}
+
+html, body, #raiz { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  /* rejilla muy tenue de fondo */
+  background-image: radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.025) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+::selection { background: rgb(181 242 61 / 0.25); }
+:focus-visible { outline: 2px solid var(--color-raptor); outline-offset: 2px; border-radius: 6px; }
+
+* { scrollbar-width: thin; scrollbar-color: var(--color-borde-fuerte) transparent; }
+
+/* «Pensando…» con brillo que recorre el texto */
+.brillo {
+  background: linear-gradient(90deg, var(--color-apagado) 0%, var(--color-apagado) 40%, var(--color-texto) 50%, var(--color-apagado) 60%, var(--color-apagado) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-brillo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Markdown de la bóveda y del chat */
+.prosa { line-height: 1.65; color: var(--color-texto); overflow-wrap: anywhere; }
+.prosa > :first-child { margin-top: 0; }
+.prosa > :last-child { margin-bottom: 0; }
+.prosa h1 { font-size: 1.6rem; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 1rem; }
+.prosa h2 { font-size: 1.2rem; font-weight: 620; letter-spacing: -0.01em; margin: 1.8rem 0 0.6rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--color-borde); }
+.prosa h3 { font-size: 1.02rem; font-weight: 600; margin: 1.4rem 0 0.5rem; }
+.prosa p, .prosa ul, .prosa ol, .prosa blockquote, .prosa pre, .prosa table { margin: 0.7rem 0; }
+.prosa ul, .prosa ol { padding-left: 1.3rem; }
+.prosa ul { list-style: disc; }
+.prosa ol { list-style: decimal; }
+.prosa li { margin: 0.2rem 0; }
+.prosa li::marker { color: var(--color-apagado); }
+.prosa a { color: var(--color-raptor); text-decoration: none; border-bottom: 1px solid rgb(181 242 61 / 0.3); }
+.prosa a:hover { border-bottom-color: var(--color-raptor); }
+.prosa a.roto { color: var(--color-tenue); border-bottom-style: dashed; border-bottom-color: var(--color-apagado); }
+.prosa strong { font-weight: 620; color: #fff; }
+.prosa code { font-family: var(--font-mono); font-size: 0.86em; background: var(--color-elevado); border: 1px solid var(--color-borde); border-radius: 5px; padding: 0.08rem 0.32rem; }
+.prosa pre { background: #0c0f0d; border: 1px solid var(--color-borde); border-radius: 10px; padding: 0.85rem 1rem; overflow-x: auto; }
+.prosa pre code { background: none; border: 0; padding: 0; font-size: 0.82rem; }
+.prosa blockquote { border-left: 3px solid var(--color-raptor-oscuro); padding: 0.1rem 0 0.1rem 0.9rem; color: var(--color-tenue); }
+.prosa hr { border: 0; border-top: 1px solid var(--color-borde); margin: 1.5rem 0; }
+.prosa .tabla { overflow-x: auto; border: 1px solid var(--color-borde); border-radius: 10px; margin: 0.8rem 0; }
+.prosa table { border-collapse: collapse; width: 100%; margin: 0; font-size: 0.9em; }
+.prosa th { text-align: left; font-weight: 600; background: var(--color-elevado); color: var(--color-tenue); }
+.prosa th, .prosa td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--color-borde); vertical-align: top; }
+.prosa tr:last-child td { border-bottom: 0; }
+.prosa input[type="checkbox"] { accent-color: var(--color-raptor); margin-right: 0.4rem; }

@@ -6,6 +6,8 @@ services:
     image: nullraptor:dev
     volumes:
       - nullraptor:/estado
+    ports:
+      - "127.0.0.1:4321:4321"   # panel web: docker compose run --rm --service-ports nullraptor node panel/servidor.mjs
     stdin_open: true
     tty: true
 

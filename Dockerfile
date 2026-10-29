@@ -1,6 +1,14 @@
 # Nullraptor, agente personal portátil: Ruflo 3.59.17 + Claude Code 2.1.308 (versiones fijadas en package-lock.json).
 # Arranque: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldanosaurio/nullraptor   → clave → memoria → menú de proyectos.
 # shortcut: imagen base fijada por etiqueta exacta, sin digest; añadir @sha256 tras el primer pull verificado.
+# Etapa 1: la web del panel (React + Vite + Tailwind). Sus dependencias solo existen aquí; a la imagen va dist/.
+FROM node:24.22.1-bookworm-slim AS panel
+WORKDIR /panel
+COPY panel/package.json panel/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY panel/ ./
+RUN npm run build
+
 FROM node:24.22.1-bookworm-slim
 
 # git para memoria y proyectos. Sin compiladores: no se construyen módulos nativos.
@@ -17,6 +25,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund \
  && npm cache clean --force
 
 COPY . .
+COPY --from=panel /panel/dist ./panel/dist
 
 # Todo el estado de cada equipo vive en un único volumen /estado: memoria y proyectos clonados,
 # memoria y política de Ruflo (junto a su ancla en ~/.config/ruflo) y la configuración de Claude.
@@ -31,6 +40,7 @@ ENV HOME=/estado/home \
     CLAUDE_FLOW_DISABLE_BRIDGE=1 \
     DISABLE_AUTOUPDATER=1 \
     npm_config_update_notifier=false \
+    PANEL_HOST=0.0.0.0 \
     PATH=/nullraptor/node_modules/.bin:$PATH
 RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/ruflo/swarm /estado/ruflo/policy \
  && ln -s /estado/ruflo/swarm /nullraptor/.swarm \
@@ -38,5 +48,7 @@ RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/ruflo/swarm /estado/ru
  && chown -R node:node /nullraptor /estado
 USER node
 VOLUME /estado
+# Panel web (node panel/servidor.mjs): publicar solo en el equipo, -p 127.0.0.1:4321:4321.
+EXPOSE 4321
 
 ENTRYPOINT ["node", "/nullraptor/scripts/preparar.mjs"]

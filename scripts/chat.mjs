@@ -1,9 +1,10 @@
-// Chat de grupo: Dano, Claude y Codex sobre un proyecto, en la terminal.
+// Chat de grupo: Dano, Claude y Codex sobre un proyecto, en la terminal (y en el panel web, con la clase Chat).
 //   node scripts/chat.mjs <carpeta del proyecto>     (preparar.mjs lo lanza con BOVEDA_DIR y TRABAJO_DIR)
 // Sin destinatario contestan las dos, alternando quién empieza; «@claude …» o «@codex …» habla con una; «/fin» cierra.
 // Las dos solo leen el proyecto (nunca dos escritores a la vez). La conversación completa queda en el equipo
 // ($TRABAJO_DIR/chats, se borra a los 30 días); a la bóveda solo va el resumen, en el Diario.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
@@ -11,9 +12,9 @@ import { pathToFileURL } from 'node:url';
 import { BIN, entornoSeguro } from '../flujo/lib/comun.mjs';
 
 export const IAS = ['claude', 'codex'];
-const NOMBRE = { dano: 'Dano', claude: 'Claude', codex: 'Codex' };
-const DIAS_LOCAL = 30;
-const MAX_MENSAJE = 20_000;
+export const NOMBRE = { dano: 'Dano', claude: 'Claude', codex: 'Codex' };
+export const DIAS_LOCAL = 30;
+export const MAX_MENSAJE = 20_000;
 const una = (s, max) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
 /** «@codex hola» → { destino: ['codex'], texto: 'hola' }; sin @, las dos en el orden del turno. */
@@ -43,10 +44,33 @@ export function entradaDiario(proyecto, resumen) {
   return `\n## [[${proyecto}]] — chat: ${tema}\n${vinetas.map((v) => `- ${v}`).join('\n')}\n`;
 }
 
-function preguntarClaude(proyecto, entrada, sesion) {
+/** Proceso hijo asíncrono (no bloquea el panel web mientras contesta una IA). */
+function correr(cmd, args, { cwd, input, timeout }) {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let hecho = false;
+    const hijo = spawn(cmd, args, { cwd, env: entornoSeguro(), windowsHide: true });
+    const fin = (status) => {
+      if (hecho) return;
+      hecho = true;
+      clearTimeout(reloj);
+      resolve({ status, stdout, stderr });
+    };
+    const reloj = setTimeout(() => hijo.kill('SIGKILL'), timeout);
+    hijo.stdout.on('data', (d) => { stdout += d; });
+    hijo.stderr.on('data', (d) => { stderr += d; });
+    hijo.on('error', (e) => { stderr += e.message; fin(null); });
+    hijo.on('close', (code) => fin(code));
+    hijo.stdin.on('error', () => {});
+    hijo.stdin.end(input);
+  });
+}
+
+async function preguntarClaude(proyecto, entrada, sesion) {
   const args = ['-p', '--output-format', 'json', '--tools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk', '--strict-mcp-config'];
   if (sesion) args.push('--resume', sesion);
-  const r = spawnSync(BIN.claude, args, { cwd: proyecto, input: entrada, encoding: 'utf8', env: entornoSeguro(), timeout: 10 * 60_000, windowsHide: true });
+  const r = await correr(BIN.claude, args, { cwd: proyecto, input: entrada, timeout: 10 * 60_000 });
   try {
     const j = JSON.parse(r.stdout);
     if (j.is_error) throw new Error(j.result);
@@ -54,35 +78,35 @@ function preguntarClaude(proyecto, entrada, sesion) {
   } catch (e) { throw new Error(`Claude no respondió (${e.message ?? r.status}). ${una(r.stderr, 200)}`); }
 }
 
-function preguntarCodex(proyecto, entrada, sesion, carpeta) {
-  const salida = path.join(carpeta, '.codex-ultimo.txt');
+async function preguntarCodex(proyecto, entrada, sesion, salida) {
   fs.rmSync(salida, { force: true });
   // resume no admite --sandbox: el modo va por configuración, también en la primera llamada.
   const comunes = ['-c', 'sandbox_mode="read-only"', '--skip-git-repo-check', '--json', '-o', salida];
   const args = sesion ? ['exec', 'resume', ...comunes, sesion, '-'] : ['exec', ...comunes, '--color', 'never', '-'];
-  const r = spawnSync(BIN.codex, args, { cwd: proyecto, input: entrada, encoding: 'utf8', env: entornoSeguro(), timeout: 10 * 60_000, windowsHide: true });
+  const r = await correr(BIN.codex, args, { cwd: proyecto, input: entrada, timeout: 10 * 60_000 });
   const id = r.stdout?.match(/"thread_id":"([\w-]+)"/)?.[1] ?? sesion;
   if (!fs.existsSync(salida)) throw new Error(`Codex no respondió (código ${r.status}). ${una(r.stderr, 200)}`);
   return { texto: fs.readFileSync(salida, 'utf8').trim(), sesion: id };
 }
 
-function resumir(proyecto, historial) {
+async function resumir(proyecto, historial) {
   const esquema = JSON.stringify({ type: 'object', required: ['tema', 'vinetas'], properties: {
     tema: { type: 'string' }, vinetas: { type: 'array', items: { type: 'string' } }, leccion: { type: 'string' } } });
   const chat = historial.map((m) => `[${NOMBRE[m.quien]}] ${m.texto}`).join('\n\n');
   const orden = 'Resume este chat para la bitácora de una bóveda de conocimiento: «tema» (máx. 6 palabras) y de 2 a 5 «vinetas» '
     + 'con lo decidido, lo descubierto y lo pendiente (nada de charla). Procedencia: [U] dicho por Dano, [P] propuesta de una IA. '
     + '«leccion» solo si hay algo reutilizable en otros proyectos; si no, vacío. Español.\n\n';
-  const r = spawnSync(BIN.claude, ['-p', '--output-format', 'json', '--json-schema', esquema, '--tools', '', '--strict-mcp-config', '--no-session-persistence'],
-    { cwd: proyecto, input: orden + chat, encoding: 'utf8', env: entornoSeguro(), timeout: 5 * 60_000, windowsHide: true });
+  const r = await correr(BIN.claude, ['-p', '--output-format', 'json', '--json-schema', esquema, '--tools', '', '--strict-mcp-config', '--no-session-persistence'],
+    { cwd: proyecto, input: orden + chat, timeout: 5 * 60_000 });
   const j = JSON.parse(r.stdout);
   return j.structured_output ?? JSON.parse(j.result);
 }
 
-function guardarEnBoveda(memoria, proyecto, historial) {
-  const resumen = resumir(proyecto.ruta, historial);
+/** Escribe el resumen en Diario/AAAA-MM-DD.md de la bóveda, hace commit y lo sube (rama del agente). */
+async function guardarEnBoveda(memoria, proyecto, historial) {
+  const resumen = await resumir(proyecto.ruta, historial);
   const entrada = entradaDiario(proyecto.nombre, resumen);
-  if (!entrada) { console.error('El resumen salió vacío: no se escribe nada en la bóveda.'); return; }
+  if (!entrada) return { avisos: ['El resumen salió vacío: no se escribe nada en la bóveda.'] };
   const dia = new Date().toISOString().slice(0, 10);
   const diario = path.join(memoria, 'Diario', `${dia}.md`);
   fs.mkdirSync(path.dirname(diario), { recursive: true });
@@ -91,29 +115,97 @@ function guardarEnBoveda(memoria, proyecto, historial) {
   const git = (args) => spawnSync('git', args, { cwd: memoria, encoding: 'utf8', windowsHide: true });
   git(['add', path.relative(memoria, diario)]);
   git(['commit', '-m', `Diario: chat sobre ${proyecto.nombre}`]);
-  if (git(['push', '-u', 'origin', 'HEAD']).status !== 0) console.warn('Aviso: resumen guardado en local; no se pudo subir la memoria.');
-  console.error(`Resumen guardado en Diario/${dia}.md:${entrada}`);
-  if (una(resumen.leccion, 500)) console.error(`Posible lección para Conocimiento/ (no se guarda sola): ${una(resumen.leccion, 500)}`);
+  const avisos = [];
+  if (git(['push', '-u', 'origin', 'HEAD']).status !== 0) avisos.push('Resumen guardado en local; no se pudo subir la memoria.');
+  return { nota: `Diario/${dia}.md`, entrada, leccion: una(resumen.leccion, 500) || null, avisos };
+}
+
+/** Borra los chats locales de más de DIAS_LOCAL días: lo local es efímero. */
+export function limpiarChats(carpeta) {
+  fs.mkdirSync(carpeta, { recursive: true });
+  for (const f of fs.readdirSync(carpeta)) {
+    const p = path.join(carpeta, f);
+    if (Date.now() - fs.statSync(p).mtimeMs > DIAS_LOCAL * 864e5) fs.rmSync(p, { force: true });
+  }
+}
+
+/**
+ * Una conversación. Eventos: 'mensaje' {quien, texto, hora} · 'escribiendo' ia|null · 'fallo' {quien, texto}.
+ * Solo un mensaje a la vez (las IA contestan por turnos).
+ */
+export class Chat extends EventEmitter {
+  constructor({ ruta, carpeta }) {
+    super();
+    this.proyecto = { ruta, nombre: path.basename(ruta) };
+    this.carpeta = carpeta;
+    limpiarChats(carpeta);
+    this.registro = path.join(carpeta, `${this.proyecto.nombre}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`);
+    this.historial = [];
+    this.estado = { claude: { vistos: 0, sesion: null }, codex: { vistos: 0, sesion: null } };
+    this.turno = 0;
+    this.ocupado = false;
+    this.escribiendo = null;
+  }
+
+  anotar(quien, texto) {
+    const m = { quien, texto, hora: new Date().toISOString() };
+    this.historial.push(m);
+    fs.appendFileSync(this.registro, `**${NOMBRE[quien]}:** ${texto}\n\n`);
+    this.emit('mensaje', m);
+  }
+
+  /** Envía una línea de Dano y espera las respuestas. Devuelve false si no había nada que enviar. */
+  async enviar(linea) {
+    if (this.ocupado) throw new Error('Espera a que terminen de contestar.');
+    const { destino, texto } = destinatarios(String(linea ?? '').trim(), this.turno);
+    if (!texto) return false;
+    if (texto.length > MAX_MENSAJE) throw new Error(`Mensaje demasiado largo (máx. ${MAX_MENSAJE} caracteres).`);
+    this.ocupado = true;
+    try {
+      if (destino.length > 1) this.turno++;
+      this.anotar('dano', texto);
+      for (const ia of destino) {
+        const e = this.estado[ia];
+        this.escribiendo = ia;
+        this.emit('escribiendo', ia);
+        try {
+          const entrada = pendientes(this.historial, e.vistos, ia, this.proyecto.nombre);
+          const r = ia === 'claude'
+            ? await preguntarClaude(this.proyecto.ruta, entrada, e.sesion)
+            : await preguntarCodex(this.proyecto.ruta, entrada, e.sesion, path.join(this.carpeta, `.codex-${path.basename(this.registro, '.md')}.txt`));
+          e.sesion = r.sesion;
+          this.anotar(ia, r.texto || '(sin respuesta)');
+          e.vistos = this.historial.length;
+        } catch (err) { this.emit('fallo', { quien: ia, texto: err.message }); }
+      }
+      return true;
+    } finally {
+      this.ocupado = false;
+      this.escribiendo = null;
+      this.emit('escribiendo', null);
+    }
+  }
+
+  /** Cierra: si hubo respuestas y hay bóveda, resume en el Diario. */
+  async cerrar(memoria) {
+    if (!this.historial.some((m) => m.quien !== 'dano')) return { registro: null, avisos: [] };
+    const base = { registro: this.registro };
+    if (!memoria) return { ...base, avisos: ['Sin BOVEDA_DIR: no se guarda resumen en la bóveda.'] };
+    try { return { ...base, ...(await guardarEnBoveda(memoria, this.proyecto, this.historial)) }; } catch (e) {
+      return { ...base, avisos: [`No se pudo resumir el chat (${e.message}).`] };
+    }
+  }
 }
 
 async function main() {
   const ruta = path.resolve(process.argv[2] ?? process.cwd());
-  const memoria = process.env.BOVEDA_DIR;
   const carpeta = path.join(path.resolve(process.env.TRABAJO_DIR ?? path.dirname(ruta)), 'chats');
-  const proyecto = { ruta, nombre: path.basename(ruta) };
-  fs.mkdirSync(carpeta, { recursive: true });
-  for (const f of fs.readdirSync(carpeta)) { // limpieza: lo local es efímero
-    const p = path.join(carpeta, f);
-    if (Date.now() - fs.statSync(p).mtimeMs > DIAS_LOCAL * 864e5) fs.rmSync(p, { force: true });
-  }
-  const registro = path.join(carpeta, `${proyecto.nombre}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`);
-  const historial = [];
-  const estado = { claude: { vistos: 0, sesion: null }, codex: { vistos: 0, sesion: null } };
-  const anotar = (quien, texto) => { historial.push({ quien, texto }); fs.appendFileSync(registro, `**${NOMBRE[quien]}:** ${texto}\n\n`); };
+  const chat = new Chat({ ruta, carpeta });
+  chat.on('mensaje', (m) => { if (m.quien !== 'dano') console.log(`\n[${NOMBRE[m.quien]}] ${m.texto}`); });
+  chat.on('fallo', (f) => console.error(`\n[${NOMBRE[f.quien]}] ${f.texto}`));
 
-  console.error(`Chat con Claude y Codex sobre «${proyecto.nombre}». «@claude …» o «@codex …» para hablar con una; «/fin» para terminar.`);
+  console.error(`Chat con Claude y Codex sobre «${chat.proyecto.nombre}». «@claude …» o «@codex …» para hablar con una; «/fin» para terminar.`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
-  let turno = 0;
   rl.setPrompt('\nTú: ');
   rl.prompt();
   try {
@@ -121,31 +213,16 @@ async function main() {
     for await (const bruta of rl) {
       const linea = bruta.trim();
       if (linea === '/fin') break;
-      if (!linea) { rl.prompt(); continue; }
-      const { destino, texto } = destinatarios(linea, turno);
-      if (!texto) { rl.prompt(); continue; }
-      if (texto.length > MAX_MENSAJE) { console.error(`Mensaje demasiado largo (máx. ${MAX_MENSAJE} caracteres).`); rl.prompt(); continue; }
-      if (destino.length > 1) turno++;
-      anotar('dano', texto);
-      for (const ia of destino) {
-        const e = estado[ia];
-        try {
-          const entrada = pendientes(historial, e.vistos, ia, proyecto.nombre);
-          const r = ia === 'claude' ? preguntarClaude(ruta, entrada, e.sesion) : preguntarCodex(ruta, entrada, e.sesion, carpeta);
-          e.sesion = r.sesion;
-          anotar(ia, r.texto || '(sin respuesta)');
-          e.vistos = historial.length;
-          console.log(`\n[${NOMBRE[ia]}] ${r.texto}`);
-        } catch (err) { console.error(`\n[${NOMBRE[ia]}] ${err.message}`); }
-      }
+      try { await chat.enviar(linea); } catch (e) { console.error(e.message); }
       rl.prompt();
     }
   } finally { rl.close(); }
 
-  if (!historial.some((m) => m.quien !== 'dano')) return;
-  console.error(`\nConversación completa (solo en este equipo, ${DIAS_LOCAL} días): ${registro}`);
-  if (!memoria) { console.error('Sin BOVEDA_DIR: no se guarda resumen en la bóveda.'); return; }
-  try { guardarEnBoveda(memoria, proyecto, historial); } catch (e) { console.warn(`Aviso: no se pudo resumir el chat (${e.message}).`); }
+  const r = await chat.cerrar(process.env.BOVEDA_DIR);
+  if (r.registro) console.error(`\nConversación completa (solo en este equipo, ${DIAS_LOCAL} días): ${r.registro}`);
+  for (const a of r.avisos ?? []) console.warn(`Aviso: ${a}`);
+  if (r.entrada) console.error(`Resumen guardado en ${r.nota}:${r.entrada}`);
+  if (r.leccion) console.error(`Posible lección para Conocimiento/ (no se guarda sola): ${r.leccion}`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) await main();

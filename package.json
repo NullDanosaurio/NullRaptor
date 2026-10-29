@@ -12,6 +12,8 @@
     "verificar": "node scripts/verificar.mjs",
     "arrancar": "node scripts/preparar.mjs",
     "flujo": "node flujo/flujo.mjs",
-    "monitor": "node flujo/monitor.mjs"
+    "monitor": "node flujo/monitor.mjs",
+    "panel": "node scripts/preparar.mjs node panel/servidor.mjs",
+    "panel:construir": "npm ci --prefix panel --ignore-scripts --no-audit --no-fund && npm run build --prefix panel"
   }
 }
