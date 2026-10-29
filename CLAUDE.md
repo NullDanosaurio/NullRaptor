@@ -116,7 +116,7 @@ SendMessage({ to: "researcher", summary: "Start", message: "[task context]" })
 - **Neural**: Enabled
 
 ```bash
-npx @claude-flow/cli@latest swarm init --topology hierarchical --max-agents 8 --strategy specialized
+npx @claude-flow/cli@3.59.17 swarm init --topology hierarchical --max-agents 8 --strategy specialized
 ```
 
 ### Agent Routing
@@ -145,14 +145,14 @@ npx @claude-flow/cli@latest swarm init --topology hierarchical --max-agents 8 --
 
 ### Before Any Task
 ```bash
-npx @claude-flow/cli@latest memory search --query "[task keywords]" --namespace patterns
-npx @claude-flow/cli@latest hooks route --task "[task description]"
+npx @claude-flow/cli@3.59.17 memory search --query "[task keywords]" --namespace patterns
+npx @claude-flow/cli@3.59.17 hooks route --task "[task description]"
 ```
 
 ### After Success
 ```bash
-npx @claude-flow/cli@latest memory store --namespace patterns --key "[name]" --value "[what worked]"
-npx @claude-flow/cli@latest hooks post-task --task-id "[id]" --success true --store-results true
+npx @claude-flow/cli@3.59.17 memory store --namespace patterns --key "[name]" --value "[what worked]"
+npx @claude-flow/cli@3.59.17 hooks post-task --task-id "[id]" --success true --store-results true
 ```
 
 ### MCP Tools (use `ToolSearch("keyword")` to discover)
@@ -178,7 +178,7 @@ npx @claude-flow/cli@latest hooks post-task --task-id "[id]" --success true --st
 | `document` | After API changes |
 
 ```bash
-npx @claude-flow/cli@latest hooks worker dispatch --trigger audit
+npx @claude-flow/cli@3.59.17 hooks worker dispatch --trigger audit
 ```
 
 ## Agents
@@ -204,13 +204,13 @@ npm run build && npm test
 ## CLI Quick Reference
 
 ```bash
-npx @claude-flow/cli@latest init --wizard           # Setup
-npx @claude-flow/cli@latest swarm init --v3-mode     # Start swarm
-npx @claude-flow/cli@latest memory search --query "" # Vector search
-npx @claude-flow/cli@latest hooks route --task ""    # Route to agent
-npx @claude-flow/cli@latest doctor --fix             # Diagnostics
-npx @claude-flow/cli@latest security scan            # Security scan
-npx @claude-flow/cli@latest performance benchmark    # Benchmarks
+npx @claude-flow/cli@3.59.17 init --wizard           # Setup
+npx @claude-flow/cli@3.59.17 swarm init --v3-mode     # Start swarm
+npx @claude-flow/cli@3.59.17 memory search --query "" # Vector search
+npx @claude-flow/cli@3.59.17 hooks route --task ""    # Route to agent
+npx @claude-flow/cli@3.59.17 doctor --fix             # Diagnostics
+npx @claude-flow/cli@3.59.17 security scan            # Security scan
+npx @claude-flow/cli@3.59.17 performance benchmark    # Benchmarks
 ```
 
 26 commands, 140+ subcommands. Use `--help` on any command for details.
@@ -218,13 +218,13 @@ npx @claude-flow/cli@latest performance benchmark    # Benchmarks
 ## Setup
 
 ```bash
-claude mcp add claude-flow -- npx -y ruflo@latest mcp start
-npx ruflo@latest doctor --fix
+claude mcp add claude-flow -- npx -y ruflo@3.59.17 mcp start
+npx ruflo@3.59.17 doctor --fix
 ```
 
 > The background `daemon` is optional. It runs interval workers that each spawn
 > a headless `claude` session, so it consumes tokens continuously. Start it only
-> if you want those sweeps: `npx ruflo@latest daemon start` (self-stops after 12h
+> if you want those sweeps: `npx ruflo@3.59.17 daemon start` (self-stops after 12h
 > by default; `--ttl 0` to disable, `daemon status --all` to audit running daemons).
 
 **Agent tool** handles execution (agents, files, code, git). **MCP tools** handle coordination (swarm, memory, hooks). **CLI** is the same via Bash.
