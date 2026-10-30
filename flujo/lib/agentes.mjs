@@ -15,7 +15,8 @@ const DIR_SIMULADORES = path.join(AGENTE, 'tests', 'flujo', 'simuladores');
 
 function promptImplementador(tarea, diagnostico) {
   const partes = [
-    `Eres el implementador de «${PROYECTO}» (lee AGENTS.md). Trabajas en un worktree aislado.`,
+    `Eres el implementador de «${PROYECTO}» en el flujo automático de Nullraptor. Trabajas en un worktree aislado.`,
+    'Sigue las instrucciones y normas del propio proyecto (AGENTS.md o CLAUDE.md, si los tiene).',
     '',
     `## Tarea ${tarea.id} (${tarea.ruta})`,
     tarea.texto,
@@ -23,7 +24,11 @@ function promptImplementador(tarea, diagnostico) {
     '## Reglas',
     `- Modifica o crea SOLO estos archivos: ${tarea.permitidos.join(', ')}. Cualquier otro cambio se revierte y el intento falla.`,
     `- Las pruebas de aceptación (${tarea.pruebas.join(', ') || 'las de tests/'}) son fijas: no puedes modificarlas.`,
-    '- No instales nada, no uses la red y no hagas commits.',
+    '- Tampoco toques tests/, scripts, package.json, el lockfile ni la configuración: son los criterios con los que',
+    '  se juzga tu trabajo y el coordinador comprueba que no cambian.',
+    '- Respeta las firmas ya fijadas en los archivos de contrato (implementa los cuerpos).',
+    '- No instales nada, no uses la red y no hagas commits: el coordinador integra el cambio si pasa pruebas y revisión.',
+    '- Todos los archivos son UTF-8: edita con tu herramienta de parches; el coordinador rechaza texto mal codificado.',
     '- Antes de terminar ejecuta:',
     '  node node_modules/typescript/bin/tsc --noEmit',
     '  node --test "tests/unit/**/*.test.ts"',

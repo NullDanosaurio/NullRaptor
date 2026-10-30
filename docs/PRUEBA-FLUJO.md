@@ -14,6 +14,6 @@ Implementar `slugify(value)` en `src/slug.mjs`: aceptar solo cadenas; normalizar
 4. Claude revisa el archivo y el contrato con acceso de lectura; emite un JSON con `approved` e `issues`.
 5. Si fallan pruebas o revisión, devuelve el diagnóstico a Codex, con un máximo de tres intentos.
 6. Solo integra el archivo si pasan todos los controles y el archivo de destino no cambió desde que comenzó la ejecución.
-7. Conserva logs y hashes en `.runs/`. No crea commits adicionales ni publica nada.
+7. Conserva logs y hashes en `$TRABAJO_DIR/flujo/<proyecto>/runs`. No crea commits adicionales ni publica nada.
 
 Las reglas de archivos y herramientas reducen el alcance de esta prueba; no representan un aislamiento infalible. No se pasan claves API a los procesos: utilizan sus sesiones de suscripción existentes.

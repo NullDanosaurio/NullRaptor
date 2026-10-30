@@ -29,9 +29,20 @@ export function cambiosEn(wt) {
     cambios.push(entrada.slice(3));
     if (entrada[0] === 'R' || entrada[0] === 'C') i++;
   }
-  // El enlace a node_modules lo crea el flujo. En Linux es un symlink que git ve como archivo
-  // (la regla «node_modules/» de .gitignore solo cubre carpetas), así que nunca cuenta como cambio.
+  // node_modules lo pone el flujo (prepararDependencias); en Windows es un enlace que git puede ver como archivo.
   return cambios.filter((c) => c !== 'node_modules');
+}
+
+/**
+ * Dependencias del proyecto en el worktree, que vive fuera del proyecto. En Linux, copia con enlaces duros (no
+ * ocupa espacio, tarda menos de un segundo y no hace falta decirle a Turbopack dónde está la raíz); en Windows, enlace.
+ */
+function prepararDependencias(wt) {
+  const origen = path.join(RAIZ, 'node_modules');
+  const destino = path.join(wt, 'node_modules');
+  if (process.platform === 'win32') { fs.symlinkSync(origen, destino, 'junction'); return; }
+  const r = spawnSync('cp', ['-al', origen, destino], { encoding: 'utf8' });
+  if (r.status !== 0) throw new ErrorInfra(`No se pudo preparar node_modules en el worktree: ${(r.stderr || '').trim().slice(0, 300)}`);
 }
 
 function restaurar(wt, archivos) {
@@ -55,13 +66,12 @@ export function cerrarWorktree(wt, rama, permitidos, motivo, integrado) {
       conservarRama = false; // la rama no tiene trabajo propio
     }
   }
+  // Un enlace (Windows) se quita antes de borrar el worktree para no borrar a través de él las dependencias del
+  // proyecto. La copia con enlaces duros (Linux) se borra con el worktree: los originales no se tocan.
   const enlace = path.join(wt, 'node_modules');
-  try {
-    if (fs.lstatSync(enlace).isSymbolicLink()) fs.unlinkSync(enlace);
-  } catch {
-    // no había enlace
-  }
-  if (fs.existsSync(enlace)) throw new ErrorInfra(`No se pudo quitar ${enlace}; worktree conservado`);
+  const esEnlace = () => { try { return fs.lstatSync(enlace).isSymbolicLink(); } catch { return false; } };
+  if (esEnlace()) fs.unlinkSync(enlace);
+  if (esEnlace()) throw new ErrorInfra(`No se pudo quitar ${enlace}; worktree conservado`);
   try {
     git(['worktree', 'remove', '--force', wt]);
   } catch (error) {
@@ -139,8 +149,9 @@ export async function ejecutarTarea(tarea, { maxIntentos = 3, simulador = null, 
 
   try {
     paso(`Ejecución ${id}: ${tarea.titulo}`);
+    fs.mkdirSync(WORKTREES, { recursive: true });
     git(['worktree', 'add', '-b', rama, wt, base]);
-    fs.symlinkSync(path.join(RAIZ, 'node_modules'), path.join(wt, 'node_modules'), 'junction');
+    prepararDependencias(wt);
 
     let aprobado = false;
     let listo = false;

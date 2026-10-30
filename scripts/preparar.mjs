@@ -11,7 +11,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { abrirCofre } from './credenciales.mjs';
-import { elegirProyecto, opcionesDelMenu } from './menu.mjs';
+import { carpetaAgente, elegirProyecto, opcionesDelMenu } from './menu.mjs';
 import { prepararIA } from './ia.mjs';
 import { explorarDelDia, leerEstado } from './mcp.mjs';
 
@@ -85,10 +85,13 @@ const mcp = prepararIA({ agente, env, memoria, trabajo });
 
 const ejecutar = (orden, args, cwd) => spawnSync(orden, args, { cwd, stdio: 'inherit', env: { ...env, BOVEDA_DIR: memoria, TRABAJO_DIR: trabajo }, shell: /\.(cmd|bat)$/i.test(orden) }).status ?? 1; // shell solo para .cmd (Windows)
 
-// El propio agente queda descargado como proyecto desde el primer arranque (menú y panel; no en la verificación).
+// El propio agente queda descargado desde el primer arranque (menú y panel; no en la verificación), aparte de los
+// proyectos. Antes iba en proyectos/Nullraptor: se mueve una vez.
 if (process.argv.length > 2 || process.stdin.isTTY) {
   const [nullraptor] = opcionesDelMenu(memoria, env.AGENTE_REPO);
-  try { clonarOActualizar(nullraptor.repo, path.join(trabajo, 'proyectos', nullraptor.nombre)); }
+  const antigua = path.join(trabajo, 'proyectos', nullraptor.nombre);
+  if (fs.existsSync(path.join(antigua, '.git')) && !fs.existsSync(carpetaAgente(trabajo))) fs.renameSync(antigua, carpetaAgente(trabajo));
+  try { clonarOActualizar(nullraptor.repo, carpetaAgente(trabajo)); }
   catch (e) { console.warn(`Aviso: no se pudo descargar ${nullraptor.nombre} (${e.message.split('\n')[0]}).`); }
 }
 

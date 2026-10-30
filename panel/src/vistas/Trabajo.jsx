@@ -82,8 +82,8 @@ function Detalle({ nombre }) {
           {flujo.tareas.length ? (
             <ul className="space-y-2.5">{flujo.tareas.map((t) => <Tarea key={t.id} t={t} vivo={vivo} />)}</ul>
           ) : (
-            <Vacio icono={CircleDashed} titulo="Sin tareas en tareas/">
-              Crea tareas en <code className="font-mono">tareas/*.md</code> del proyecto y lánzalas desde la terminal con <code className="font-mono">npm run flujo -- plan</code>.
+            <Vacio icono={CircleDashed} titulo="Sin tareas en la bóveda">
+              Crea tareas en <code className="font-mono">Proyectos/{nombre}/Tareas/*.md</code> de la bóveda y lánzalas desde la terminal con <code className="font-mono">npm run flujo -- plan</code>.
             </Vacio>
           )}
           {flujo.ramasPendientes > 0 && <p className="mt-3 text-[12px] text-aviso">{flujo.ramasPendientes} rama{flujo.ramasPendientes === 1 ? '' : 's'} flujo/… sin integrar (intentos rechazados conservados).</p>}

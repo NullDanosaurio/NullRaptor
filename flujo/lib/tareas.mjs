@@ -1,10 +1,14 @@
-// Lectura de tareas (Markdown), orden por dependencias y estado persistente.
+// Lectura de tareas (Markdown, en la bóveda: Proyectos/<proyecto>/Tareas), orden por dependencias y estado persistente.
 import fs from 'node:fs';
 import path from 'node:path';
-import { RAIZ, RUNS } from './comun.mjs';
+import { RUNS, TAREAS } from './comun.mjs';
 
-const DIR_TAREAS = path.join(RAIZ, 'tareas');
 const ESTADO = path.join(RUNS, 'estado-tareas.json');
+
+function carpetaTareas() {
+  if (!TAREAS) throw new Error('Sin bóveda (BOVEDA_DIR): las tareas del flujo viven en Proyectos/<proyecto>/Tareas de la bóveda.');
+  return TAREAS;
+}
 
 // Rutas que una tarea nunca puede dar al implementador: pruebas, criterios,
 // coordinador, manifiestos, configuración de herramientas y secretos.
@@ -18,12 +22,14 @@ export const PROHIBIDOS = [
 const lista = (texto) => texto.split(',').map((s) => s.trim().replaceAll('\\', '/')).filter((s) => s && !/^ningun[ao]s?$/i.test(s));
 const campo = (texto, nombre) => texto.match(new RegExp(`^${nombre}:\\s*(.+)$`, 'mi'))?.[1]?.trim() ?? '';
 
+/** Lee una tarea por su archivo (p. ej. «F1-01-catalogo.md»), dentro de la carpeta de tareas de la bóveda. */
 export function leerTarea(ruta) {
-  const abs = path.resolve(RAIZ, ruta);
-  if (!abs.startsWith(DIR_TAREAS + path.sep)) throw new Error(`La tarea debe estar dentro de tareas/: ${ruta}`);
+  const dir = carpetaTareas();
+  const abs = path.resolve(dir, ruta);
+  if (!abs.startsWith(dir + path.sep)) throw new Error(`La tarea debe estar en ${dir}: ${ruta}`);
   const texto = fs.readFileSync(abs, 'utf8');
   const titulo = texto.match(/^#\s+(.+)$/m)?.[1]?.trim();
-  const relativa = path.relative(RAIZ, abs).replaceAll('\\', '/');
+  const relativa = path.relative(dir, abs).replaceAll('\\', '/');
   const tarea = {
     ruta: relativa,
     id: campo(texto, 'Id') || path.basename(abs, '.md'),
@@ -46,13 +52,14 @@ export function leerTarea(ruta) {
   return tarea;
 }
 
-/** Tareas de la carpeta tareas/ (sin subcarpetas ni archivos que empiecen por «_»). */
+/** Tareas de la carpeta de tareas (sin subcarpetas ni archivos que empiecen por «_»). */
 export function listarTareas() {
-  if (!fs.existsSync(DIR_TAREAS)) return [];
-  return fs.readdirSync(DIR_TAREAS)
+  const dir = carpetaTareas();
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
     .filter((n) => n.endsWith('.md') && !n.startsWith('_') && n.toLowerCase() !== 'readme.md')
     .sort()
-    .map((n) => leerTarea(path.join('tareas', n)));
+    .map((n) => leerTarea(n));
 }
 
 /** Orden topológico estable; falla ante dependencias desconocidas o ciclos. */

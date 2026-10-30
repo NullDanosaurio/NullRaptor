@@ -17,6 +17,8 @@ export function proyectosConocidos(memoria) {
 
 // Repositorio del propio agente: siempre sale primero en el menú, aunque la memoria no tenga su nota.
 export const AGENTE_REPO = 'https://github.com/NullDanosaurio/NullRaptor.git';
+// Su copia de trabajo va aparte de los proyectos: proyectos/ solo tiene proyectos.
+export const carpetaAgente = (trabajo) => path.join(trabajo, 'nullraptor');
 
 // Menú: 1 = el agente (Nullraptor), 2 = la bóveda (la memoria, rama agente), después el resto de la memoria.
 export function opcionesDelMenu(memoria, agenteRepo = AGENTE_REPO) {
@@ -89,7 +91,8 @@ async function revisarMcp(rl, memoria, elegidos, git) {
 export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
   const lista = opcionesDelMenu(memoria, env.AGENTE_REPO);
   const destino = (nombre) => path.join(trabajo, 'proyectos', nombre);
-  const nota = (p) => (p.boveda ? '  (memoria, rama agente)' : fs.existsSync(destino(p.nombre)) ? '' : '  (se descargará)');
+  const carpeta = (p) => (p === lista[0] ? carpetaAgente(trabajo) : destino(p.nombre));
+  const nota = (p) => (p.boveda ? '  (memoria, rama agente)' : fs.existsSync(carpeta(p)) ? '' : '  (se descargará)');
   console.error('\nProyectos:');
   lista.forEach((p, i) => console.error(`  ${i + 1}. ${p.nombre}${nota(p)}`));
   const { hoy: mcpHoy = [], ultimaExploracion } = leerEstado(memoria);
@@ -123,7 +126,7 @@ export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
       }
       const p = lista[Number(r) - 1];
       if (p?.boveda) return memoria;
-      if (p) { clonar(p.repo, destino(p.nombre)); return destino(p.nombre); }
+      if (p) { clonar(p.repo, carpeta(p)); return carpeta(p); }
       console.error('Opción no válida.');
     }
   } finally { rl.close(); }

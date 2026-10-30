@@ -192,7 +192,8 @@ npm run flujo -- revisar [Id]         # turno de Claude: comprobaciones sobre el
 Si Claude rechaza, su diagnóstico se guarda y Codex lo recibe en su siguiente turno. Requiere `main` limpio al
 empezar (no trabajar a la vez en la misma carpeta del proyecto). Codex usa la cuota de la suscripción de ChatGPT.
 
-Las tareas, sus pruebas y los registros (`.runs/`, `.worktrees/`, fuera de git) viven en el proyecto; Claude,
+Nada del flujo vive en el proyecto: las tareas están en la bóveda (`Proyectos/<proyecto>/Tareas`) y los registros y
+worktrees en `$TRABAJO_DIR/flujo/<proyecto>` (en Linux, node_modules entra en el worktree con enlaces duros); Claude,
 Ruflo y su memoria, en el agente. Las comprobaciones son las de un proyecto Next.js + TypeScript + Playwright
 (la tienda); habrá que generalizarlas con el segundo tipo de proyecto. Codex no va en la imagen todavía.
 

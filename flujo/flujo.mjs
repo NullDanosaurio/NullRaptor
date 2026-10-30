@@ -1,6 +1,7 @@
-// Coordinador del flujo automático. Trabaja sobre el proyecto de FLUJO_PROYECTO o del directorio actual.
+// Coordinador del flujo automático. Trabaja sobre el proyecto de FLUJO_PROYECTO o del directorio actual; sus tareas
+// están en la bóveda (Proyectos/<proyecto>/Tareas) y sus registros y worktrees en $TRABAJO_DIR/flujo/<proyecto>.
 //
-//   node flujo/flujo.mjs tarea tareas/F1-01-....md   ejecuta una tarea
+//   node flujo/flujo.mjs tarea F1-01-....md          ejecuta una tarea
 //   node flujo/flujo.mjs plan                        ejecuta las pendientes en orden de dependencias
 //   node flujo/flujo.mjs plan --turno-codex          Codex avanza sin revisión: deja ramas «listo para revisar»
 //   node flujo/flujo.mjs revisar [Id]                turno de Claude: revisa e integra lo que dejó Codex
@@ -92,7 +93,7 @@ function mostrarEstado() {
 async function principal() {
   switch (comando) {
     case 'tarea': {
-      if (!posicionales[0]) throw new Error('Indica la tarea: node flujo/flujo.mjs tarea tareas/<archivo>.md');
+      if (!posicionales[0]) throw new Error('Indica la tarea: node flujo/flujo.mjs tarea <archivo>.md (de Proyectos/<proyecto>/Tareas en la bóveda)');
       const tarea = leerTarea(posicionales[0]);
       return conBloqueo(tarea.id, async () => ((await ejecutarTarea(tarea, ajustes)).resultado === 'integrado' ? 0 : 1));
     }
@@ -113,7 +114,7 @@ async function principal() {
         return 0;
       });
     default:
-      console.log('Uso: FLUJO_PROYECTO=<carpeta> node flujo/flujo.mjs <tarea RUTA | plan [--turno-codex] | revisar [Id] | estado | cancelar | recuperar> [--intentos=N] [--sin-e2e] [--simulador=NOMBRE]');
+      console.log('Uso: FLUJO_PROYECTO=<carpeta> node flujo/flujo.mjs <tarea ARCHIVO | plan [--turno-codex] | revisar [Id] | estado | cancelar | recuperar> [--intentos=N] [--sin-e2e] [--simulador=NOMBRE]');
       return comando === 'ayuda' ? 0 : 2;
   }
 }

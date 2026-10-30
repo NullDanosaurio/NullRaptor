@@ -9,6 +9,19 @@ export const NOMBRE_FASE = {
   implementador: 'Implementación', typecheck: 'Typecheck', pruebas: 'Unitarias', build: 'Build', e2e: 'E2E', revision: 'Revisión',
 };
 
+/**
+ * Dónde guarda el flujo lo de un proyecto, siempre fuera de su repositorio: los contratos de tareas en la bóveda
+ * (Proyectos/<nombre>/Tareas) y los registros y worktrees en el volumen de Nullraptor ($TRABAJO_DIR/flujo/<nombre>).
+ */
+export function rutasFlujo(raiz, { nombre = path.basename(path.resolve(raiz)), trabajo = process.env.TRABAJO_DIR, boveda = process.env.BOVEDA_DIR } = {}) {
+  const base = path.join(path.resolve(trabajo ?? path.join(raiz, '..', '..')), 'flujo', nombre);
+  return {
+    tareas: boveda ? path.join(path.resolve(boveda), 'Proyectos', nombre, 'Tareas') : null,
+    runs: path.join(base, 'runs'),
+    worktrees: path.join(base, 'worktrees'),
+  };
+}
+
 export const leerJson = (ruta, defecto) => {
   try {
     return JSON.parse(fs.readFileSync(ruta, 'utf8'));
@@ -27,9 +40,9 @@ export function procesoVivo(pid) {
   }
 }
 
-export function leerTareas(raiz) {
-  const dir = path.join(raiz, 'tareas');
-  if (!fs.existsSync(dir)) return [];
+export function leerTareas(raiz, rutas = rutasFlujo(raiz)) {
+  const dir = rutas.tareas;
+  if (!dir || !fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
     .filter((n) => n.endsWith('.md') && !n.startsWith('_') && n.toLowerCase() !== 'readme.md')
     .sort()
@@ -65,8 +78,8 @@ function ultimaLinea(archivo) {
   }
 }
 
-export function datosEjecucion(raiz, id) {
-  const dir = path.join(raiz, '.runs', id ?? '');
+export function datosEjecucion(raiz, id, rutas = rutasFlujo(raiz)) {
+  const dir = path.join(rutas.runs, id ?? '');
   if (!id || !fs.existsSync(dir)) return null;
   const resumen = leerJson(path.join(dir, 'resumen.json'), null);
   const archivos = fs.readdirSync(dir);
@@ -104,13 +117,13 @@ export function ramasPendientes(raiz) {
 }
 
 /** Todo el estado del flujo de un proyecto, en datos (para el panel). */
-export function estadoFlujo(raiz) {
-  const runs = path.join(raiz, '.runs');
+export function estadoFlujo(raiz, rutas = rutasFlujo(raiz)) {
+  const { runs } = rutas;
   const estado = leerJson(path.join(runs, 'estado-tareas.json'), {});
   const bloqueo = leerJson(path.join(runs, 'flujo.lock'), null);
-  const tareas = leerTareas(raiz).map((t) => {
+  const tareas = leerTareas(raiz, rutas).map((t) => {
     const e = estado[t.id];
-    const ej = e?.ejecucion ? datosEjecucion(raiz, e.ejecucion) : null;
+    const ej = e?.ejecucion ? datosEjecucion(raiz, e.ejecucion, rutas) : null;
     return {
       ...t,
       estado: e?.estado ?? 'pendiente',

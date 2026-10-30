@@ -4,13 +4,14 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rutasFlujo } from './estado.mjs';
 
 // RAIZ = proyecto sobre el que se trabaja (FLUJO_PROYECTO o directorio actual); AGENTE = este repositorio.
 // Las herramientas de IA salen del agente; las de compilar y probar, del propio proyecto.
+// Nada del flujo vive en el proyecto: tareas en la bóveda; registros y worktrees en el volumen (rutasFlujo).
 export const AGENTE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const RAIZ = path.resolve(process.env.FLUJO_PROYECTO ?? process.cwd());
-export const RUNS = path.join(RAIZ, '.runs');
-export const WORKTREES = path.join(RAIZ, '.worktrees');
+export const { tareas: TAREAS, runs: RUNS, worktrees: WORKTREES } = rutasFlujo(RAIZ);
 export const MIN = 60_000;
 // shortcut: comprobaciones de un proyecto Next.js + TypeScript + Playwright (la tienda); generalizar con el segundo tipo de proyecto.
 export const BIN = {
@@ -60,7 +61,6 @@ export function entornoSeguro() {
     ...process.env,
     NEXT_TELEMETRY_DISABLED: '1',
     npm_config_update_notifier: 'false',
-    FLUJO_RAIZ: RAIZ,
   };
   // Navegadores locales del proyecto si los tiene; si no, los del equipo (npx playwright install).
   const navegadores = path.join(RAIZ, '.tools', 'ms-playwright');
@@ -88,7 +88,7 @@ export function cancelar(motivo) {
 }
 
 export function comprobarCancelacion() {
-  if (!cancelado && fs.existsSync(CANCELAR)) cancelar('solicitud en .runs/cancelar');
+  if (!cancelado && fs.existsSync(CANCELAR)) cancelar('solicitud de cancelación');
   if (cancelado) throw new Cancelado('Ejecución cancelada');
 }
 
@@ -142,7 +142,7 @@ export function ejecutar(cmd, args, { cwd, timeoutMs, entrada, log, env }) {
       matar(hijo);
     }, timeoutMs);
     const vigilante = setInterval(() => {
-      if (fs.existsSync(CANCELAR)) cancelar('solicitud en .runs/cancelar');
+      if (fs.existsSync(CANCELAR)) cancelar('solicitud de cancelación');
     }, 1000);
     hijo.stdout.on('data', (d) => {
       out += d;

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   FASES, NOMBRE_FASE, datosEjecucion as datosEjecucionDe, fasesDeIntento, leerJson, leerTareas as leerTareasDe,
-  procesoVivo, ramasPendientes as ramasPendientesDe,
+  procesoVivo, ramasPendientes as ramasPendientesDe, rutasFlujo,
 } from './lib/estado.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
@@ -13,7 +13,8 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   return [k, v ?? true];
 }));
 const RAIZ = path.resolve(typeof args.raiz === 'string' ? args.raiz : (process.env.FLUJO_PROYECTO ?? process.cwd()));
-const RUNS = path.join(RAIZ, '.runs');
+const RUTAS = rutasFlujo(RAIZ);
+const RUNS = RUTAS.runs;
 const REFRESCO_MS = 2000;
 
 // --- Presentación ---------------------------------------------------------------
@@ -44,8 +45,8 @@ export function duracion(ms) {
 
 // --- Datos (flujo/lib/estado.mjs) ------------------------------------------------
 export { FASES, fasesDeIntento };
-const leerTareas = () => leerTareasDe(RAIZ);
-const datosEjecucion = (id) => datosEjecucionDe(RAIZ, id);
+const leerTareas = () => leerTareasDe(RAIZ, RUTAS);
+const datosEjecucion = (id) => datosEjecucionDe(RAIZ, id, RUTAS);
 const ramasPendientes = () => ramasPendientesDe(RAIZ);
 
 // --- Vista ------------------------------------------------------------------------
@@ -102,7 +103,7 @@ export function construirVista({ columnas = 80, ahora = Date.now() } = {}) {
       fila(`     ${tenue(`fase actual: ${ej.actual ? NOMBRE_FASE[ej.actual] : '—'} · ${duracion(Math.max(0, ahora - ej.desde))} en esta fase`)}`);
     }
   }
-  if (tareas.length === 0) fila(tenue('No hay tareas en tareas/.'));
+  if (tareas.length === 0) fila(tenue('No hay tareas en la bóveda (Proyectos/<proyecto>/Tareas).'));
   lineas.push(tenue(`╰${'─'.repeat(interior + 2)}╯`));
 
   const ramas = ramasPendientes();

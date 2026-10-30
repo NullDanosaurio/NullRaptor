@@ -21,8 +21,10 @@ function entorno() {
   fs.writeFileSync(path.join(memoria, '.git', 'secreto.md'), 'no');
   fs.writeFileSync(path.join(memoria, '00-Inicio.md'), '---\ntipo: indice\n---\n# Inicio\nVer [[Demo]] y [[Falta|otra]].\n');
   fs.writeFileSync(path.join(memoria, 'Proyectos', 'Demo.md'), '---\ntipo: proyecto\nrepo: https://github.com/x/Demo\n---\n# Demo\nRaptor veloz.\n');
-  fs.mkdirSync(path.join(trabajo, 'proyectos', 'Demo', 'tareas'), { recursive: true });
-  fs.writeFileSync(path.join(trabajo, 'proyectos', 'Demo', 'tareas', 'T1.md'), '# Primera tarea\nId: T1\n');
+  fs.mkdirSync(path.join(trabajo, 'proyectos', 'Demo'), { recursive: true });
+  // Las tareas del flujo viven en la bóveda, no en el proyecto.
+  fs.mkdirSync(path.join(memoria, 'Proyectos', 'Demo', 'Tareas'), { recursive: true });
+  fs.writeFileSync(path.join(memoria, 'Proyectos', 'Demo', 'Tareas', 'T1.md'), '# Primera tarea\nId: T1\n');
   fs.writeFileSync(path.join(base, 'fuera.md'), 'fuera');
   return { base, memoria, trabajo };
 }
@@ -48,7 +50,7 @@ test('frontmatter, enlaces y retroenlaces', () => {
   const nota = leerNota(memoria, 'Proyectos/Demo.md');
   assert.equal(nota.datos.tipo, 'proyecto');
   assert.deepEqual(nota.retroenlaces, ['00-Inicio.md']);
-  assert.equal(listarNotas(memoria).length, 2);
+  assert.equal(listarNotas(memoria).length, 3); // con la tarea de Demo
 });
 
 test('buscar: sin acentos ni mayúsculas, fuera del frontmatter', () => {
@@ -105,7 +107,7 @@ test('API del panel', async (t) => {
 
   const resumen = await pedir(port, 'GET', '/api/resumen');
   assert.equal(resumen.estado, 200);
-  assert.equal(resumen.datos.boveda.notas, 2);
+  assert.equal(resumen.datos.boveda.notas, 3); // con la tarea T1
   const demo = resumen.datos.proyectos.find((p) => p.nombre === 'Demo');
   assert.equal(demo.local, true);
   assert.equal(demo.repo, 'https://github.com/x/Demo');
@@ -138,11 +140,13 @@ test('Nullraptor y la bóveda salen primero (menú y panel); la bóveda abre la 
   const menu = opcionesDelMenu(memoria);
   assert.deepEqual(menu.map((p) => p.nombre), ['Nullraptor', 'Bóveda', 'Demo']);
   assert.equal(menu[0].repo, AGENTE_REPO);
-  fs.mkdirSync(path.join(trabajo, 'proyectos', 'Nullraptor'));
+  fs.mkdirSync(path.join(trabajo, 'nullraptor')); // aparte de los proyectos
+  fs.mkdirSync(path.join(trabajo, 'proyectos', 'Nullraptor')); // copia antigua: no sale dos veces
   const lista = listarProyectos(trabajo, memoria);
   assert.deepEqual(lista.map((p) => p.nombre), ['Nullraptor', 'Bóveda', 'Demo']);
   assert.ok(lista[1].local);
   assert.equal(rutaProyecto(trabajo, BOVEDA, memoria), memoria);
   assert.equal(rutaProyecto(trabajo, BOVEDA), null); // sin bóveda configurada
+  assert.equal(rutaProyecto(trabajo, 'Nullraptor'), path.join(trabajo, 'nullraptor'));
   assert.deepEqual(listarProyectos(trabajo, null).map((p) => p.nombre), ['Nullraptor', 'Demo']);
 });

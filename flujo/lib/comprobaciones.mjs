@@ -56,7 +56,7 @@ export function problemasDeCodificacion(wt, archivos) {
 
 // Lo que define cómo se juzga un cambio: no puede diferir de la base.
 export const PROTEGIDOS = [
-  'tests', 'tareas', 'scripts', 'config', 'package.json', 'package-lock.json', 'tsconfig.json',
+  'tests', 'scripts', 'config', 'package.json', 'package-lock.json', 'tsconfig.json',
   'next.config.ts', 'playwright.config.ts', 'postcss.config.mjs',
 ];
 

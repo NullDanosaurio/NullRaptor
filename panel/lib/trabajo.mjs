@@ -2,8 +2,8 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { estadoFlujo, leerJson } from '../../flujo/lib/estado.mjs';
-import { proyectosConocidos } from '../../scripts/menu.mjs';
+import { estadoFlujo, leerJson, rutasFlujo } from '../../flujo/lib/estado.mjs';
+import { carpetaAgente, proyectosConocidos } from '../../scripts/menu.mjs';
 
 const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 }).trim();
@@ -11,14 +11,20 @@ const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', wi
 export const carpetaProyectos = (trabajo) => path.join(trabajo, 'proyectos');
 /** La bóveda también es un proyecto: se trabaja sobre la memoria (rama agente). */
 export const BOVEDA = 'Bóveda';
+/** El propio agente: su copia de trabajo vive aparte ($TRABAJO_DIR/nullraptor), no entre los proyectos. */
+export const NULLRAPTOR = 'Nullraptor';
+const esDir = (ruta) => { try { return fs.statSync(ruta).isDirectory(); } catch { return false; } };
 
 /** Carpeta de un proyecto del equipo por su nombre; null si el nombre no es válido o no existe. */
 export function rutaProyecto(trabajo, nombre, memoria = null) {
   if (nombre === BOVEDA) return memoria;
+  if (nombre === NULLRAPTOR) return esDir(carpetaAgente(trabajo)) ? carpetaAgente(trabajo) : null;
   if (typeof nombre !== 'string' || !NOMBRE_VALIDO.test(nombre)) return null;
   const ruta = path.join(carpetaProyectos(trabajo), nombre);
-  try { return fs.statSync(ruta).isDirectory() ? ruta : null; } catch { return null; }
+  return esDir(ruta) ? ruta : null;
 }
+
+const flujoDe = (trabajo, nombre, ruta, memoria) => estadoFlujo(ruta, rutasFlujo(ruta, { nombre, trabajo, boveda: memoria }));
 
 function datosGit(ruta) {
   try {
@@ -39,9 +45,10 @@ export function listarProyectos(trabajo, memoria) {
   const locales = (() => {
     try {
       return fs.readdirSync(carpetaProyectos(trabajo), { withFileTypes: true })
-        .filter((e) => e.isDirectory() && NOMBRE_VALIDO.test(e.name)).map((e) => e.name);
+        .filter((e) => e.isDirectory() && NOMBRE_VALIDO.test(e.name) && e.name !== NULLRAPTOR).map((e) => e.name);
     } catch { return []; }
   })();
+  if (esDir(carpetaAgente(trabajo))) locales.push(NULLRAPTOR);
   const conocidos = memoria ? proyectosConocidos(memoria) : [];
   const notas = memoria ? (() => { try { return fs.readdirSync(path.join(memoria, 'Proyectos')).filter((f) => f.endsWith('.md')).map((f) => f.slice(0, -3)); } catch { return []; } })() : [];
   // Primero el propio agente y la bóveda; después el resto por orden alfabético.
@@ -49,10 +56,10 @@ export function listarProyectos(trabajo, memoria) {
   const nombres = [...new Set([...locales, ...conocidos.map((c) => c.nombre), ...(memoria ? [BOVEDA] : [])])]
     .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, 'es'));
   return nombres.map((nombre) => {
-    const ruta = nombre === BOVEDA ? memoria : locales.includes(nombre) ? path.join(carpetaProyectos(trabajo), nombre) : null;
+    const ruta = locales.includes(nombre) || nombre === BOVEDA ? rutaProyecto(trabajo, nombre, memoria) : null;
     let flujo = null;
     if (ruta) {
-      const f = estadoFlujo(ruta);
+      const f = flujoDe(trabajo, nombre, ruta, memoria);
       flujo = {
         tareas: f.tareas.length,
         integradas: f.tareas.filter((t) => t.estado === 'integrado').length,
@@ -78,7 +85,7 @@ export function listarProyectos(trabajo, memoria) {
 export function detalleProyecto(trabajo, nombre, memoria = null) {
   const ruta = rutaProyecto(trabajo, nombre, memoria);
   if (!ruta) return null;
-  return { nombre, git: datosGit(ruta), flujo: estadoFlujo(ruta) };
+  return { nombre, git: datosGit(ruta), flujo: flujoDe(trabajo, nombre, ruta, memoria) };
 }
 
 /** Recomendaciones MCP del día y servidores instalados (MCP/estado.json de la bóveda). */
