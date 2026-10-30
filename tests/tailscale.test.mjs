@@ -58,6 +58,7 @@ test('sin passkey no se entra por el dominio; este equipo sigue igual; otro Host
   const pagina = await pedir(port, 'GET', '/', { cab: fuera() });
   assert.equal(pagina.estado, 303);
   assert.equal(pagina.cab.location, '/entrar');
+  assert.equal((await pedir(port, 'GET', '/vista/', { cab: fuera() })).estado, 303); // la vista previa, también con passkey
   assert.match((await pedir(port, 'GET', '/entrar', { cab: fuera() })).datos, /Código del lanzador/);
   assert.equal((await pedir(port, 'GET', '/entrar.js', { cab: fuera() })).estado, 200);
   // Por localhost pero llegando por un proxy: también remota.

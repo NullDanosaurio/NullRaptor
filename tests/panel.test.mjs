@@ -11,6 +11,7 @@ import { Chats } from '../panel/lib/chats.mjs';
 import { crearServidor, escrituraPermitida, hostPermitido } from '../panel/servidor.mjs';
 import { BOVEDA, listarProyectos, rutaProyecto } from '../panel/lib/trabajo.mjs';
 import { AGENTE_REPO, opcionesDelMenu } from '../scripts/menu.mjs';
+import { crearVista, limpiarCookies } from '../panel/lib/vista.mjs';
 
 function entorno() {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-'));
@@ -87,7 +88,7 @@ function pedir(puerto, metodo, ruta, { cuerpo, cab = {} } = {}) {
     const r = http.request({ host: '127.0.0.1', port: puerto, method: metodo, path: ruta, headers: { 'content-type': 'application/json', ...cab } }, (res) => {
       let d = '';
       res.on('data', (x) => { d += x; });
-      res.on('end', () => resolve({ estado: res.statusCode, datos: d && res.headers['content-type']?.includes('json') ? JSON.parse(d) : d }));
+      res.on('end', () => resolve({ estado: res.statusCode, cab: res.headers, datos: d && res.headers['content-type']?.includes('json') ? JSON.parse(d) : d }));
     });
     r.on('error', reject);
     if (cuerpo) r.write(typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo));
@@ -145,4 +146,44 @@ test('Nullraptor y la bóveda salen primero (menú y panel); la bóveda abre la 
   assert.equal(rutaProyecto(trabajo, BOVEDA, memoria), memoria);
   assert.equal(rutaProyecto(trabajo, BOVEDA), null); // sin bóveda configurada
   assert.deepEqual(listarProyectos(trabajo, null).map((p) => p.nombre), ['Nullraptor', 'Demo']);
+});
+
+test('vista previa: /vista/ se reenvía al servidor de desarrollo sin las cookies del panel', async (t) => {
+  const { memoria, trabajo } = entorno();
+  const visto = [];
+  const web = http.createServer((req, res) => {
+    visto.push({ metodo: req.method, url: req.url, host: req.headers.host, cookie: req.headers.cookie, origin: req.headers.origin });
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"ok":true}');
+  });
+  await new Promise((r) => web.listen(0, '127.0.0.1', r));
+  const vista = crearVista({ puerto: web.address().port });
+  const servidor = crearServidor({ trabajo, memoria, vista });
+  await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
+  t.after(() => { servidor.close(); web.close(); });
+  const { port } = servidor.address();
+
+  const r = await pedir(port, 'GET', '/vista/libros?x=1', { cab: { cookie: 'nr_sesion=secreto; carrito=3' } });
+  assert.equal(r.estado, 200);
+  assert.deepEqual(visto[0], { metodo: 'GET', url: '/vista/libros?x=1', host: `127.0.0.1:${vista.puerto}`, cookie: 'carrito=3', origin: undefined });
+  // Escrituras: la web no manda X-Nullraptor; vale el mismo origen y se rechaza otro.
+  assert.equal((await pedir(port, 'POST', '/vista/accion', { cab: { origin: `http://127.0.0.1:${port}`, host: `127.0.0.1:${port}` } })).estado, 200);
+  assert.equal(visto[1].origin, `http://127.0.0.1:${vista.puerto}`);
+  assert.equal((await pedir(port, 'POST', '/vista/accion', { cab: { origin: 'https://evil.com' } })).estado, 403);
+  assert.equal(visto.length, 2);
+  assert.equal(limpiarCookies('nr_sesion=a; __Host-nr_pk=b'), null);
+
+  // Rutas fijas desde una página de la vista: imagen reenviada con /vista delante; página, redirigida; API, nunca.
+  const desde = { referer: `http://127.0.0.1:${port}/vista/libros`, host: `127.0.0.1:${port}` };
+  assert.equal((await pedir(port, 'GET', '/catalogo/a.jpg', { cab: { ...desde, 'sec-fetch-dest': 'image' } })).estado, 200);
+  assert.equal(visto[2].url, '/vista/catalogo/a.jpg');
+  const pagina = await pedir(port, 'GET', '/carrito?x=1', { cab: { ...desde, 'sec-fetch-dest': 'document' } });
+  assert.equal(pagina.estado, 302);
+  assert.equal(pagina.cab.location, '/vista/carrito?x=1');
+  assert.equal((await pedir(port, 'GET', '/api/resumen', { cab: desde })).estado, 200);
+  await pedir(port, 'GET', '/catalogo/a.jpg', { cab: { ...desde, referer: 'https://evil.com/vista/' } }); // otro sitio: no
+  assert.equal(visto.length, 3);
+
+  await new Promise((r) => { web.close(r); web.closeAllConnections(); });
+  assert.equal((await pedir(port, 'GET', '/vista/')).estado, 502);
 });

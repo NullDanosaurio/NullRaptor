@@ -20,6 +20,7 @@ import { Registro } from './lib/registro.mjs';
 import { Remoto } from './lib/remoto.mjs';
 import { crearRutasRemoto } from './lib/rutas-remoto.mjs';
 import { detalleProyecto, estadoMcp, listarProyectos, rutaProyecto } from './lib/trabajo.mjs';
+import { crearVista, esPagina, esVista, rutaDesdeVista } from './lib/vista.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(AQUI, 'dist');
@@ -87,6 +88,14 @@ function servirEstatico(res, ruta) {
   fs.createReadStream(destino).pipe(res);
 }
 
+/** ¿Es un archivo de la web del panel? (esos nunca se mandan a la vista previa) */
+function archivoDelPanel(ruta) {
+  try {
+    const destino = path.resolve(DIST, `.${decodeURIComponent(ruta)}`);
+    return destino.startsWith(DIST + path.sep) && fs.statSync(destino).isFile();
+  } catch { return false; }
+}
+
 function html(res, codigo, cuerpo, extra = {}) {
   res.writeHead(codigo, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEGURIDAD, ...extra });
   res.end(cuerpo);
@@ -119,7 +128,7 @@ async function entrar(req, res, url, acceso, permitido) {
 
 export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
-  dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal',
+  dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', vista = crearVista(),
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -128,6 +137,11 @@ export function crearServidor({
   const entrada = dominio ? crearEntrada({ passkeys, sesiones, codigoLanzador, registro, leerCuerpo, json, html }) : null;
   const rutasRemoto = crearRutasRemoto({ remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json });
   const sinBoveda = () => ({ error: 'Sin bóveda: arranca el panel con preparar.mjs (BOVEDA_DIR).' });
+  // Escritura hacia la vista previa: la web no manda X-Nullraptor, así que basta con el Origin (exacto por Tailscale).
+  const escrituraVista = (req, remota) => (remota
+    ? req.headers.origin === origenRemoto
+    : escrituraPermitida({ headers: { ...req.headers, 'x-nullraptor': '1' } }, permitido));
+  const leer = (req) => req.method === 'GET' || req.method === 'HEAD';
 
   const rutas = {
     'GET /api/resumen': () => ({
@@ -154,7 +168,7 @@ export function crearServidor({
     },
   };
 
-  return http.createServer(async (req, res) => {
+  const servidor = http.createServer(async (req, res) => {
     try {
       if (!permitido(req.headers.host)) { res.writeHead(421); res.end(); return; }
       const url = new URL(req.url, 'http://localhost');
@@ -163,7 +177,7 @@ export function crearServidor({
       const remota = esRemota(req, dominio);
       let sesion = null;
       if (remota) {
-        if (req.method !== 'GET' && req.method !== 'HEAD' && !escrituraPermitida(req, permitido, origenRemoto)) { json(res, 403, { error: 'Petición no permitida.' }); return; }
+        if (!leer(req) && !(esVista(p) || rutaDesdeVista(req, p) ? escrituraVista(req, true) : escrituraPermitida(req, permitido, origenRemoto))) { json(res, 403, { error: 'Petición no permitida.' }); return; }
         if (await entrada(req, res, p)) return;
         sesion = sesiones.leer(req);
         if (!sesion) {
@@ -178,6 +192,16 @@ export function crearServidor({
           else html(res, 303, '', { Location: '/entrar' });
           return;
         }
+      }
+      const fija = rutaDesdeVista(req, p);
+      if (esVista(p) || (fija && !archivoDelPanel(p))) {
+        if (!remota && !leer(req) && !escrituraVista(req, false)) { json(res, 403, { error: 'Petición no permitida.' }); return; }
+        if (!esVista(p)) {
+          if (leer(req) && esPagina(req)) { html(res, 302, '', { Location: fija + url.search }); return; }
+          req.url = fija + url.search;
+        }
+        vista.peticion(req, res);
+        return;
       }
       if (!p.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
@@ -217,6 +241,15 @@ export function crearServidor({
       if (!e.codigo) console.error(`[panel] ${e.stack ?? e.message}`);
     }
   });
+  // WebSocket solo para la vista previa, con la misma entrada que una petición normal.
+  servidor.on('upgrade', (req, socket, cabeza) => {
+    const p = new URL(req.url, 'http://localhost').pathname;
+    const remota = esRemota(req, dominio);
+    const dentro = remota ? Boolean(sesiones.leer(req)) : !acceso || acceso.autenticado(req);
+    if (!permitido(req.headers.host) || !esVista(p) || !dentro || !escrituraVista(req, remota)) { socket.destroy(); return; }
+    vista.mejora(req, socket, cabeza);
+  });
+  return servidor;
 }
 
 const esPrincipal = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
