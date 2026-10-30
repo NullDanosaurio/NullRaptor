@@ -1,57 +1,42 @@
-// Pruebas de las sesiones remotas del panel: validación de proyecto, límites, URL, confianza y API.
-// Con un `claude` falso: no se abre ninguna sesión real.
+// Pruebas de las sesiones remotas (Claude Code en terminal): validación de proyecto, límites, argumentos y reglas,
+// entorno, pantalla en vivo, teclas, tamaño, registro y cierre. Con un `claude` falso: no se abre nada real.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { PassThrough } from 'node:stream';
-import { Remoto, entornoRemoto, extraerUrls, marcarConfianza } from '../panel/lib/remoto.mjs';
-import { crearServidor } from '../panel/servidor.mjs';
+import { comillas, tamanoValido } from '../panel/lib/pty.mjs';
+import { entorno, nuevo } from './apoyo/remoto.mjs';
+import { Registro } from '../panel/lib/registro.mjs';
+import { ajustesTerminal, entornoRemoto, extraerUrls, marcarConfianza } from '../panel/lib/remoto.mjs';
 
-// Salida real de `claude remote-control` (2.1.308), recortada.
-const SALIDA = 'Enable Remote Control? (y/n) \n·|· Connecting · NullRaptor · main\n\x1b[1A\x1b[J·✔︎· Connected · NullRaptor · main\n'
-  + '    \x1b]8;;https://claude.ai/code/session_013NNAwC4Nn3KwgNYEzG11vb?from=cli\x07Demo\x1b]8;;\x07\n'
-  + 'Continue coding in the Claude mobile app or https://claude.ai/code?environment=env_01QrZjrwC8UJb9L5DSZ2fKRP\n';
+// Salida real de `claude --remote-control` (2.1.308) en la terminal, recortada.
+const SALIDA = '\x1b]8;id=fl1gej;https://claude.ai/code/session_013NNAw9kQjK9W2UWAKCPdzG?from=cli\x07/rc active\x1b]8;;\x07\r\n'
+  + '/remote-control is active · Continue here, on your phone, or at https://claude.ai/code/session_013NNAw9kQjK9W2UWAKCPdzG\r\n';
 
-function entorno() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'remoto-'));
-  const trabajo = path.join(base, 'trabajo');
-  for (const p of ['A', 'B', 'C', 'D']) fs.mkdirSync(path.join(trabajo, 'proyectos', p), { recursive: true });
-  fs.writeFileSync(path.join(base, 'fuera'), 'x');
-  const configDir = path.join(base, 'claude');
-  fs.mkdirSync(configDir);
-  return { base, trabajo, configDir, memoria: path.join(base, 'memoria') };
-}
-
-function falso() {
-  const lanzados = [];
-  const lanzar = (args, opciones) => {
-    const hijo = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), exitCode: null, signalCode: null, args, opciones, señales: [] });
-    hijo.stdin.setEncoding('utf8');
-    hijo.kill = (s) => { hijo.señales.push(s); hijo.signalCode = s; setImmediate(() => hijo.emit('exit', null, s)); return true; };
-    lanzados.push(hijo);
-    return hijo;
-  };
-  return { lanzar, lanzados };
-}
-
-const nuevo = (e, extra = {}) => {
-  const f = falso();
-  const env = { AGENTE_CLAVE: 'secreta', CLAUDE_CODE_OAUTH_TOKEN: 'tok', GITHUB_TOKEN: 'gh', PATH: process.env.PATH };
-  return { ...f, remoto: new Remoto({ trabajo: e.trabajo, memoria: e.memoria, env, lanzar: f.lanzar, configDir: e.configDir, ...extra }) };
-};
 const espera = () => new Promise((r) => setImmediate(r));
 
-test('extraerUrls: sesión y entorno de la salida real', () => {
-  assert.deepEqual(extraerUrls(SALIDA), {
-    sesion: 'https://claude.ai/code/session_013NNAwC4Nn3KwgNYEzG11vb?from=cli',
-    entorno: 'https://claude.ai/code?environment=env_01QrZjrwC8UJb9L5DSZ2fKRP',
-  });
+/** Respuesta HTTP de mentira para el SSE. */
+function resFalsa() {
+  const r = Object.assign(new EventEmitter(), { escrito: '', terminado: false, cabeceras: null });
+  r.writeHead = (codigo, cab) => { r.cabeceras = { codigo, ...cab }; };
+  r.write = (d) => { r.escrito += d; return true; };
+  r.end = () => { r.terminado = true; r.emit('close'); };
+  return r;
+}
+const eventos = (texto) => [...texto.matchAll(/event: (\w+)\ndata: (.*)\n\n/g)].map(([, tipo, datos]) => [tipo, JSON.parse(datos)]);
+
+test('extraerUrls: la URL de la sesión en la salida real de la terminal', () => {
+  assert.equal(extraerUrls(SALIDA).sesion, 'https://claude.ai/code/session_013NNAw9kQjK9W2UWAKCPdzG');
   assert.deepEqual(extraerUrls('nada'), { sesion: null, entorno: null });
   assert.equal(extraerUrls('https://claude.ai.evil.com/code/session_x').sesion, null);
+});
+
+test('pty: comillas de shell y tamaños válidos', () => {
+  assert.equal(comillas("a'b; rm -rf /"), `'a'\\''b; rm -rf /'`);
+  assert.ok(tamanoValido(120, 36));
+  for (const [c, f] of [[10, 36], [120, 2], [1e6, 36], ['120', 36], [12.5, 36]]) assert.ok(!tamanoValido(c, f), `${c}x${f}`);
 });
 
 test('validación de proyecto: solo carpetas de TRABAJO_DIR/proyectos', () => {
@@ -63,27 +48,84 @@ test('validación de proyecto: solo carpetas de TRABAJO_DIR/proyectos', () => {
   assert.equal(lanzados.length, 0);
 });
 
-test('abrir: cwd del proyecto, --capacity 1, entorno sin AGENTE_CLAVE, URL y estado', async () => {
+test('abrir: Claude con Remote Control, permisos manuales, reglas deny y entorno limpio', () => {
   const e = entorno();
   const { remoto, lanzados } = nuevo(e);
-  const s = remoto.abrir('A');
-  assert.equal(s.estado, 'conectando');
+  remoto.abrir('A', { quien: 'iPhone', cols: 100, filas: 30 });
   const [h] = lanzados;
   assert.equal(h.opciones.cwd, path.join(e.trabajo, 'proyectos', 'A'));
-  assert.deepEqual(h.args, ['remote-control', '--name', 'Nullraptor · A', '--capacity', '1']);
-  assert.ok(!h.args.includes('--permission-mode')); // permisos por defecto
-  assert.equal(h.opciones.env.AGENTE_CLAVE, undefined);
-  assert.equal(h.opciones.env.GITHUB_TOKEN, 'gh');
-  assert.equal(h.opciones.env.BOVEDA_DIR, e.memoria);
-  assert.equal(h.opciones.env.TRABAJO_DIR, e.trabajo);
+  assert.deepEqual([h.opciones.cols, h.opciones.filas], [100, 30]);
+  assert.deepEqual(h.args.slice(0, 4), ['--remote-control', 'Nullraptor · A', '--permission-mode', 'manual']);
+  assert.equal(h.args[4], '--settings');
+  const { deny } = JSON.parse(h.args[5]).permissions;
+  for (const regla of ['Read(//cofre/**)', `Read(/${path.join(e.base, '.nullraptor')}/**)`, `Read(/${path.join(e.configDir, '.credentials.json')})`, `Edit(/${path.join(e.trabajo, 'registros')}/**)`]) {
+    assert.ok(deny.includes(regla), regla);
+  }
+  const env = h.opciones.env;
+  assert.equal(env.AGENTE_CLAVE, undefined);
+  assert.equal(env.CLAUDE_CODE_CHILD_SESSION, undefined);
+  assert.equal(env.CLAUDECODE, undefined);
+  assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, 'tok'); // sin sesión de claude.ai guardada, se usa el token
+  assert.equal(env.GITHUB_TOKEN, 'gh');
+  assert.equal(env.BOVEDA_DIR, e.memoria);
+  assert.equal(env.TRABAJO_DIR, e.trabajo);
+  assert.equal(remoto.lista()[0].quien, 'iPhone');
+});
+
+test('pantalla: URL y estado, repintado al conectarse, datos en vivo y fin', async () => {
+  const e = entorno();
+  const { remoto, lanzados } = nuevo(e);
+  const { id } = remoto.abrir('A');
+  const [h] = lanzados;
+  h.stdout.write('hola ');
+  await espera();
+  assert.equal(remoto.lista()[0].estado, 'conectando');
+  const res = resFalsa();
+  remoto.suscribir(id, res, 'yo');
+  assert.equal(res.cabeceras['Content-Type'], 'text/event-stream; charset=utf-8');
   h.stdout.write(SALIDA);
   await espera();
-  assert.equal(h.stdin.read(), 'y\n'); // contesta la pregunta de la primera vez
-  const [l] = remoto.lista();
-  assert.equal(l.estado, 'conectada');
-  assert.match(l.url, /\/code\/session_/);
-  assert.match(l.entorno, /environment=env_/);
-  assert.equal(l.hijo, undefined); // la lista no expone el proceso
+  const [s] = remoto.lista();
+  assert.equal(s.estado, 'conectada');
+  assert.match(s.url, /session_013NNAw9kQjK9W2UWAKCPdzG$/);
+  h.emit('exit', 0, null);
+  const ev = eventos(res.escrito);
+  assert.deepEqual(ev[0], ['pantalla', 'hola ']);
+  assert.deepEqual(ev[1], ['datos', SALIDA]);
+  assert.equal(ev[2][0], 'fin');
+  assert.ok(res.terminado);
+  assert.throws(() => remoto.suscribir(id, resFalsa()), (err) => err.codigo === 404);
+});
+
+test('teclas y tamaño: van al proceso; se validan', async () => {
+  const e = entorno();
+  const { remoto, lanzados, tamanos } = nuevo(e);
+  const { id } = remoto.abrir('A');
+  remoto.escribir(id, 'hola\r', 'yo');
+  assert.equal(lanzados[0].stdin.read(), 'hola\r');
+  for (const malo of ['', null, 5, 'x'.repeat(70_000)]) assert.throws(() => remoto.escribir(id, malo), (err) => err.codigo === 400);
+  await remoto.tamano(id, 90, 25);
+  assert.deepEqual(tamanos, [['/dev/pts/7', 90, 25]]);
+  await assert.rejects(remoto.tamano(id, 5, 25), (err) => err.codigo === 400);
+  await assert.rejects(remoto.tamano('no-existe', 90, 25), (err) => err.codigo === 404);
+});
+
+test('registro: apertura, entrada, salida y cierre en el volumen', async () => {
+  const e = entorno();
+  const registro = new Registro({ carpeta: path.join(e.trabajo, 'registros') });
+  const { remoto, lanzados } = nuevo(e, { registro });
+  const { id } = remoto.abrir('A', { quien: 'iPhone' });
+  remoto.escribir(id, 'ls\r', 'iPhone');
+  lanzados[0].stdout.write('respuesta');
+  await espera();
+  remoto.cerrar(id);
+  await espera();
+  const [archivo] = fs.readdirSync(path.join(e.trabajo, 'registros', 'terminal'));
+  assert.match(archivo, /-A-[0-9a-f]{8}\.jsonl$/);
+  const lineas = fs.readFileSync(path.join(e.trabajo, 'registros', 'terminal', archivo), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(lineas.map((l) => l.tipo), ['apertura', 'entrada', 'escribe', 'salida', 'cierre']);
+  assert.equal(lineas[0].quien, 'iPhone');
+  assert.equal(lineas[1].datos, 'ls\r');
 });
 
 test('confianza: se marca la carpeta en .claude.json sin tocar lo demás', () => {
@@ -96,17 +138,21 @@ test('confianza: se marca la carpeta en .claude.json sin tocar lo demás', () =>
   assert.equal(c.otra, 1);
   assert.deepEqual(c.projects['/x'], { hasTrustDialogAccepted: true, extra: 2 });
   assert.equal(c.projects[path.join(e.trabajo, 'proyectos', 'A')].hasTrustDialogAccepted, true);
-  assert.equal(marcarConfianza(e.configDir, path.join(e.trabajo, 'proyectos', 'A')), false); // ya estaba
+  assert.equal(marcarConfianza(e.configDir, path.join(e.trabajo, 'proyectos', 'A')), false);
 });
 
-test('entornoRemoto: con sesión de claude.ai guardada se quita el token', () => {
+test('entornoRemoto y ajustesTerminal: token fuera con sesión guardada; reglas sobre rutas absolutas', () => {
   const e = entorno();
   assert.equal(entornoRemoto({ CLAUDE_CODE_OAUTH_TOKEN: 't' }, { ...e }).CLAUDE_CODE_OAUTH_TOKEN, 't');
   fs.writeFileSync(path.join(e.configDir, '.credentials.json'), '{}');
   assert.equal(entornoRemoto({ CLAUDE_CODE_OAUTH_TOKEN: 't', AGENTE_CLAVE: 'k' }, { ...e }).CLAUDE_CODE_OAUTH_TOKEN, undefined);
+  const { deny } = ajustesTerminal({ env: { HOME: '/estado/home' }, configDir: '/estado/home/.claude', trabajo: '/estado/trabajo' }).permissions;
+  assert.ok(deny.includes('Edit(//estado/home/.nullraptor/**)'));
+  assert.ok(!deny.some((r) => r.startsWith('Write('))); // Claude avisa de que Write nunca coincide
+  assert.ok(deny.includes('Read(//estado/home/.claude/.credentials.json)'));
 });
 
-test('límites: una por proyecto y máximo 3 en total', async () => {
+test('límites: una por proyecto y máximo 3 en total; cerrar deja hueco', () => {
   const e = entorno();
   const { remoto, lanzados } = nuevo(e);
   const a = remoto.abrir('A');
@@ -115,24 +161,23 @@ test('límites: una por proyecto y máximo 3 en total', async () => {
   remoto.abrir('C');
   assert.throws(() => remoto.abrir('D'), (err) => err.codigo === 429);
   assert.equal(lanzados.length, 3);
-  // Al cerrar una, hay hueco otra vez y la cerrada desaparece de la lista.
   assert.ok(remoto.cerrar(a.id));
-  assert.deepEqual(lanzados[0].señales, ['SIGINT']);
+  assert.deepEqual(lanzados[0].señales, ['SIGTERM']);
   assert.equal(remoto.lista().length, 2);
   assert.equal(remoto.abrir('D').proyecto, 'D');
   assert.equal(remoto.cerrar('no-existe'), false);
 });
 
-test('una sesión que termina sola deja hueco y conserva el motivo', async () => {
+test('una sesión que termina sola deja hueco y conserva el motivo', () => {
   const e = entorno();
   const { remoto, lanzados } = nuevo(e, { maxTotal: 1 });
   remoto.abrir('A');
-  lanzados[0].stderr.write('Error: Workspace not trusted.\n');
+  lanzados[0].stdout.write('\x1b[31mError: algo falló\x1b[0m\r\n');
   lanzados[0].emit('exit', 1, null);
   const [s] = remoto.lista();
   assert.equal(s.estado, 'terminada');
-  assert.equal(s.motivo, 'Error: Workspace not trusted.');
-  assert.equal(remoto.abrir('A').estado, 'conectando'); // no cuenta para los límites y se sustituye
+  assert.equal(s.motivo, 'Error: algo falló');
+  assert.equal(remoto.abrir('A').estado, 'conectando');
   assert.equal(remoto.lista().length, 1);
 });
 
@@ -141,10 +186,8 @@ test('cierre automático tras el tiempo máximo', async () => {
   const { remoto, lanzados } = nuevo(e, { maxMs: 20 });
   remoto.abrir('A');
   await new Promise((r) => setTimeout(r, 60));
-  assert.deepEqual(lanzados[0].señales, ['SIGINT']);
-  const [s] = remoto.lista();
-  assert.equal(s.estado, 'terminada');
-  assert.match(s.motivo, /4 h/);
+  assert.deepEqual(lanzados[0].señales, ['SIGTERM']);
+  assert.match(remoto.lista()[0].motivo, /4 h/);
 });
 
 test('cerrarTodas: mueren todas al parar el panel y se espera a que terminen', async () => {
@@ -153,57 +196,7 @@ test('cerrarTodas: mueren todas al parar el panel y se espera a que terminen', a
   remoto.abrir('A');
   remoto.abrir('B');
   const fin = remoto.cerrarTodas();
-  assert.deepEqual(lanzados.map((h) => h.señales), [['SIGINT'], ['SIGINT']]);
+  assert.deepEqual(lanzados.map((h) => h.señales), [['SIGTERM'], ['SIGTERM']]);
   assert.ok(remoto.lista().every((s) => s.estado === 'terminada'));
-  await fin; // el falso emite 'exit' al recibir la señal
-});
-
-test('error antes de conectar: se corta enseguida, deja hueco y explica la carpeta ocupada', () => {
-  const e = entorno();
-  const { remoto, lanzados } = nuevo(e, { maxTotal: 1 });
-  remoto.abrir('A');
-  lanzados[0].stderr.write('\x1b[31mError: This folder is already served by a terminal `claude remote-control` on this device. Stop it first.\x1b[0m\nExiting in about 56 seconds.\n');
-  assert.deepEqual(lanzados[0].señales, ['SIGINT']);
-  const [s] = remoto.lista();
-  assert.equal(s.estado, 'terminada');
-  assert.match(s.motivo, /espera un minuto/);
-  assert.equal(remoto.abrir('B').estado, 'conectando');
-});
-
-function pedir(puerto, metodo, ruta, { cuerpo, cab = {} } = {}) {
-  return new Promise((resolve, reject) => {
-    const r = http.request({ host: '127.0.0.1', port: puerto, method: metodo, path: ruta, headers: { 'content-type': 'application/json', ...cab } }, (res) => {
-      let d = '';
-      res.on('data', (x) => { d += x; });
-      res.on('end', () => resolve({ estado: res.statusCode, datos: d ? JSON.parse(d) : null }));
-    });
-    r.on('error', reject);
-    if (cuerpo) r.write(JSON.stringify(cuerpo));
-    r.end();
-  });
-}
-
-test('API /api/remoto: protección, validación y límites', async (t) => {
-  const e = entorno();
-  const { remoto } = nuevo(e, { maxTotal: 1 });
-  const servidor = crearServidor({ trabajo: e.trabajo, memoria: null, remoto });
-  await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
-  t.after(() => { remoto.cerrarTodas(); servidor.close(); });
-  const { port } = servidor.address();
-  const cab = { 'x-nullraptor': '1' };
-
-  assert.equal((await pedir(port, 'GET', '/api/remoto', { cab: { host: 'evil.com' } })).estado, 421);
-  assert.equal((await pedir(port, 'POST', '/api/remoto/abrir', { cuerpo: { proyecto: 'A' } })).estado, 403);
-  assert.equal((await pedir(port, 'POST', '/api/remoto/abrir', { cuerpo: { proyecto: '../fuera' }, cab })).estado, 404);
-  const abierta = await pedir(port, 'POST', '/api/remoto/abrir', { cuerpo: { proyecto: 'A' }, cab });
-  assert.equal(abierta.estado, 201);
-  assert.equal((await pedir(port, 'POST', '/api/remoto/abrir', { cuerpo: { proyecto: 'A' }, cab })).estado, 409);
-  assert.equal((await pedir(port, 'POST', '/api/remoto/abrir', { cuerpo: { proyecto: 'B' }, cab })).estado, 429);
-  const lista = await pedir(port, 'GET', '/api/remoto');
-  assert.equal(lista.datos.sesiones[0].proyecto, 'A');
-  assert.equal(lista.datos.maxTotal, 1);
-  assert.equal((await pedir(port, 'GET', '/api/resumen')).datos.remoto.length, 1);
-  assert.equal((await pedir(port, 'POST', `/api/remoto/${abierta.datos.id}/cerrar`)).estado, 403);
-  assert.equal((await pedir(port, 'POST', `/api/remoto/${abierta.datos.id}/cerrar`, { cab })).estado, 200);
-  assert.equal((await pedir(port, 'POST', `/api/remoto/${abierta.datos.id}/cerrar`, { cab })).estado, 404);
+  await fin;
 });

@@ -5,8 +5,28 @@ async function respuesta(r) {
   // Modo red: sin sesión (o con el código cambiado), a la página de entrada.
   if (r.status === 401) { window.location.assign('/entrar'); throw new Error('Hace falta el código de acceso.'); }
   const datos = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(datos.error ?? `Error ${r.status}`);
+  if (!r.ok) throw Object.assign(new Error(datos.error ?? `Error ${r.status}`), { estado: r.status, reautenticar: Boolean(datos.reautenticar) });
   return datos;
+}
+
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const deB64 = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+
+/** Confirma la passkey (por Tailscale, para la terminal y la seguridad: vale una hora). */
+export async function confirmarPasskey() {
+  const o = await post('/api/seguridad/reautenticar/opciones');
+  const c = await navigator.credentials.get({ publicKey: { ...o, challenge: deB64(o.challenge) } });
+  const r = c.response;
+  await post('/api/seguridad/reautenticar', { id: c.id, clientDataJSON: b64(r.clientDataJSON), authenticatorData: b64(r.authenticatorData), signature: b64(r.signature) });
+}
+
+/** Hace `fn`; si el servidor pide confirmar la passkey, la pide y lo repite una vez. */
+export async function conPasskey(fn) {
+  try { return await fn(); } catch (e) {
+    if (!e.reautenticar) throw e;
+    await confirmarPasskey();
+    return fn();
+  }
 }
 
 export const get = (ruta) => fetch(ruta, { headers: { Accept: 'application/json' } }).then(respuesta);

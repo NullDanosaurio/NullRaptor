@@ -5,7 +5,9 @@
 # este equipo puede leerla). Si deja de abrir el cofre, se olvida y se vuelve a pedir.
 # El instalador copia este archivo a %LOCALAPPDATA%\Nullraptor; tras cada actualización se refresca desde la imagen.
 # Modo red (otros navegadores de casa, con código de acceso): una vez con -Red y se recuerda; -SoloEquipo lo quita.
-param([switch]$Red, [switch]$SoloEquipo)
+# Tailscale (desde cualquier parte, solo tus dispositivos, con passkey): una vez con -Tailscale y se recuerda;
+# -SinTailscale lo quita. Publica el panel con «tailscale serve» (HTTPS dentro de tu tailnet; nunca Funnel).
+param([switch]$Red, [switch]$SoloEquipo, [switch]$Tailscale, [switch]$SinTailscale)
 $imagen = if ($env:NULLRAPTOR_IMAGEN) { $env:NULLRAPTOR_IMAGEN } else { 'ghcr.io/nulldanosaurio/nullraptor:main' }
 $cofre = if ($env:CREDENCIALES) { $env:CREDENCIALES } else { Join-Path $HOME '.nullraptor\credenciales.cifrado' }
 $guardada = Join-Path $env:LOCALAPPDATA 'Nullraptor\clave.dpapi'
@@ -20,9 +22,20 @@ $archivoRed = Join-Path $env:LOCALAPPDATA 'Nullraptor\red'
 New-Item -ItemType Directory -Force (Split-Path $archivoRed) | Out-Null
 if ($Red) { New-Item -ItemType File -Force $archivoRed | Out-Null } elseif ($SoloEquipo) { Remove-Item $archivoRed -ErrorAction SilentlyContinue }
 $enRed = if (Test-Path $archivoRed) { '1' } else { '0' }
+$archivoTs = Join-Path $env:LOCALAPPDATA 'Nullraptor\tailscale'
+if ($Tailscale) { New-Item -ItemType File -Force $archivoTs | Out-Null } elseif ($SinTailscale) { Remove-Item $archivoTs -ErrorAction SilentlyContinue }
+$dominio = ''
 # 127.0.0.1 y no localhost: .NET prueba antes ::1, que no está publicado, y agota la espera.
 function Panel-Listo { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$puerto" | Out-Null; return $true } catch { return $false } }
 function Abrir-Panel {
+  if ($dominio) {
+    Write-Host "`nDesde tus dispositivos con Tailscale: https://$dominio (con passkey)."
+    docker exec $nombre test -s /estado/home/.nullraptor/passkeys.json *> $null
+    if ($LASTEXITCODE) {
+      $codigoTs = (docker exec $nombre cat /estado/home/.nullraptor/panel-codigo).Trim()
+      Write-Host "  Primera passkey: abre https://$dominio/entrar en tu móvil y escribe el código $codigoTs"
+    }
+  }
   if ($enRed -eq '1') {
     # Este navegador entra solo (el código va en la dirección una vez); los demás de casa lo escriben.
     $codigo = (docker exec $nombre cat /estado/home/.nullraptor/panel-codigo).Trim()
@@ -48,6 +61,20 @@ function Abrir-Firewall {
   try { Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile', '-Command', $orden } catch { Write-Host 'Aviso: sin la regla, los otros equipos no llegarán al panel.' }
 }
 
+# Tailscale: el panel sigue publicado solo en 127.0.0.1; «tailscale serve» lo sirve por HTTPS a tu tailnet.
+function Preparar-Tailscale {
+  $ts = (Get-Command tailscale -ErrorAction SilentlyContinue).Source
+  if (-not $ts) { $ts = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe' }
+  if (-not (Test-Path $ts)) { Salir 'Tailscale no está instalado: https://tailscale.com/download (y en el móvil, su app). Inicia sesión con la misma cuenta.' }
+  $estado = & $ts status --json | ConvertFrom-Json
+  if ($estado.BackendState -ne 'Running') { Salir 'Tailscale no está conectado: ábrelo e inicia sesión.' }
+  $script:dominio = $estado.Self.DNSName.TrimEnd('.').ToLower()
+  & $ts serve --bg --https=443 "http://127.0.0.1:$puerto" | Out-Null
+  if ($LASTEXITCODE) { Salir "tailscale serve ha fallado. Activa MagicDNS y los certificados HTTPS en https://login.tailscale.com/admin/dns y vuelve a probar." }
+}
+if (Test-Path $archivoTs) { Preparar-Tailscale }
+elseif ($SinTailscale) { $ts = (Get-Command tailscale -ErrorAction SilentlyContinue).Source; if ($ts) { & $ts serve --https=443 off *> $null } }
+
 # 1. Docker en marcha.
 Refrescar-Path
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Salir 'Docker no está instalado: ejecuta "Instalar Nullraptor.cmd" del USB.' }
@@ -63,7 +90,7 @@ if (-not (Docker-Listo)) {
 }
 
 # Si ya está en marcha, solo se abre el navegador.
-if ((docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}}' $nombre 2>$null) -eq "true $enRed" -and (Panel-Listo)) { Abrir-Panel }
+if ((docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}} {{index .Config.Labels "nullraptor.dominio"}}' $nombre 2>$null) -eq "true $enRed $dominio" -and (Panel-Listo)) { Abrir-Panel }
 
 # 2. Imagen al día. Sin internet o sin acceso al registro, se usa la que ya haya en el equipo.
 Write-Host "Comprobando $imagen..."
@@ -111,7 +138,7 @@ if ($PSCommandPath -eq $instalado) {
 #    nullraptor (/estado). El puerto se publica solo en este equipo (127.0.0.1) o, en modo red, en la red de casa.
 docker rm -f $nombre *> $null
 $publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
-docker run -d --name $nombre --label "nullraptor.red=$enRed" -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -v nullraptor:/estado -v $montaCofre -p $publica $imagen node panel/servidor.mjs | Out-Null
+docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -v nullraptor:/estado -v $montaCofre -p $publica $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE
 Remove-Item Env:AGENTE_CLAVE -ErrorAction SilentlyContinue
 if ($codigo) { Salir "No se pudo arrancar el contenedor ($codigo). ¿Está ocupado el puerto $puerto?" $codigo }

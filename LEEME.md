@@ -51,6 +51,24 @@ reiniciar cierra todas las sesiones. Abre una regla del firewall de Windows solo
 Wi-Fi está como pública en Windows, no llegará). Sin HTTPS: úsalo solo en tu red de confianza, no en Wi-Fi públicas;
 ojo con VPN tipo ZeroTier, cuyos miembros también son «red privada».
 
+**Desde cualquier parte: Tailscale + passkey** (lanzador con `-Tailscale`, se recuerda; `-SinTailscale` lo quita).
+Antes, una vez: instala Tailscale en el PC y en el móvil con la misma cuenta y activa MagicDNS y los certificados
+HTTPS en https://login.tailscale.com/admin/dns. El lanzador ejecuta `tailscale serve` (nunca Funnel): el panel sigue
+publicado solo en `127.0.0.1` y Tailscale lo sirve por HTTPS en `https://<pc>.<tailnet>.ts.net` únicamente a tus
+dispositivos; no se abre ningún puerto del router. Todo lo que llega por ese dominio exige **passkey** (huella, cara
+o PIN; `panel/lib/passkey.mjs`, WebAuthn sin dependencias): la primera se crea en `/entrar` con el código que
+muestra el lanzador; las siguientes, con un código de un solo uso (10 min, QR) que se saca en Remoto → Seguridad
+desde un dispositivo que ya tenga passkey. Sesión en cookie `__Host-` (Secure, HttpOnly, SameSite=Strict) de 12 h
+como mucho y 2 h sin uso; abrir o usar la terminal y gestionar passkeys piden confirmar la passkey cada hora. Las
+escrituras exigen Origin exacto (`https://<dominio>`) y `X-Nullraptor`; 10 fallos por minuto como mucho. Desde
+este equipo (`localhost`) todo sigue sin passkey. **Registro** en el volumen: `$TRABAJO_DIR/registros/accesos.jsonl`
+(entradas, fallos, altas) y `registros/terminal/` (cada sesión entera: lo que entra y lo que sale). **Aviso al
+móvil** opcional: `AVISO_NTFY` en el cofre con la URL de un tema de ntfy (p. ej. `https://ntfy.sh/<tema-largo-y-raro>`)
+avisa de cada entrada, passkey nueva y terminal abierta. ¿Perdiste todas las passkeys? Borra
+`/estado/home/.nullraptor/passkeys.json` desde el PC (`docker exec nullraptor rm …`) y da de alta otra con el código.
+Límite: quien tenga tu móvil desbloqueado y la passkey entra, y dentro del contenedor tiene lo mismo que Claude
+(incluidos sus tokens); el contenedor lo separa de Windows.
+
 **Proyectos:** el menú y el panel muestran primero **Nullraptor** (el propio agente, descargado en el primer
 arranque) y la **Bóveda** (se trabaja sobre la memoria, rama `agente`), y después el resto de la memoria.
 
@@ -133,13 +151,15 @@ reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cu
 «Terminar y resumir» escribe en el Diario), **Trabajo** (tareas y fases del flujo en vivo, commits), **Bóveda**
 (árbol, búsqueda, notas con `[[enlaces]]` y retroenlaces; solo lectura) y **Remoto**.
 
-**Remoto** (`panel/lib/remoto.mjs`): «Abrir sesión remota» lanza `claude remote-control --capacity 1` en
-`$TRABAJO_DIR/proyectos/<P>` con el entorno de `preparar.mjs` (tokens y `BOVEDA_DIR`, nunca `AGENTE_CLAVE`) para
-seguir desde claude.ai/code o la app del móvil (enlace y QR generado en el navegador). No es una terminal: el panel
-solo abre, enseña el enlace y cierra. Marca la carpeta como de confianza en `.claude.json` (sin eso Claude se niega).
-Una sesión por proyecto, 3 como mucho, se cierran solas a las 4 h y todas al parar el panel. Permisos de Claude por
-defecto: se aprueban desde la app. La primera vez Claude pregunta «Enable Remote Control?» y el panel contesta que
-sí. Si una sesión muere de golpe, la carpeta queda ocupada cerca de un minuto («espera un minuto y vuelve a abrirla»).
+**Remoto** (`panel/lib/remoto.mjs`, `pty.mjs`): «Abrir sesión» lanza `claude --remote-control --permission-mode
+manual` en `$TRABAJO_DIR/proyectos/<P>` dentro de una terminal real (`script`, sin módulos nativos) con el entorno de
+`preparar.mjs` (tokens y `BOVEDA_DIR`, nunca `AGENTE_CLAVE`). Se ve y se maneja en la terminal del panel (xterm.js,
+con teclas Esc/Tab/flechas/Ctrl+C para el móvil) y a la vez desde claude.ai/code o la app (enlace y QR). Solo
+Claude Code, nunca una shell: pregunta antes de cada acción y unas reglas `deny` (`--settings`) le impiden leer o
+editar el cofre, `~/.nullraptor` (código y passkeys), las credenciales y `.claude.json` de Claude y los registros.
+Las reglas de `Bash` son orientativas (una orden se puede disfrazar); lo que protege es que pregunte siempre.
+Marca la carpeta como de confianza en `.claude.json`. Una sesión por proyecto, 3 como mucho, se cierran solas a
+las 4 h y todas al parar el panel. Con la red de casa y solo el código (`-Red`) la terminal no se usa.
 
 ```powershell
 docker run -it --rm -p 127.0.0.1:4321:4321 -v nullraptor:/estado -v "$HOME\.nullraptor:/cofre:ro" ghcr.io/nulldanosaurio/nullraptor node panel/servidor.mjs
