@@ -7,7 +7,9 @@
 # Modo red (otros navegadores de casa, con código de acceso): una vez con -Red y se recuerda; -SoloEquipo lo quita.
 # Tailscale (desde cualquier parte, solo tus dispositivos, con passkey): una vez con -Tailscale y se recuerda;
 # -SinTailscale lo quita. Publica el panel con «tailscale serve» (HTTPS dentro de tu tailnet; nunca Funnel).
-param([switch]$Red, [switch]$SoloEquipo, [switch]$Tailscale, [switch]$SinTailscale)
+# Carpetas de Windows para la IA: -Carpeta 'C:\ruta' (una o varias, separadas por comas) se monta con lectura y
+# escritura en /pc/<nombre> y se recuerda; -SinCarpetas las quita todas. Nunca una que contenga el cofre o la clave.
+param([switch]$Red, [switch]$SoloEquipo, [switch]$Tailscale, [switch]$SinTailscale, [string[]]$Carpeta, [switch]$SinCarpetas)
 $imagen = if ($env:NULLRAPTOR_IMAGEN) { $env:NULLRAPTOR_IMAGEN } else { 'ghcr.io/nulldanosaurio/nullraptor:main' }
 $cofre = if ($env:CREDENCIALES) { $env:CREDENCIALES } else { Join-Path $HOME '.nullraptor\credenciales.cifrado' }
 $guardada = Join-Path $env:LOCALAPPDATA 'Nullraptor\clave.dpapi'
@@ -25,6 +27,31 @@ $enRed = if (Test-Path $archivoRed) { '1' } else { '0' }
 $archivoTs = Join-Path $env:LOCALAPPDATA 'Nullraptor\tailscale'
 if ($Tailscale) { New-Item -ItemType File -Force $archivoTs | Out-Null } elseif ($SinTailscale) { Remove-Item $archivoTs -ErrorAction SilentlyContinue }
 $dominio = ''
+
+# Carpetas de Windows recordadas (una ruta por línea). Se rechaza cualquiera que contenga el cofre o la clave.
+$archivoCarpetas = Join-Path $env:LOCALAPPDATA 'Nullraptor\carpetas'
+if ($SinCarpetas) { Remove-Item $archivoCarpetas -ErrorAction SilentlyContinue }
+function Contiene($padre, $ruta) { return ($ruta.TrimEnd('\') + '\').StartsWith($padre.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) }
+if ($Carpeta) {
+  $lista = @(if (Test-Path $archivoCarpetas) { Get-Content $archivoCarpetas })
+  foreach ($c in $Carpeta) {
+    if (-not (Test-Path -LiteralPath $c -PathType Container)) { Salir "No existe la carpeta ${c}." }
+    $c = (Resolve-Path -LiteralPath $c).ProviderPath.TrimEnd('\')
+    if ((Contiene $c $cofre) -or (Contiene $c (Split-Path $guardada))) { Salir "No monto ${c}: contiene el cofre o la clave de Nullraptor. Elige una carpeta más concreta." }
+    if ($lista -notcontains $c) { $lista += $c }
+  }
+  $lista | Set-Content $archivoCarpetas
+}
+$carpetas = @(if (Test-Path $archivoCarpetas) { Get-Content $archivoCarpetas | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } })
+$montaCarpetas = @(); $usados = @{}
+foreach ($c in $carpetas) {
+  $n = (Split-Path $c -Leaf) -replace '[^A-Za-z0-9._-]', '_'
+  if (-not $n.Trim('_')) { $n = $c.Substring(0, 1) }   # raíz de una unidad, p. ej. D:\ -> /pc/D
+  $base = $n; for ($i = 2; $usados.ContainsKey($n); $i++) { $n = "$base-$i" }
+  $usados[$n] = 1
+  $montaCarpetas += '-v', "${c}:/pc/$n"
+}
+$etiquetaCarpetas = $carpetas -join '|'
 # 127.0.0.1 y no localhost: .NET prueba antes ::1, que no está publicado, y agota la espera.
 function Panel-Listo { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$puerto" | Out-Null; return $true } catch { return $false } }
 function Abrir-Panel {
@@ -90,7 +117,7 @@ if (-not (Docker-Listo)) {
 }
 
 # Si ya está en marcha, solo se abre el navegador.
-if ((docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}} {{index .Config.Labels "nullraptor.dominio"}}' $nombre 2>$null) -eq "true $enRed $dominio" -and (Panel-Listo)) { Abrir-Panel }
+if ((docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}} {{index .Config.Labels "nullraptor.dominio"}} {{index .Config.Labels "nullraptor.carpetas"}}' $nombre 2>$null) -eq "true $enRed $dominio $etiquetaCarpetas" -and (Panel-Listo)) { Abrir-Panel }
 
 # 2. Imagen al día. Sin internet o sin acceso al registro, se usa la que ya haya en el equipo.
 Write-Host "Comprobando $imagen..."
@@ -138,7 +165,7 @@ if ($PSCommandPath -eq $instalado) {
 #    nullraptor (/estado). El puerto se publica solo en este equipo (127.0.0.1) o, en modo red, en la red de casa.
 docker rm -f $nombre *> $null
 $publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
-docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -v nullraptor:/estado -v $montaCofre -p $publica $imagen node panel/servidor.mjs | Out-Null
+docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" --label "nullraptor.carpetas=$etiquetaCarpetas" -v nullraptor:/estado -v $montaCofre @montaCarpetas -p $publica $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE
 Remove-Item Env:AGENTE_CLAVE -ErrorAction SilentlyContinue
 if ($codigo) { Salir "No se pudo arrancar el contenedor ($codigo). ¿Está ocupado el puerto $puerto?" $codigo }
@@ -148,4 +175,5 @@ for ($i = 0; -not (Panel-Listo); $i++) {
   if ($i -ge 180) { Salir "El panel no responde tras 6 minutos. Registro: docker logs $nombre" }
   Start-Sleep -Seconds 2
 }
+foreach ($c in $carpetas) { Write-Host "Carpeta para la IA: $c" }
 Abrir-Panel
