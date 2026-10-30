@@ -3,7 +3,7 @@
 > Velocirráptor listo y rápido que caza en manada: tu agente personal, con su memoria a cuestas.
 > Antes «Ruflo Portable» (renombrado el 29/10/2026).
 
-Agente personal portátil: Ruflo + Claude Code en un contenedor. Arranca con **una clave**, descarga su memoria
+Agente personal portátil: Claude Code + Codex en un contenedor, con Ruflo como herramienta (MCP). Arranca con **una clave**, descarga su memoria
 (vault de Obsidian en GitHub) y muestra un menú con los proyectos que conoce: si el elegido no está en el equipo
 lo descarga, y si es nuevo crea su repositorio privado y lo registra en la memoria. Una vez al día recomienda 3
 servidores MCP, que solo se instalan con autorización.

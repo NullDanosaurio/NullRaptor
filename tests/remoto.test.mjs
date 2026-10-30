@@ -70,6 +70,17 @@ test('abrir: Claude con Remote Control, permisos manuales, reglas deny y entorno
   assert.equal(env.BOVEDA_DIR, e.memoria);
   assert.equal(env.TRABAJO_DIR, e.trabajo);
   assert.equal(remoto.lista()[0].quien, 'iPhone');
+  assert.ok(!h.args.includes('--mcp-config')); // sin archivo MCP preparado, no se pasa
+});
+
+test('abrir: el MCP preparado al arrancar (Ruflo) llega a la sesión desde fuera del proyecto', () => {
+  const e = entorno();
+  fs.writeFileSync(path.join(e.trabajo, '.mcp-agente.json'), '{"mcpServers":{}}');
+  const { remoto, lanzados } = nuevo(e);
+  remoto.abrir('A');
+  const i = lanzados[0].args.indexOf('--mcp-config');
+  assert.equal(lanzados[0].args[i + 1], path.join(e.trabajo, '.mcp-agente.json'));
+  assert.ok(!fs.existsSync(path.join(e.trabajo, 'proyectos', 'A', '.mcp.json')));
 });
 
 test('pantalla: URL y estado, repintado al conectarse, datos en vivo y fin', async () => {

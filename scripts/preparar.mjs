@@ -12,7 +12,8 @@ import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { abrirCofre } from './credenciales.mjs';
 import { elegirProyecto, opcionesDelMenu } from './menu.mjs';
-import { aConfigMcp, explorarDelDia, leerEstado } from './mcp.mjs';
+import { prepararIA } from './ia.mjs';
+import { explorarDelDia, leerEstado } from './mcp.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAMA_MEMORIA = 'agente'; // el agente nunca escribe en main: Daniel fusiona.
@@ -79,6 +80,9 @@ if (env.AGENTE_GIT_NOMBRE) git(['config', 'user.name', env.AGENTE_GIT_NOMBRE], m
 if (env.AGENTE_GIT_EMAIL) git(['config', 'user.email', env.AGENTE_GIT_EMAIL], memoria);
 console.error(`Memoria lista (rama ${RAMA_MEMORIA}).`);
 
+// Instrucciones globales y MCP de la IA, desde fuera de los proyectos (también para las sesiones del panel).
+const mcp = prepararIA({ agente, env, memoria, trabajo });
+
 const ejecutar = (orden, args, cwd) => spawnSync(orden, args, { cwd, stdio: 'inherit', env: { ...env, BOVEDA_DIR: memoria, TRABAJO_DIR: trabajo }, shell: /\.(cmd|bat)$/i.test(orden) }).status ?? 1; // shell solo para .cmd (Windows)
 
 // El propio agente queda descargado como proyecto desde el primer arranque (menú y panel; no en la verificación).
@@ -106,19 +110,6 @@ try {
 
 const proyecto = await elegirProyecto({ memoria, trabajo, env, git, clonar: clonarOActualizar });
 if (!proyecto) process.exit(0);
-
-// El «cerebro» del agente (instrucciones, skills, agentes, comandos) va con él a cualquier proyecto.
-if (env.CLAUDE_CONFIG_DIR) {
-  fs.cpSync(path.join(agente, 'CLAUDE.md'), path.join(env.CLAUDE_CONFIG_DIR, 'CLAUDE.md'));
-  for (const d of ['skills', 'agents', 'commands']) fs.cpSync(path.join(agente, '.claude', d), path.join(env.CLAUDE_CONFIG_DIR, d), { recursive: true });
-}
-const mcp = path.join(trabajo, '.mcp-agente.json');
-const mcpBase = JSON.parse(fs.readFileSync(path.join(agente, '.mcp.json'), 'utf8'));
-mcpBase.mcpServers.ruflo.args = [path.join(agente, 'scripts', 'ruflo-mcp.mjs')];
-// Explícitas: un cliente MCP puede no heredar el entorno, y sin ellas Ruflo guarda la memoria fuera del volumen.
-Object.assign(mcpBase.mcpServers.ruflo.env, Object.fromEntries(Object.entries(env).filter(([k]) => k.startsWith('CLAUDE_FLOW_'))));
-Object.assign(mcpBase.mcpServers, aConfigMcp(leerEstado(memoria).instalados, env)); // los autorizados por Daniel
-fs.writeFileSync(mcp, JSON.stringify(mcpBase, null, 2));
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
 const modo = (await rl.question('\nIntro = Claude Code · c = chat con Claude y Codex: ')).trim().toLowerCase();

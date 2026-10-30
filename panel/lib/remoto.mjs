@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cortarPty, lanzarPty, redimensionar, tamanoValido, ttyDe } from './pty.mjs';
 import { rutaProyecto } from './trabajo.mjs';
+import { ARCHIVO_MCP } from '../../scripts/ia.mjs';
 
 const AGENTE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLAUDE = path.join(AGENTE, 'node_modules', '.bin', 'claude');
@@ -101,6 +102,9 @@ export class Remoto {
     const env = entornoRemoto(this.env, { trabajo: this.trabajo, memoria: this.memoria, configDir: this.configDir });
     const ajustes = JSON.stringify(ajustesTerminal({ env, configDir: this.configDir, trabajo: this.trabajo }));
     const args = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes];
+    // MCP (Ruflo y los autorizados) desde fuera del proyecto: lo prepara scripts/ia.mjs al arrancar.
+    const mcp = path.join(this.trabajo, ARCHIVO_MCP);
+    if (fs.existsSync(mcp)) args.push('--mcp-config', mcp);
     const hijo = this.lanzar(args, { cwd: ruta, env, cols, filas });
     const id = randomUUID();
     const s = { id, proyecto: nombre, url: null, entorno: null, inicio: new Date().toISOString(), estado: 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };

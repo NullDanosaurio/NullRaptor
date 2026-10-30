@@ -28,6 +28,7 @@ dist/
 # Estado de política de Ruflo: por equipo, ligado a ~/.config/ruflo (va en volumen)
 .claude-flow/policy/
 .claude-flow/memory-package.json
+.claude-flow/daemon*
 
 # Cofre de credenciales: solo en cada equipo, nunca en git ni en la imagen (decisión 29/10/2026)
 *.cifrado
