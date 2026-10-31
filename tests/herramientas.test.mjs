@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { carpetaHerramientas, leerFicha, listarHerramientas } from '../scripts/herramientas.mjs';
+import { aprobar, archivoAprobaciones, carpetaHerramientas, desactivar, herramientasActivas, huella, leerFicha, listarHerramientas } from '../scripts/herramientas.mjs';
 
 function entorno() {
   const trabajo = fs.mkdtempSync(path.join(os.tmpdir(), 'herramientas-'));
@@ -80,7 +80,56 @@ test('listado: Ruflo de la imagen primero; las propias por orden, con error si n
   herramienta(base, 'zeta', buena());
   herramienta(base, 'alfa', { ...buena(), tipo: 'otro' });
   fs.mkdirSync(path.join(base, '.oculta'));
-  const lista = listarHerramientas({ trabajo, env: {} });
+  const lista = listarHerramientas({ trabajo, env: { HOME: trabajo } });
   assert.deepEqual(lista.map((h) => [h.id, h.origen, Boolean(h.error)]), [['ruflo', 'imagen', false], ['alfa', 'propia', true], ['zeta', 'propia', false]]);
-  assert.deepEqual(listarHerramientas({ trabajo: path.join(trabajo, 'no-existe'), env: {} }).map((h) => h.id), ['ruflo']);
+  assert.deepEqual(listarHerramientas({ trabajo: path.join(trabajo, 'no-existe'), env: { HOME: trabajo } }).map((h) => h.id), ['ruflo']);
+});
+
+test('aprobación: propuesta → aprobada con huella; si cambia un archivo, «cambiada»; desactivar la retira', () => {
+  const { trabajo, base } = entorno();
+  const env = { HOME: path.join(trabajo, 'casa') };
+  const dir = herramienta(base, 'tiempo', buena());
+  herramienta(base, 'rota', { ...buena(), tipo: 'otro' });
+  const estado = () => Object.fromEntries(listarHerramientas({ trabajo, env }).map((h) => [h.id, h.estado]));
+  assert.deepEqual(estado(), { ruflo: 'activa', rota: 'no válida', tiempo: 'propuesta' });
+  assert.deepEqual(herramientasActivas({ trabajo, env }), []);
+
+  const { huella: firma } = aprobar({ trabajo, env, id: 'tiempo', quien: 'iPhone' });
+  assert.equal(firma, huella(dir));
+  assert.equal(estado().tiempo, 'aprobada');
+  assert.deepEqual(herramientasActivas({ trabajo, env }).map((h) => h.id), ['tiempo']);
+  assert.equal((fs.statSync(archivoAprobaciones(env)).mode & 0o777), 0o600);
+
+  // Un cambio en cualquier archivo (también uno nuevo) la saca de las activas hasta volver a aprobarla.
+  fs.writeFileSync(path.join(dir, 'servidor.mjs'), '// otra cosa\n');
+  assert.equal(estado().tiempo, 'cambiada');
+  assert.deepEqual(herramientasActivas({ trabajo, env }), []);
+  aprobar({ trabajo, env, id: 'tiempo' });
+  fs.mkdirSync(path.join(dir, 'lib'));
+  fs.writeFileSync(path.join(dir, 'lib', 'extra.mjs'), '');
+  assert.equal(estado().tiempo, 'cambiada');
+
+  assert.equal(desactivar({ env, id: 'tiempo' }), true);
+  assert.equal(desactivar({ env, id: 'tiempo' }), false);
+  assert.equal(estado().tiempo, 'propuesta');
+
+  assert.throws(() => aprobar({ trabajo, env, id: 'rota' }), (e) => e.codigo === 400);
+  assert.throws(() => aprobar({ trabajo, env, id: 'no-existe' }), (e) => e.codigo === 404);
+  assert.throws(() => aprobar({ trabajo, env, id: 'ruflo' }), (e) => e.codigo === 400);
+});
+
+test('huella: no sigue enlaces simbólicos (cuenta su destino) y no depende del orden de creación', (t) => {
+  const { trabajo } = entorno();
+  const a = path.join(trabajo, 'a');
+  const b = path.join(trabajo, 'b');
+  for (const [dir, orden] of [[a, ['x', 'y']], [b, ['y', 'x']]]) {
+    fs.mkdirSync(dir);
+    for (const n of orden) fs.writeFileSync(path.join(dir, n), n);
+  }
+  assert.equal(huella(a), huella(b));
+  try { fs.symlinkSync('/etc/hostname', path.join(a, 'enlace')); } catch { t.skip('sin enlaces simbólicos'); return; }
+  const con = huella(a);
+  fs.rmSync(path.join(a, 'enlace'));
+  fs.symlinkSync('/etc/hosts', path.join(a, 'enlace'));
+  assert.notEqual(huella(a), con);
 });
