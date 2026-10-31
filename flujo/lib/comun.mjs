@@ -36,7 +36,10 @@ function buscarCodex() {
       .filter((f) => fs.existsSync(f))
       .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
   } catch {}
-  return candidatos[0] ?? 'codex';
+  if (candidatos[0]) return candidatos[0];
+  // En Docker (y en Linux o macOS): la CLI fijada en package.json. En Windows su .cmd pediría shell: se usa la app.
+  const local = path.join(AGENTE, 'node_modules', '.bin', 'codex');
+  return process.platform !== 'win32' && fs.existsSync(local) ? local : 'codex';
 }
 const BLOQUEO = path.join(RUNS, 'flujo.lock');
 const CANCELAR = path.join(RUNS, 'cancelar');

@@ -1,4 +1,5 @@
-# Nullraptor, agente personal portátil: Ruflo 3.59.17 + Claude Code 2.1.308 (versiones fijadas en package-lock.json).
+# Nullraptor, agente personal portátil: Claude Code 2.1.308 + Codex 0.163.0 + Ruflo 3.59.17 (versiones fijadas en package-lock.json).
+# Codex trae su binario en un paquete por plataforma (optionalDependencies): no necesita scripts de instalación.
 # Arranque: docker run -it --rm -v nullraptor:/estado ghcr.io/nulldanosaurio/nullraptor   → clave → memoria → menú de proyectos.
 # shortcut: imagen base fijada por etiqueta exacta, sin digest; añadir @sha256 tras el primer pull verificado.
 # Etapa 1: la web del panel (React + Vite + Tailwind). Sus dependencias solo existen aquí; a la imagen va dist/.

@@ -136,6 +136,11 @@ Los tokens solo existen en la memoria de los procesos: git los recibe por variab
 
 ## Chat con Claude y Codex a la vez
 
+**Codex** (la CLI de OpenAI, con la suscripción de ChatGPT) va en la imagen con versión fijada (`@openai/codex` en
+package.json). En Windows nativo se usa el de la app de Codex. Se inicia sesión una vez por equipo, desde la terminal
+del contenedor: `codex login --device-auth` (da un código para abrir en el navegador); queda en el volumen
+(`/estado/home/.codex`). `codex login status` dice si hay sesión.
+
 Tras elegir proyecto: `c` en vez de Intro (`scripts/chat.mjs`). Sin destinatario contestan las dos, alternando quién
 empieza, y cada una lee lo que dijo la otra; `@claude …` o `@codex …` habla con una; `/fin` cierra. Las dos **solo
 leen** el proyecto (los cambios, por el flujo automático). Decisión [U] 29/10/2026: la bóveda es conocimiento, no un
@@ -195,7 +200,7 @@ empezar (no trabajar a la vez en la misma carpeta del proyecto). Codex usa la cu
 Nada del flujo vive en el proyecto: las tareas están en la bóveda (`Proyectos/<proyecto>/Tareas`) y los registros y
 worktrees en `$TRABAJO_DIR/flujo/<proyecto>` (en Linux, node_modules entra en el worktree con enlaces duros); Claude,
 Ruflo y su memoria, en el agente. Las comprobaciones son las de un proyecto Next.js + TypeScript + Playwright
-(la tienda); habrá que generalizarlas con el segundo tipo de proyecto. Codex no va en la imagen todavía.
+(la tienda); habrá que generalizarlas con el segundo tipo de proyecto.
 
 ## Desarrollo del agente
 

@@ -2,6 +2,7 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "2.1.308",
     "@claude-flow/codex": "3.0.5",
+    "@openai/codex": "0.163.0",
     "ruflo": "3.59.17"
   },
   "name": "nullraptor",
