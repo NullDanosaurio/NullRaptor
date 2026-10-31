@@ -1,6 +1,7 @@
 // Estructura del panel: barra lateral (abajo en el móvil) y la vista elegida por la ruta.
 import { BookOpen, FolderKanban, LayoutDashboard, MessagesSquare, MonitorSmartphone } from 'lucide-react';
 import { useDatos, useRuta } from './api.js';
+import AvisoActualizacion from './componentes/AvisoActualizacion.jsx';
 import { cx, Punto } from './componentes/ui.jsx';
 import Boveda from './vistas/Boveda.jsx';
 import Chat from './vistas/Chat.jsx';
@@ -76,8 +77,11 @@ export default function App() {
         <div className="mt-auto hidden md:block"><EstadoBoveda /></div>
       </nav>
 
-      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        <Vista key={actual.id} resto={resto} />
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <AvisoActualizacion />
+        <div className="relative min-h-0 flex-1">
+          <div className="absolute inset-0"><Vista key={actual.id} resto={resto} /></div>
+        </div>
       </main>
     </div>
   );

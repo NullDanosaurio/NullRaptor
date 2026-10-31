@@ -1,5 +1,19 @@
 # Registro de trabajo
 
+## 31/10/2026 — Reestructuración, fase 3 (herramientas), Codex en la imagen, terminal móvil y actualización automática
+- [U] Se sigue el plan de 5 fases del 30/10 (tareas en Ruflo). F3-1: formato de herramientas propias
+  (`$TRABAJO_DIR/herramientas/<id>/herramienta.json`). F3-2: aprobación con huella sha256 en
+  `~/.nullraptor/herramientas.json`; si cambia un archivo, deja de estar activa.
+- [O] Codex no estaba en la imagen (solo se buscaba el de la app de Windows): `@openai/codex` 0.163.0 fijado; sesión de
+  ChatGPT iniciada con `codex login --device-auth` y probada.
+- [U] Prioridad: la terminal del panel en el móvil no dejaba pegar, dictar, adjuntar imágenes ni abrir enlaces →
+  caja de escritura bajo la terminal, imágenes en `$TRABAJO_DIR/adjuntos` y enlaces pulsables. [?] Sin probar en
+  el móvil (no hay navegador en el contenedor).
+- [U] Actualización automática: sola si no hay sesiones abiertas; si las hay, aviso y botón «Actualizar ahora».
+  [?] La parte de Windows (tarea programada, `-Actualizar`) está sin probar: no hay PowerShell en el contenedor.
+- [O] El estado del flujo de TuRinconDeLectura se perdió al moverlo a `$TRABAJO_DIR/flujo`; reconstruido desde los
+  commits de `main` (19/19 integradas).
+
 ## 29/10/2026 — Auditoría y paquete portátil 0.2.0
 
 ### Encontrado [O]

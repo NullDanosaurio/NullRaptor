@@ -42,6 +42,17 @@ pedir. Contrapartidas: quien entre en tu sesión de Windows puede abrir el agent
 `AGENTE_CLAVE` del contenedor mientras está en marcha (`docker inspect` la muestra a quien controle Docker en el
 equipo). Otra imagen: variable `NULLRAPTOR_IMAGEN` (p. ej. `nullraptor:dev`).
 
+**Actualización automática** (decisión [U] 31/10/2026): cada cambio en `main` genera una imagen nueva (CI) y el
+equipo la instala solo. La copia instalada del lanzador registra la tarea programada «Nullraptor (actualizar)» (de
+tu usuario, sin administrador), que cada 5 minutos ejecuta `arrancar.ps1 -Actualizar` sin ventana: baja la imagen y,
+si es nueva, recrea el contenedor con los mismos ajustes (red, Tailscale, carpetas y la clave recordada) **solo si no
+hay sesiones de Claude ni chats abiertos**. Si los hay, el panel muestra «Hay una versión nueva» con el botón
+«Actualizar ahora», que la instala en la siguiente pasada aunque haya sesiones (se cierran). Si el contenedor está
+parado, no lo arranca. Se hablan por archivos del volumen (`$TRABAJO_DIR/actualizacion`: `panel.json`,
+`disponible.json`, `solicitada.json`; `panel/lib/actualizacion.mjs`). Registro en
+`%LOCALAPPDATA%\Nullraptor\actualizar.log`. `-SinActualizar` quita la tarea (se recuerda; `-ConActualizar` la vuelve a
+poner). La tarea se crea la primera vez que se abre el lanzador ya actualizado.
+
 **Red de casa** (lanzador con `-Red`, se recuerda; `-SoloEquipo` lo quita; el instalador lo pregunta): el panel
 se publica en todas las interfaces y el lanzador muestra las direcciones (`http://<IP>:4321`) y el **código de
 acceso**. Cada navegador lo escribe una vez en `/entrar` y queda con una cookie de sesión (HttpOnly, SameSite=Strict,

@@ -11,6 +11,7 @@ import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { Actualizacion } from './lib/actualizacion.mjs';
 import { crearAcceso, hostRed, leerOCrearCodigo, paginaEntrar } from './lib/acceso.mjs';
 import { buscar, cambiosRecientes, estadoGit, leerNota, listarNotas } from './lib/boveda.mjs';
 import { Chats } from './lib/chats.mjs';
@@ -119,7 +120,7 @@ async function entrar(req, res, url, acceso, permitido) {
 
 export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
-  dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal',
+  dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -127,6 +128,14 @@ export function crearServidor({
   const chats = new Chats({ trabajo, memoria });
   const entrada = dominio ? crearEntrada({ passkeys, sesiones, codigoLanzador, registro, leerCuerpo, json, html }) : null;
   const rutasRemoto = crearRutasRemoto({ remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json });
+  // Para la actualización automática: cuántas sesiones hay abiertas (la tarea de Windows no corta ninguna).
+  let latido = null;
+  if (actualizacion) {
+    const publicar = () => { try { actualizacion.publicar(remoto.activas().length + chats.lista().length); } catch (e) { console.warn(`[panel] actualización: ${e.message}`); } };
+    publicar();
+    latido = setInterval(publicar, 20_000);
+    latido.unref?.();
+  }
   const sinBoveda = () => ({ error: 'Sin bóveda: arranca el panel con preparar.mjs (BOVEDA_DIR).' });
 
   const rutas = {
@@ -139,6 +148,8 @@ export function crearServidor({
       remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
       hoy: new Date().toISOString().slice(0, 10),
     }),
+    'GET /api/actualizacion': () => actualizacion?.estado() ?? { disponible: null, solicitada: null },
+    'POST /api/actualizacion/ahora': (_q, _c, { quien }) => (actualizacion ? actualizacion.solicitar(quien) : [404, { error: 'Sin actualización automática.' }]),
     'GET /api/proyectos': () => listarProyectos(trabajo, memoria),
     'GET /api/proyecto': (q) => detalleProyecto(trabajo, q.get('nombre'), memoria) ?? [404, { error: 'Proyecto no encontrado en este equipo.' }],
     'GET /api/boveda/notas': () => (memoria ? listarNotas(memoria) : [503, sinBoveda()]),
@@ -154,7 +165,7 @@ export function crearServidor({
     },
   };
 
-  return http.createServer(async (req, res) => {
+  const servidor = http.createServer(async (req, res) => {
     try {
       if (!permitido(req.headers.host)) { res.writeHead(421); res.end(); return; }
       const url = new URL(req.url, 'http://localhost');
@@ -209,7 +220,7 @@ export function crearServidor({
       const manejador = rutas[`${req.method} ${p}`];
       if (!manejador) { json(res, 404, { error: 'No existe.' }); return; }
       const cuerpo = req.method === 'POST' ? await leerCuerpo(req) : null;
-      const r = await manejador(q, cuerpo ?? {});
+      const r = await manejador(q, cuerpo ?? {}, { quien: quienEs(req, sesion) });
       if (Array.isArray(r) && typeof r[0] === 'number') json(res, r[0], r[1]);
       else json(res, 200, r);
     } catch (e) {
@@ -217,6 +228,8 @@ export function crearServidor({
       if (!e.codigo) console.error(`[panel] ${e.stack ?? e.message}`);
     }
   });
+  servidor.on('close', () => clearInterval(latido));
+  return servidor;
 }
 
 const esPrincipal = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -240,7 +253,8 @@ if (esPrincipal) {
   process.on('exit', () => remoto.cerrarTodas());
   for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(senal, () => remoto.cerrarTodas().then(() => process.exit(0)));
   const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;
-  crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador }).listen(puerto, host, () => {
+  const actualizacion = new Actualizacion({ trabajo });
+  crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador, actualizacion }).listen(puerto, host, () => {
     console.error(`Panel de Nullraptor en http://localhost:${puerto}  (Ctrl+C para cerrar)`);
     if (red) console.error(`Modo red: abierto a la red de casa con código de acceso (en ${archivoCodigo}).`);
     if (dominio) console.error(`Tailscale: https://${dominio} con passkey${passkeys.hay() ? '' : ` (primera passkey con el código de ${archivoCodigo})`}.`);

@@ -9,12 +9,27 @@
 # -SinTailscale lo quita. Publica el panel con «tailscale serve» (HTTPS dentro de tu tailnet; nunca Funnel).
 # Carpetas de Windows para la IA: -Carpeta 'C:\ruta' (una o varias, separadas por comas) se monta con lectura y
 # escritura en /pc/<nombre> y se recuerda; -SinCarpetas las quita todas. Nunca una que contenga el cofre o la clave.
-param([switch]$Red, [switch]$SoloEquipo, [switch]$Tailscale, [switch]$SinTailscale, [string[]]$Carpeta, [switch]$SinCarpetas)
+# Actualización automática: la copia instalada registra la tarea «Nullraptor (actualizar)», que cada 5 minutos lo
+# ejecuta con -Actualizar (sin ventana ni preguntas). Si hay imagen nueva, recrea el contenedor con los mismos
+# ajustes cuando no hay sesiones de Claude abiertas o cuando se pide desde el panel («Actualizar ahora»); si no,
+# el panel avisa. Si el contenedor está parado no lo arranca. Registro en %LOCALAPPDATA%\Nullraptor\actualizar.log.
+# -SinActualizar quita la tarea y se recuerda; -ConActualizar la vuelve a poner.
+param([switch]$Red, [switch]$SoloEquipo, [switch]$Tailscale, [switch]$SinTailscale, [string[]]$Carpeta, [switch]$SinCarpetas,
+  [switch]$Actualizar, [switch]$SinActualizar, [switch]$ConActualizar)
 $imagen = if ($env:NULLRAPTOR_IMAGEN) { $env:NULLRAPTOR_IMAGEN } else { 'ghcr.io/nulldanosaurio/nullraptor:main' }
 $cofre = if ($env:CREDENCIALES) { $env:CREDENCIALES } else { Join-Path $HOME '.nullraptor\credenciales.cifrado' }
 $guardada = Join-Path $env:LOCALAPPDATA 'Nullraptor\clave.dpapi'
 
-function Salir($mensaje, $codigo = 1) { Write-Host $mensaje; Read-Host 'Pulsa Intro para cerrar' | Out-Null; exit $codigo }
+$registroAct = Join-Path $env:LOCALAPPDATA 'Nullraptor\actualizar.log'
+function Anotar($mensaje) {
+  if ((Test-Path $registroAct) -and (Get-Item $registroAct).Length -gt 1MB) { Remove-Item $registroAct }
+  "$(Get-Date -Format s) $mensaje" | Add-Content $registroAct
+}
+# Con -Actualizar no hay nadie delante: se anota y se sale sin esperar.
+function Salir($mensaje, $codigo = 1) {
+  if ($Actualizar) { Anotar $mensaje; exit $codigo }
+  Write-Host $mensaje; Read-Host 'Pulsa Intro para cerrar' | Out-Null; exit $codigo
+}
 function Refrescar-Path { $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User') }
 function Docker-Listo { docker info *> $null; return $LASTEXITCODE -eq 0 }
 $nombre = 'nullraptor'
@@ -99,11 +114,13 @@ function Preparar-Tailscale {
   & $ts serve --bg --https=443 "http://127.0.0.1:$puerto" | Out-Null
   if ($LASTEXITCODE) { Salir "tailscale serve ha fallado. Activa MagicDNS y los certificados HTTPS en https://login.tailscale.com/admin/dns y vuelve a probar." }
 }
-if (Test-Path $archivoTs) { Preparar-Tailscale }
+# Con -Actualizar, Tailscale ya sirve el panel (serve --bg): el dominio se toma del contenedor, más abajo.
+if (-not $Actualizar -and (Test-Path $archivoTs)) { Preparar-Tailscale }
 elseif ($SinTailscale) { $ts = (Get-Command tailscale -ErrorAction SilentlyContinue).Source; if ($ts) { & $ts serve --https=443 off *> $null } }
 
 # 1. Docker en marcha.
 Refrescar-Path
+if ($Actualizar -and -not ((Get-Command docker -ErrorAction SilentlyContinue) -and (Docker-Listo))) { exit 0 } # sin Docker: ya se hará
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Salir 'Docker no está instalado: ejecuta "Instalar Nullraptor.cmd" del USB.' }
 if (-not (Docker-Listo)) {
   $exe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
@@ -116,8 +133,37 @@ if (-not (Docker-Listo)) {
   }
 }
 
+# Actualización automática: solo si hay imagen nueva y nadie está trabajando (o se ha pedido desde el panel).
+if ($Actualizar) {
+  if ((docker inspect -f '{{.State.Running}}' $nombre 2>$null) -ne 'true') { exit 0 } # parado a propósito: no se toca
+  # En JSON: PowerShell 5.1 estropea las comillas dobles dentro de los argumentos de otros programas.
+  $dominio = "$((docker inspect -f '{{json .Config.Labels}}' $nombre | ConvertFrom-Json).'nullraptor.dominio')".Trim()
+  docker pull -q $imagen *> $null
+  if ($LASTEXITCODE) { Anotar "Sin acceso a $imagen; se reintenta luego."; exit 0 }
+  $dir = '/estado/trabajo/actualizacion'
+  $enMarcha = "$(docker inspect -f '{{.Image}}' $nombre)".Trim()
+  $nueva = "$(docker image inspect -f '{{.Id}}' $imagen)".Trim()
+  if ($enMarcha -eq $nueva) { docker exec $nombre rm -f "$dir/disponible.json" "$dir/solicitada.json" *> $null; exit 0 }
+  # El aviso para el panel, con la fecha en que se vio por primera vez.
+  $previo = $(try { (docker exec $nombre cat "$dir/disponible.json" 2>$null) | ConvertFrom-Json } catch { $null })
+  if (-not $previo -or $previo.imagen -ne $nueva) {
+    @{ imagen = $nueva; fecha = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json -Compress |
+      docker exec -i $nombre sh -c "mkdir -p $dir && cat > $dir/disponible.json"
+    Anotar "Imagen nueva: $nueva"
+  }
+  docker exec $nombre test -f "$dir/solicitada.json" *> $null
+  $pedida = -not $LASTEXITCODE
+  $panel = $(try { (docker exec $nombre cat "$dir/panel.json" 2>$null) | ConvertFrom-Json } catch { $null })
+  # Sin noticias del panel en 5 minutos, está colgado: se actualiza igual. Sin panel.json (versión anterior), se espera.
+  $mudo = $panel -and ((Get-Date) - [datetime]$panel.fecha).TotalMinutes -gt 5
+  $libre = $panel -and $panel.sesiones -eq 0
+  if (-not ($pedida -or $libre -or $mudo)) { exit 0 }
+  Anotar "Actualizando ($(if ($pedida) { 'pedido desde el panel' } elseif ($libre) { 'sin sesiones abiertas' } else { 'el panel no responde' }))."
+  docker exec $nombre rm -f "$dir/disponible.json" "$dir/solicitada.json" *> $null
+}
+
 # Si ya está en marcha, solo se abre el navegador.
-if ((docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}} {{index .Config.Labels "nullraptor.dominio"}} {{index .Config.Labels "nullraptor.carpetas"}}' $nombre 2>$null) -eq "true $enRed $dominio $etiquetaCarpetas" -and (Panel-Listo)) { Abrir-Panel }
+if (-not $Actualizar -and (docker inspect -f '{{.State.Running}} {{index .Config.Labels "nullraptor.red"}} {{index .Config.Labels "nullraptor.dominio"}} {{index .Config.Labels "nullraptor.carpetas"}}' $nombre 2>$null) -eq "true $enRed $dominio $etiquetaCarpetas" -and (Panel-Listo)) { Abrir-Panel }
 
 # 2. Imagen al día. Sin internet o sin acceso al registro, se usa la que ya haya en el equipo.
 Write-Host "Comprobando $imagen..."
@@ -144,6 +190,7 @@ if (Test-Path $guardada) {
   try { $ok = Probar ((Get-Content $guardada -Raw).Trim() | ConvertTo-SecureString) } catch { $ok = $false }
   if (-not $ok) { Remove-Item $guardada; Write-Host 'La clave recordada ya no abre el cofre: escríbela de nuevo.' }
 }
+if (-not $ok -and $Actualizar) { Salir 'No hay clave recordada que abra el cofre: arranca Nullraptor a mano una vez.' }
 for ($i = 0; -not $ok -and $i -lt 3; $i++) {
   $s = Read-Host 'Clave del cofre (solo se pide esta vez en este equipo)' -AsSecureString
   if (Probar $s) {
@@ -156,6 +203,24 @@ if (-not $ok) { Salir 'No se pudo abrir el cofre.' }
 
 # 4. Este lanzador, al día con la imagen (vale para el próximo arranque). Solo la copia instalada, no la del repo.
 $instalado = Join-Path $env:LOCALAPPDATA 'Nullraptor\arrancar.ps1'
+# La tarea de actualización se registra desde la copia instalada (sin permisos de administrador: es de tu usuario).
+$tarea = 'Nullraptor (actualizar)'
+$archivoSinAct = Join-Path $env:LOCALAPPDATA 'Nullraptor\sin-actualizar'
+if ($ConActualizar) { Remove-Item $archivoSinAct -ErrorAction SilentlyContinue }
+if ($SinActualizar) {
+  New-Item -ItemType File -Force $archivoSinAct | Out-Null
+  Unregister-ScheduledTask -TaskName $tarea -Confirm:$false -ErrorAction SilentlyContinue
+  Write-Host 'Actualización automática desactivada (-ConActualizar la vuelve a poner).'
+} elseif ($PSCommandPath -eq $instalado -and -not $Actualizar -and -not (Test-Path $archivoSinAct) -and -not (Get-ScheduledTask -TaskName $tarea -ErrorAction SilentlyContinue)) {
+  try {
+    # conhost --headless: sin ventana que aparezca cada 5 minutos.
+    $accion = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$instalado`" -Actualizar"
+    $cuando = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Minutes 5)
+    $ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+    Register-ScheduledTask -TaskName $tarea -Action $accion -Trigger $cuando -Settings $ajustes -Description 'Instala las versiones nuevas de Nullraptor cuando no hay sesiones abiertas.' | Out-Null
+    Write-Host 'Actualización automática activada (cada 5 minutos; -SinActualizar la quita).'
+  } catch { Write-Host "Aviso: no se pudo programar la actualización automática ($($_.Exception.Message))." }
+}
 if ($PSCommandPath -eq $instalado) {
   $tmp = docker create $imagen
   if (-not $LASTEXITCODE) { docker cp "${tmp}:/nullraptor/scripts/arrancar.ps1" $instalado *> $null; docker rm $tmp *> $null }
@@ -175,5 +240,6 @@ for ($i = 0; -not (Panel-Listo); $i++) {
   if ($i -ge 180) { Salir "El panel no responde tras 6 minutos. Registro: docker logs $nombre" }
   Start-Sleep -Seconds 2
 }
+if ($Actualizar) { Anotar "Actualizado a $nueva."; exit 0 }
 foreach ($c in $carpetas) { Write-Host "Carpeta para la IA: $c" }
 Abrir-Panel
