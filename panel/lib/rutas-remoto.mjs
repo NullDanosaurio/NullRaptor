@@ -5,7 +5,22 @@
 //  - Por la red de casa con solo el código (PANEL_RED): la terminal no se puede usar.
 const ID = '([0-9a-f-]{36})';
 
-export function crearRutasRemoto({ remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json }) {
+/** Cuerpo binario (imágenes adjuntas), con tope. */
+function leerBinario(req, max) {
+  return new Promise((resolve, reject) => {
+    const trozos = [];
+    let tam = 0;
+    req.on('data', (t) => {
+      tam += t.length;
+      if (tam > max) { reject(Object.assign(new Error('Imagen demasiado grande (máximo 10 MB).'), { codigo: 413 })); req.destroy(); return; }
+      trozos.push(t);
+    });
+    req.on('end', () => resolve(Buffer.concat(trozos)));
+    req.on('error', reject);
+  });
+}
+
+export function crearRutasRemoto({ maxImagen = 10 * 1024 * 1024, remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json }) {
   const reautenticar = { error: 'Confirma con tu passkey para seguir.', reautenticar: true };
 
   /** ctx: { remota, sesion, soloCodigo, quien }. Devuelve true si atendió la petición. */
@@ -35,7 +50,7 @@ export function crearRutasRemoto({ remoto, passkeys, sesiones, registro, dominio
       json(res, 201, s);
       return true;
     }
-    const m = p.match(new RegExp(`^/api/remoto/${ID}/(cerrar|terminal|entrada|tamano)$`));
+    const m = p.match(new RegExp(`^/api/remoto/${ID}/(cerrar|terminal|entrada|tamano|imagen)$`));
     if (m) {
       const [, id, accion] = m;
       if (accion === 'cerrar') {
@@ -46,6 +61,11 @@ export function crearRutasRemoto({ remoto, passkeys, sesiones, registro, dominio
       if (no) return responder(no);
       if (accion === 'terminal') { if (metodo('GET')) remoto.suscribir(id, res, quien); return true; }
       if (!metodo('POST')) return true;
+      if (accion === 'imagen') {
+        const tipo = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+        const ruta = remoto.guardarImagen(id, tipo, await leerBinario(req, maxImagen), quien);
+        return responder([201, { ruta }]);
+      }
       const cuerpo = await leerCuerpo(req);
       if (accion === 'entrada') { remoto.escribir(id, cuerpo.datos, quien); json(res, 202, { ok: true }); return true; }
       await remoto.tamano(id, cuerpo.cols, cuerpo.filas);

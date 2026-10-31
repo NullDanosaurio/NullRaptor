@@ -18,6 +18,12 @@ export const MAX_TOTAL = 3;
 export const MAX_MS = 4 * 60 * 60_000;
 const MAX_PANTALLA = 512 * 1024; // lo último de la terminal, para repintarla al conectarse
 const MAX_ENTRADA = 64 * 1024;
+export const MAX_IMAGEN = 10 * 1024 * 1024;
+// Imágenes que se pueden adjuntar: extensión y primeros bytes (no basta con el tipo que diga el navegador).
+const IMAGENES = {
+  'image/png': ['png', [0x89, 0x50, 0x4e, 0x47]], 'image/jpeg': ['jpg', [0xff, 0xd8, 0xff]],
+  'image/gif': ['gif', [0x47, 0x49, 0x46, 0x38]], 'image/webp': ['webp', [0x52, 0x49, 0x46, 0x46]],
+};
 
 const fallo = (mensaje, codigo) => Object.assign(new Error(mensaje), { codigo });
 const sinAnsi = (s) => s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]/g, '');
@@ -80,6 +86,7 @@ export class Remoto {
   constructor({ trabajo, memoria = null, env = process.env, lanzar = lanzarClaude, maxTotal = MAX_TOTAL, maxMs = MAX_MS, configDir, registro = null, tty = ttyDe, cambiarTamano = redimensionar, cortar = cortarPty } = {}) {
     Object.assign(this, { trabajo, memoria, env, lanzar, maxTotal, maxMs, registro, tty, cambiarTamano, cortar });
     this.configDir = configDir ?? env.CLAUDE_CONFIG_DIR ?? os.homedir();
+    this.adjuntos = path.join(trabajo, 'adjuntos');
     this.sesiones = new Map(); // id → { id, proyecto, url, entorno, inicio, estado, motivo, hijo, pantalla, clientes, reloj, fin, apunte }
   }
 
@@ -101,7 +108,9 @@ export class Remoto {
     marcarConfianza(this.configDir, ruta);
     const env = entornoRemoto(this.env, { trabajo: this.trabajo, memoria: this.memoria, configDir: this.configDir });
     const ajustes = JSON.stringify(ajustesTerminal({ env, configDir: this.configDir, trabajo: this.trabajo }));
-    const args = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes];
+    // Adjuntos (imágenes del panel): fuera del proyecto, en una carpeta que Claude puede leer.
+    fs.mkdirSync(this.adjuntos, { recursive: true, mode: 0o700 });
+    const args = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes, '--add-dir', this.adjuntos];
     // MCP (Ruflo y los autorizados) desde fuera del proyecto: lo prepara scripts/ia.mjs al arrancar.
     const mcp = path.join(this.trabajo, ARCHIVO_MCP);
     if (fs.existsSync(mcp)) args.push('--mcp-config', mcp);
@@ -133,6 +142,7 @@ export class Remoto {
     hijo.stdin?.on('error', () => {});
     const terminar = (motivo) => {
       if (s.estado !== 'terminada') { clearTimeout(s.reloj); s.estado = 'terminada'; s.motivo ??= motivo; s.hijo = null; }
+      fs.rmSync(path.join(this.adjuntos, id), { recursive: true, force: true });
       for (const res of s.clientes) { sse(res, 'fin', { motivo: s.motivo }); res.end(); }
       s.clientes.clear();
     };
@@ -173,6 +183,21 @@ export class Remoto {
     s.apunte('entrada', datos);
     if (quien !== s.ultimoQuien) { s.ultimoQuien = quien; s.apunte('escribe', { quien }); }
     s.hijo.stdin.write(datos);
+  }
+
+  /** Guarda una imagen adjuntada desde el panel y devuelve su ruta, para pasársela a Claude en el mensaje. */
+  guardarImagen(id, tipo, datos, quien) {
+    const s = this.viva(id);
+    const [ext, firma] = IMAGENES[tipo] ?? [];
+    const valida = ext && Buffer.isBuffer(datos) && datos.length <= MAX_IMAGEN && firma.every((b, i) => datos[i] === b);
+    if (!valida) throw fallo('Solo imágenes PNG, JPEG, GIF o WebP de hasta 10 MB.', 400);
+    const dir = path.join(this.adjuntos, id);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    s.imagenes = (s.imagenes ?? 0) + 1;
+    const ruta = path.join(dir, `imagen-${s.imagenes}.${ext}`);
+    fs.writeFileSync(ruta, datos, { mode: 0o600 });
+    s.apunte('imagen', { ruta, bytes: datos.length, quien });
+    return ruta;
   }
 
   async tamano(id, cols, filas) {

@@ -143,6 +143,25 @@ test('este equipo usa la terminal sin passkey; la red de casa con solo el códig
   assert.match(no.datos.error, /solo se usa desde este equipo o por Tailscale/);
   assert.equal((await pedir(port, 'GET', '/api/remoto', { cab: casa })).datos.terminal, false);
   assert.equal(lanzados.length, 1);
+
+  // Imagen adjunta: cuerpo binario con su tipo; desde casa (solo código), no.
+  const subir = (datos, cab) => new Promise((resolve, reject) => {
+    const r = http.request({ host: '127.0.0.1', port, method: 'POST', path: `/api/remoto/${abierta.datos.id}/imagen`, headers: { 'content-type': 'image/png', ...cab } }, (res) => {
+      let d = '';
+      res.on('data', (x) => { d += x; });
+      res.on('end', () => resolve({ estado: res.statusCode, datos: d ? JSON.parse(d) : null }));
+    });
+    r.on('error', (e) => (e.code === 'ECONNRESET' || e.code === 'EPIPE' ? resolve({ estado: 413 }) : reject(e)));
+    r.end(datos);
+  });
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]);
+  const subida = await subir(png, local);
+  assert.equal(subida.estado, 201);
+  assert.deepEqual(fs.readFileSync(subida.datos.ruta), png);
+  assert.equal((await subir(png, casa)).estado, 403);
+  assert.equal((await subir(png, { ...local, 'x-nullraptor': '' })).estado, 403);
+  assert.equal((await subir(Buffer.from('hola'), local)).estado, 400);
+  assert.equal((await subir(Buffer.alloc(11 * 1024 * 1024, 0x89), local)).estado, 413);
 });
 
 test('registro de accesos: altas y fallos quedan en el volumen', async (t) => {

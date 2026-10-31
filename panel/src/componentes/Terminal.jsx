@@ -2,14 +2,27 @@
 // salen por POST, en orden. Por Tailscale, si el servidor pide confirmar la passkey, se pide con un botón (Safari
 // solo deja usar la passkey tras un toque). Copiar: Ctrl+C (o Cmd+C) con texto seleccionado copia en vez de interrumpir;
 // Claude Code captura el ratón, así que se selecciona con Mayús+arrastrar. En el móvil, «Texto» muestra la pantalla
-// como texto normal para seleccionarlo con el dedo.
+// como texto normal para seleccionarlo con el dedo. Debajo, el redactor (Redactor.jsx) para pegar, dictar y adjuntar
+// imágenes. Los enlaces se abren en otra pestaña (los normales y los OSC 8 que pinta Claude Code).
 import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal as XTerm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { Copy, FileText, KeyRound, RotateCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { confirmarPasskey, post } from '../api.js';
+import { confirmarPasskey, post, subir } from '../api.js';
+import Redactor from './Redactor.jsx';
 import { Boton, cx } from './ui.jsx';
+
+const abrirEnlace = (uri) => { if (/^https?:\/\//i.test(uri)) window.open(uri, '_blank', 'noopener,noreferrer'); };
+const URL_TEXTO = /(https?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?)\]])/g;
+
+/** Texto con los enlaces pulsables (vista de texto del móvil). */
+function ConEnlaces({ texto }) {
+  return texto.split(URL_TEXTO).map((trozo, i) => (i % 2
+    ? <a key={i} href={trozo} target="_blank" rel="noopener noreferrer" className="text-raptor underline">{trozo}</a>
+    : trozo));
+}
 
 // Teclas que en el móvil no hay: Claude Code usa Esc, Tab, Mayús+Tab (modo de permisos), flechas y Ctrl+C.
 const TECLAS = [['Esc', '\x1b'], ['Tab', '\t'], ['⇧Tab', '\x1b[Z'], ['↑', '\x1b[A'], ['↓', '\x1b[B'], ['Ctrl+C', '\x03'], ['Intro', '\r']];
@@ -54,9 +67,11 @@ export default function Terminal({ id, className }) {
       cursorBlink: true, scrollback: 5000, fontSize: 13,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       theme: { background: '#0c0f0d', foreground: '#e6e8e3', cursor: '#b5f04a' },
+      linkHandler: { activate: (_e, uri) => abrirEnlace(uri), allowNonHttpProtocols: false },
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
+    term.loadAddon(new WebLinksAddon((_e, uri) => abrirEnlace(uri)));
     term.open(caja.current);
     xterm.current = term;
     // Ctrl+C / Cmd+C con selección (o Ctrl+Mayús+C): copiar, sin mandar la interrupción a Claude.
@@ -83,7 +98,7 @@ export default function Terminal({ id, className }) {
         if (e.reautenticar) setEstado('confirmar'); else setAviso(e.message);
       } finally { enviando = false; if (pendiente) vaciar(); }
     };
-    enviar.current = (d) => { pendiente += d; vaciar(); term.focus(); };
+    enviar.current = (d, enfocar = true) => { pendiente += d; vaciar(); if (enfocar) term.focus(); };
     term.onData((d) => enviar.current(d));
 
     let reloj;
@@ -112,6 +127,13 @@ export default function Terminal({ id, className }) {
     return () => { vivo = false; xterm.current = null; clearTimeout(reloj); observador.disconnect(); fuente?.close(); term.dispose(); };
   }, [id, intento]);
 
+  const subirImagen = useCallback(async (archivo) => {
+    try { return (await subir(`/api/remoto/${id}/imagen`, archivo)).ruta; } catch (e) {
+      if (e.reautenticar) setEstado('confirmar');
+      throw e;
+    }
+  }, [id]);
+
   // Copia la selección; sin selección, toda la pantalla.
   const copiar = useCallback(async (valor) => {
     const term = xterm.current;
@@ -130,7 +152,7 @@ export default function Terminal({ id, className }) {
               <Boton tam="sm" onClick={() => copiar(texto)}><Copy className="size-3.5" /> {copiado ? 'Copiado' : 'Copiar todo'}</Boton>
               <Boton tam="sm" variante="fantasma" onClick={() => setTexto(null)} className="ml-auto"><X className="size-3.5" /> Volver</Boton>
             </div>
-            <pre className="min-h-0 flex-1 select-text overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] text-[#e6e8e3]">{texto}</pre>
+            <pre className="min-h-0 flex-1 select-text overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] text-[#e6e8e3]"><ConEnlaces texto={texto} /></pre>
           </div>
         )}
         {estado !== 'viva' && (
@@ -154,6 +176,7 @@ export default function Terminal({ id, className }) {
           <FileText className="size-3.5" /> Texto
         </Boton>
       </div>
+      <Redactor activo={estado === 'viva'} enviar={(d) => enviar.current(d, false)} subirImagen={subirImagen} />
     </div>
   );
 }

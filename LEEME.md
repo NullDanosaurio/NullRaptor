@@ -159,7 +159,12 @@ reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cu
 **Remoto** (`panel/lib/remoto.mjs`, `pty.mjs`): «Abrir sesión» lanza `claude --remote-control --permission-mode
 manual` en `$TRABAJO_DIR/proyectos/<P>` dentro de una terminal real (`script`, sin módulos nativos) con el entorno de
 `preparar.mjs` (tokens y `BOVEDA_DIR`, nunca `AGENTE_CLAVE`). Se ve y se maneja en la terminal del panel (xterm.js,
-con teclas Esc/Tab/flechas/Ctrl+C para el móvil) y a la vez desde claude.ai/code o la app (enlace y QR). Solo
+con teclas Esc/Tab/flechas/Ctrl+C para el móvil) y a la vez desde claude.ai/code o la app (enlace y QR). Bajo la
+terminal, una caja de escritura para lo que xterm no deja hacer en el móvil: pegar, dictar (reconocimiento de voz del
+navegador, en español), adjuntar imágenes (galería, cámara o pegadas) y enviar con Intro o «Enviar». Las imágenes se
+guardan en `$TRABAJO_DIR/adjuntos/<sesión>` (fuera del proyecto; Claude la recibe con `--add-dir`), se comprueban
+por sus primeros bytes (PNG, JPEG, GIF, WebP; 10 MB) y se borran al cerrar la sesión. Los enlaces se abren con un
+toque, también en la vista «Texto». Solo
 Claude Code, nunca una shell: pregunta antes de cada acción y unas reglas `deny` (`--settings`) le impiden leer o
 editar el cofre, `~/.nullraptor` (código y passkeys), las credenciales y `.claude.json` de Claude y los registros.
 Las reglas de `Bash` son orientativas (una orden se puede disfrazar); lo que protege es que pregunte siempre.

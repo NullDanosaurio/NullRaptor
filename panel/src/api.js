@@ -38,6 +38,13 @@ export const post = (ruta, cuerpo) => fetch(ruta, {
   body: JSON.stringify(cuerpo ?? {}),
 }).then(respuesta);
 
+/** Sube un archivo tal cual (cuerpo binario con su tipo). */
+export const subir = (ruta, archivo) => fetch(ruta, {
+  method: 'POST',
+  headers: { 'Content-Type': archivo.type || 'application/octet-stream', 'X-Nullraptor': '1' },
+  body: archivo,
+}).then(respuesta);
+
 /** Datos de una ruta, con refresco opcional cada `cada` ms (se pausa con la pestaña oculta). */
 export function useDatos(ruta, { cada = 0 } = {}) {
   const [estado, setEstado] = useState({ datos: null, error: null, cargando: Boolean(ruta) });
