@@ -1,5 +1,18 @@
 # Registro de trabajo
 
+## 02/11/2026 — Adjuntos en la terminal: más tipos de archivo
+- [U] Daniel pide adjuntar más que imágenes desde el redactor de la terminal.
+- `panel/lib/adjuntos.mjs`: imágenes (PNG, JPEG, GIF, WebP), PDF, Office (docx, xlsx, pptx, odt, ods, odp) y texto o
+  código (~55 extensiones), de hasta 20 MB (antes 10 MB, solo imágenes). Se decide por la extensión y se comprueba
+  con el contenido (firma `%PDF-`, zip, imagen o UTF-8 válido sin bytes nulos); el tipo del navegador no cuenta.
+- Nombre saneado (sin rutas ni caracteres raros, 60 caracteres) y numerado (`1-informe.pdf`) para que no se pisen.
+  La ruta `/api/remoto/<id>/imagen` pasa a `/archivo`, con el nombre en la cabecera `X-Nombre`. La CSP admite `blob:`
+  en imágenes (vistas previas). Redactor: clip en vez del botón de imagen; ficha con nombre para lo que no es imagen.
+- Pruebas [O]: 101/101 (`tests/adjuntos.test.mjs` nuevo; remoto y tailscale adaptadas). Web construida. Commit
+  `ac8ffa4` subido a `main`.
+- [?] Sin probar con archivos reales desde el móvil ni en un navegador (no hay en el contenedor); no se pudo ver si
+  la CI publicó la imagen (sin `gh`).
+
 ## 02/11/2026 — Fase 5: lanzador simple y Nullraptor como aplicación
 - [U] Acceso (red de casa, Tailscale) y carpetas de Windows desde Ajustes, desde el PC o por Tailscale con passkey
   confirmada (opción recomendada que eligió Daniel). [U] Daniel pide que la web se abra como una aplicación propia
