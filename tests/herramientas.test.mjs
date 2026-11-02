@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { aprobar, archivoAprobaciones, carpetaHerramientas, desactivar, herramientasActivas, huella, leerFicha, listarHerramientas } from '../scripts/herramientas.mjs';
+import {
+  aprobar, archivoAprobaciones, archivosDe, carpetaHerramientas, configHerramientas, desactivar, herramientaLanzable, herramientasActivas, huella,
+  leerFicha, listarHerramientas, verArchivo,
+} from '../scripts/herramientas.mjs';
 
 function entorno() {
   const trabajo = fs.mkdtempSync(path.join(os.tmpdir(), 'herramientas-'));
@@ -16,7 +19,7 @@ function entorno() {
 function herramienta(base, id, ficha, archivos = { 'servidor.mjs': '// servidor\n' }) {
   const dir = path.join(base, id);
   fs.mkdirSync(dir, { recursive: true });
-  for (const [n, c] of Object.entries(archivos)) fs.writeFileSync(path.join(dir, n), c);
+  for (const [n, c] of Object.entries(archivos)) { fs.mkdirSync(path.dirname(path.join(dir, n)), { recursive: true }); fs.writeFileSync(path.join(dir, n), c); }
   if (ficha !== undefined) fs.writeFileSync(path.join(dir, 'herramienta.json'), typeof ficha === 'string' ? ficha : JSON.stringify(ficha));
   return dir;
 }
@@ -132,4 +135,46 @@ test('huella: no sigue enlaces simbólicos (cuenta su destino) y no depende del 
   fs.rmSync(path.join(a, 'enlace'));
   fs.symlinkSync('/etc/hosts', path.join(a, 'enlace'));
   assert.notEqual(huella(a), con);
+});
+
+test('aprobar con la huella revisada: si cambió entretanto, 409 y sigue sin aprobar', () => {
+  const { trabajo, base } = entorno();
+  const env = { HOME: path.join(trabajo, 'casa') };
+  const dir = herramienta(base, 'tiempo', buena());
+  const vista = listarHerramientas({ trabajo, env }).find((h) => h.id === 'tiempo');
+  assert.equal(vista.huella, huella(dir));
+  fs.writeFileSync(path.join(dir, 'servidor.mjs'), '// colado después de revisar\n');
+  assert.throws(() => aprobar({ trabajo, env, id: 'tiempo', esperada: vista.huella }), (e) => e.codigo === 409);
+  assert.equal(listarHerramientas({ trabajo, env }).find((h) => h.id === 'tiempo').estado, 'propuesta');
+  aprobar({ trabajo, env, id: 'tiempo', esperada: huella(dir) });
+  assert.equal(listarHerramientas({ trabajo, env }).find((h) => h.id === 'tiempo').estado, 'aprobada');
+});
+
+test('revisar: lista de archivos y texto, sin salir de la carpeta ni seguir enlaces', (t) => {
+  const { trabajo, base } = entorno();
+  const dir = herramienta(base, 'tiempo', buena(), { 'servidor.mjs': 'hola', 'lib/x.mjs': '' });
+  assert.deepEqual(archivosDe({ trabajo, env: {}, id: 'tiempo' }).archivos.map((a) => a.ruta), ['herramienta.json', 'lib/x.mjs', 'servidor.mjs']);
+  assert.equal(verArchivo({ trabajo, env: {}, id: 'tiempo', ruta: 'servidor.mjs' }).texto, 'hola');
+  for (const ruta of ['../tiempo/servidor.mjs', '/etc/passwd', 'lib/../../x', '']) assert.throws(() => verArchivo({ trabajo, env: {}, id: 'tiempo', ruta }), (e) => e.codigo === 400, ruta);
+  assert.throws(() => verArchivo({ trabajo, env: {}, id: 'tiempo', ruta: 'nada' }), (e) => e.codigo === 404);
+  assert.throws(() => verArchivo({ trabajo, env: {}, id: 'tiempo', ruta: 'lib' }), (e) => e.codigo === 400);
+  try { fs.symlinkSync('/etc/hostname', path.join(dir, 'enlace')); } catch { t.skip('sin enlaces simbólicos'); return; }
+  assert.throws(() => verArchivo({ trabajo, env: {}, id: 'tiempo', ruta: 'enlace' }), (e) => e.codigo === 400);
+  assert.deepEqual(archivosDe({ trabajo, env: {}, id: 'tiempo' }).archivos.find((a) => a.ruta === 'enlace'), { ruta: 'enlace', enlace: '/etc/hostname' });
+});
+
+test('config MCP: solo las aprobadas, con el lanzador y sus variables del cofre; sin la obligatoria, fuera', () => {
+  const { trabajo, base } = entorno();
+  const env = { HOME: path.join(trabajo, 'casa'), TIEMPO_CLAVE: 'k', GITHUB_TOKEN: 'gh' };
+  herramienta(base, 'tiempo', buena({ variables: [{ nombre: 'TIEMPO_CLAVE', obligatoria: true }, { nombre: 'TIEMPO_OPCIONAL' }] }));
+  herramienta(base, 'mapas', buena({ variables: [{ nombre: 'MAPAS_CLAVE', obligatoria: true }] }));
+  herramienta(base, 'nueva', buena());
+  aprobar({ trabajo, env, id: 'tiempo' });
+  aprobar({ trabajo, env, id: 'mapas' });
+  const c = configHerramientas({ agente: '/agente', trabajo, env });
+  assert.deepEqual(Object.keys(c), ['herramienta-tiempo']); // mapas sin su clave; nueva sin aprobar
+  assert.deepEqual(c['herramienta-tiempo'].args, [path.join('/agente', 'scripts', 'herramienta-mcp.mjs'), 'tiempo']);
+  assert.deepEqual(c['herramienta-tiempo'].env, { TRABAJO_DIR: path.resolve(trabajo), HOME: env.HOME, TIEMPO_CLAVE: 'k' });
+  assert.throws(() => herramientaLanzable({ trabajo, env, id: 'nueva' }), /propuesta/);
+  assert.throws(() => herramientaLanzable({ trabajo, env, id: 'ruflo' }), /no existe/);
 });

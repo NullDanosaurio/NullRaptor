@@ -145,6 +145,27 @@ Los tokens solo existen en la memoria de los procesos: git los recibe por variab
   calendario; «vigilar mi impresora Elegoo» → ninguno instalable hoy.
 - A mano: `node scripts/preparar.mjs node scripts/mcp.mjs explorar [--forzar]`.
 
+## Herramientas propias (en caliente)
+
+Además de Ruflo (viene con la imagen), la IA puede crear herramientas nuevas sin reconstruir la imagen. Cada una es
+una carpeta `$TRABAJO_DIR/herramientas/<id>` (en el volumen) con su ficha `herramienta.json` y un servidor MCP por
+stdio en Node (`scripts/herramientas.mjs` explica el formato; `config/claude-global.md`, lo que se le pide a la IA).
+
+- **Propuesta → aprobada**: lo nuevo queda «propuesta». En el panel → **Herramientas** se ven sus archivos y, al
+  aprobar, se guarda la huella sha256 de todo su contenido en `~/.nullraptor/herramientas.json` (las sesiones de
+  Claude no pueden leerlo ni editarlo). Se aprueba la huella revisada: si cambió mientras la mirabas, se rechaza.
+- **Si cambia, se para**: cualquier archivo distinto la deja «cambiada» hasta aprobarla otra vez. El lanzador
+  (`scripts/herramienta-mcp.mjs`) lo comprueba **en cada arranque**, también si se reinicia a mitad de una sesión.
+- **Llega en caliente**: aprobar o desactivar rehace `$TRABAJO_DIR/.mcp-agente.json`, y cada sesión remota nueva lo
+  rehace antes de abrirse. Las sesiones ya abiertas no cambian. Cada una aparece como MCP `herramienta-<id>`.
+- **Qué recibe**: solo `PATH`, `HOME`, idioma y las variables de su ficha, sacadas del cofre (si falta una obligatoria,
+  no se activa). Nunca las credenciales del agente. Pero corre con los permisos del contenedor: revisa antes de aprobar.
+- **Quién aprueba**: desde este equipo, o por Tailscale con la passkey confirmada en la última hora. Desde la red de
+  casa con solo el código, no (desactivar sí). Todo queda en el registro de accesos.
+- **Límite**: desde dentro del contenedor, una sesión podría llamar a la API del panel; lo que lo impide es que
+  Claude va en modo manual y pregunta antes de cada orden. Llegan a las sesiones de Claude (Remoto y el menú); el chat
+  del panel y el flujo automático no cargan MCP.
+
 ## Chat con Claude y Codex a la vez
 
 **Codex** (la CLI de OpenAI, con la suscripción de ChatGPT) va en la imagen con versión fijada (`@openai/codex` en

@@ -1,9 +1,11 @@
 // Configuración de la IA que Nullraptor da desde fuera a cada sesión, sin dejar nada en los repositorios:
 //  - instrucciones globales (config/claude-global.md → CLAUDE_CONFIG_DIR/CLAUDE.md), iguales en todos los proyectos;
-//  - servidores MCP (Ruflo + los autorizados) en $TRABAJO_DIR/.mcp-agente.json, para pasarlo con --mcp-config.
+//  - servidores MCP (Ruflo, los autorizados y las herramientas propias aprobadas) en $TRABAJO_DIR/.mcp-agente.json,
+//    para pasarlo con --mcp-config.
 // También retira las copias de Ruflo que versiones anteriores dejaban en la configuración global.
 import fs from 'node:fs';
 import path from 'node:path';
+import { configHerramientas } from './herramientas.mjs';
 import { aConfigMcp, leerEstado } from './mcp.mjs';
 
 export const ARCHIVO_MCP = '.mcp-agente.json';
@@ -26,14 +28,28 @@ export function retirarAntiguos(configDir) {
   }
 }
 
-/** Config MCP: Ruflo con raíz en el agente (su estado nunca cae en un proyecto) y los MCP autorizados. */
-export function configMcp({ agente, env, memoria }) {
+/** Config MCP: Ruflo con raíz en el agente (su estado nunca cae en un proyecto), los MCP autorizados y las
+ * herramientas propias aprobadas en el panel. */
+export function configMcp({ agente, env, memoria, trabajo }) {
   const base = JSON.parse(fs.readFileSync(path.join(agente, 'config', 'mcp.json'), 'utf8'));
   base.mcpServers.ruflo.args = [path.join(agente, 'scripts', 'ruflo-mcp.mjs')];
   // Explícitas: un cliente MCP puede no heredar el entorno, y sin ellas Ruflo guarda la memoria fuera del volumen.
   Object.assign(base.mcpServers.ruflo.env, Object.fromEntries(Object.entries(env).filter(([k]) => k.startsWith('CLAUDE_FLOW_'))));
   if (memoria) Object.assign(base.mcpServers, aConfigMcp(leerEstado(memoria).instalados, env));
+  if (trabajo) Object.assign(base.mcpServers, configHerramientas({ agente, trabajo, env }));
   return base;
+}
+
+/** (Re)escribe $TRABAJO_DIR/.mcp-agente.json. El panel lo llama al aprobar o desactivar una herramienta y antes de
+ * abrir cada sesión: así una herramienta nueva llega sin reiniciar nada. */
+export function escribirMcp({ agente, env, memoria, trabajo }) {
+  const mcp = path.join(trabajo, ARCHIVO_MCP);
+  fs.mkdirSync(trabajo, { recursive: true });
+  // Lleva las variables de los MCP autorizados y de las herramientas (del cofre): solo para este usuario.
+  const temporal = `${mcp}.${process.pid}.tmp`;
+  fs.writeFileSync(temporal, JSON.stringify(configMcp({ agente, env, memoria, trabajo }), null, 2), { mode: 0o600 });
+  fs.renameSync(temporal, mcp);
+  return mcp;
 }
 
 /** Deja lista la configuración de la IA. Devuelve la ruta del archivo MCP. */
@@ -44,9 +60,5 @@ export function prepararIA({ agente, env, memoria, trabajo }) {
     fs.copyFileSync(path.join(agente, 'config', 'claude-global.md'), path.join(configDir, 'CLAUDE.md'));
     retirarAntiguos(configDir);
   }
-  const mcp = path.join(trabajo, ARCHIVO_MCP);
-  fs.mkdirSync(trabajo, { recursive: true });
-  // Lleva las variables de los MCP autorizados (del cofre): solo para este usuario.
-  fs.writeFileSync(mcp, JSON.stringify(configMcp({ agente, env, memoria }), null, 2), { mode: 0o600 });
-  return mcp;
+  return escribirMcp({ agente, env, memoria, trabajo });
 }

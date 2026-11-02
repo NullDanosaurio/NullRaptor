@@ -1,5 +1,18 @@
 # Registro de trabajo
 
+## 02/11/2026 — Fase 3 terminada: herramientas en caliente (F3-3, F3-4, F3-5)
+- [O] Las tareas F3-x/F4/F5 que se crearon en Ruflo no están (`task_list` vacía); queda la nota del plan en su
+  memoria. Lo que faltaba de la fase se reconstruye desde el código.
+- F3-3: las aprobadas entran en `.mcp-agente.json` como `herramienta-<id>` con un lanzador
+  (`scripts/herramienta-mcp.mjs`) que comprueba la huella **en cada arranque**; reciben solo PATH, HOME, idioma y sus
+  variables del cofre. El panel rehace la configuración al aprobar o desactivar y antes de abrir cada sesión remota.
+- F3-4: pestaña **Herramientas** del panel: estados, archivos para revisar y aprobar o desactivar. Se aprueba la huella
+  revisada (si cambió, 409). Desde este equipo o por Tailscale con passkey confirmada; con solo el código, no.
+- F3-5: `config/claude-global.md` explica a la IA cómo crear una herramienta y que la deja propuesta.
+- Pruebas [O]: 87/87. Real: panel en otro puerto, herramienta MCP «hora» sin dependencias, aprobada por la API y
+  respondiendo a `initialize`, `tools/list` y `tools/call` a través del lanzador.
+- [?] Sin probar: que Claude Code la cargue en una sesión real (gasta suscripción) y la vista en el móvil.
+
 ## 31/10/2026 — Reestructuración, fase 3 (herramientas), Codex en la imagen, terminal móvil y actualización automática
 - [U] Se sigue el plan de 5 fases del 30/10 (tareas en Ruflo). F3-1: formato de herramientas propias
   (`$TRABAJO_DIR/herramientas/<id>/herramienta.json`). F3-2: aprobación con huella sha256 en

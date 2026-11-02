@@ -116,13 +116,15 @@ function guardarAprobaciones(env, aprobaciones) {
 
 const fallo = (mensaje, codigo) => Object.assign(new Error(mensaje), { codigo });
 
-/** Aprueba una herramienta propia válida con la huella de lo que hay ahora. */
-export function aprobar({ trabajo, env = process.env, id, quien = 'este equipo' }) {
+/** Aprueba una herramienta propia válida con la huella de lo que hay ahora. Con `esperada` (la huella que Daniel
+ * revisó en el panel), si el contenido ha cambiado entretanto no se aprueba (409). */
+export function aprobar({ trabajo, env = process.env, id, quien = 'este equipo', esperada = null }) {
   if (DE_LA_IMAGEN.some((h) => h.id === id)) throw fallo('Las herramientas de la imagen siempre están activas.', 400);
   let h;
   try { h = leerFicha(carpetaHerramientas(trabajo, env), id); } catch (e) { throw fallo(e.code === 'ENOENT' ? 'Esa herramienta no existe.' : `No se puede aprobar: ${e.message}.`, e.code === 'ENOENT' ? 404 : 400); }
   let firma;
   try { firma = huella(h.carpeta); } catch (e) { throw fallo(`No se puede aprobar: ${e.message}.`, 400); }
+  if (esperada !== null && esperada !== firma) throw fallo('La herramienta ha cambiado mientras la revisabas: vuelve a mirarla.', 409);
   const aprobaciones = leerAprobaciones(env);
   aprobaciones[id] = { huella: firma, fecha: new Date().toISOString(), quien };
   guardarAprobaciones(env, aprobaciones);
@@ -142,10 +144,10 @@ function estadoDe(h, aprobaciones) {
   if (h.origen === 'imagen') return { estado: 'activa' };
   if (h.error) return { estado: 'no válida' };
   const a = Object.hasOwn(aprobaciones, h.id) ? aprobaciones[h.id] : null;
-  if (!a) return { estado: 'propuesta' };
   let actual;
-  try { actual = huella(h.carpeta); } catch (e) { return { estado: 'cambiada', aprobada: a.fecha, motivo: e.message }; }
-  return actual === a.huella ? { estado: 'aprobada', aprobada: a.fecha } : { estado: 'cambiada', aprobada: a.fecha };
+  try { actual = huella(h.carpeta); } catch (e) { return { estado: a ? 'cambiada' : 'propuesta', ...(a && { aprobada: a.fecha }), motivo: e.message }; }
+  if (!a) return { estado: 'propuesta', huella: actual };
+  return { estado: actual === a.huella ? 'aprobada' : 'cambiada', aprobada: a.fecha, huella: actual };
 }
 
 /** Todas las herramientas: primero las de la imagen; las propias con `error` si su ficha no vale. */
@@ -162,3 +164,59 @@ export function listarHerramientas({ trabajo, env = process.env }) {
 
 /** Las propias que pueden correr ahora: aprobadas y sin cambios desde entonces. */
 export const herramientasActivas = ({ trabajo, env = process.env }) => listarHerramientas({ trabajo, env }).filter((h) => h.estado === 'aprobada');
+
+const MAX_LISTA = 300;
+const MAX_VER = 200 * 1024;
+
+/** Archivos de una herramienta propia, para revisarla antes de aprobarla (hasta 300; los enlaces, con su destino). */
+export function archivosDe({ trabajo, env = process.env, id }) {
+  const h = leerFicha(carpetaHerramientas(trabajo, env), id);
+  const archivos = [];
+  const recorrer = (dir, rel) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      if (archivos.length >= MAX_LISTA) return;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      const abs = path.join(dir, e.name);
+      if (e.isSymbolicLink()) archivos.push({ ruta: r, enlace: fs.readlinkSync(abs) });
+      else if (e.isDirectory()) recorrer(abs, r);
+      else if (e.isFile()) archivos.push({ ruta: r, bytes: fs.statSync(abs).size });
+    }
+  };
+  recorrer(h.carpeta, '');
+  return { archivos, cortada: archivos.length >= MAX_LISTA };
+}
+
+/** Texto de un archivo de una herramienta (sin seguir enlaces ni salir de su carpeta), hasta 200 KB. */
+export function verArchivo({ trabajo, env = process.env, id, ruta }) {
+  const h = leerFicha(carpetaHerramientas(trabajo, env), id);
+  if (typeof ruta !== 'string' || !ruta || path.isAbsolute(ruta) || ruta.split(/[\\/]/).includes('..')) throw fallo('Ruta no válida.', 400);
+  const abs = path.join(h.carpeta, ruta);
+  let st;
+  try { st = fs.lstatSync(abs); } catch { throw fallo('Ese archivo no existe.', 404); }
+  if (!st.isFile() || fs.realpathSync(abs) !== abs) throw fallo('Solo se ven archivos normales (no enlaces ni carpetas).', 400);
+  const datos = fs.readFileSync(abs);
+  const binario = datos.subarray(0, 8000).includes(0);
+  return { ruta, bytes: datos.length, binario, texto: binario ? null : datos.subarray(0, MAX_VER).toString('utf8'), cortado: datos.length > MAX_VER };
+}
+
+/** La herramienta, solo si ahora mismo está aprobada y sin cambios. El lanzador lo comprueba en cada arranque. */
+export function herramientaLanzable({ trabajo, env = process.env, id }) {
+  const h = listarHerramientas({ trabajo, env }).find((x) => x.id === id && x.origen === 'propia');
+  if (!h) throw new Error(`no existe la herramienta «${id}»`);
+  if (h.estado !== 'aprobada') throw new Error(`«${id}» está ${h.estado}: apruébala en el panel (Herramientas)`);
+  return h;
+}
+
+/** Entradas MCP de las propias aprobadas. Arrancan con el lanzador (scripts/herramienta-mcp.mjs), que vuelve a
+ * comprobar la huella cada vez. Las variables salen del cofre (env); si falta una obligatoria, se omite y se avisa. */
+export function configHerramientas({ agente, trabajo, env = process.env }) {
+  const servidores = {};
+  for (const h of herramientasActivas({ trabajo, env })) {
+    const faltan = h.mcp.variables.filter((v) => v.obligatoria && !env[v.nombre]).map((v) => v.nombre);
+    if (faltan.length) { console.warn(`Herramienta ${h.id} sin activar: faltan ${faltan.join(', ')} en el cofre.`); continue; }
+    const variables = Object.fromEntries(h.mcp.variables.filter((v) => env[v.nombre]).map((v) => [v.nombre, env[v.nombre]]));
+    const base = { TRABAJO_DIR: path.resolve(trabajo), HOME: env.HOME ?? os.homedir(), ...(env.HERRAMIENTAS_DIR && { HERRAMIENTAS_DIR: env.HERRAMIENTAS_DIR }) };
+    servidores[`herramienta-${h.id}`] = { command: process.execPath, args: [path.join(agente, 'scripts', 'herramienta-mcp.mjs'), h.id], env: { ...base, ...variables } };
+  }
+  return servidores;
+}

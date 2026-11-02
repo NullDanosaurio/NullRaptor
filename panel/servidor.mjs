@@ -19,7 +19,9 @@ import { crearEntrada, esRemota, hostDominio, quienEs } from './lib/entrada.mjs'
 import { Passkeys, Sesiones } from './lib/passkey.mjs';
 import { Registro } from './lib/registro.mjs';
 import { Remoto } from './lib/remoto.mjs';
+import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
 import { crearRutasRemoto } from './lib/rutas-remoto.mjs';
+import { escribirMcp } from '../scripts/ia.mjs';
 import { detalleProyecto, estadoMcp, listarProyectos, rutaProyecto } from './lib/trabajo.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -121,6 +123,7 @@ async function entrar(req, res, url, acceso, permitido) {
 export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
   dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
+  env = process.env, prepararMcp = null,
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -128,6 +131,9 @@ export function crearServidor({
   const chats = new Chats({ trabajo, memoria });
   const entrada = dominio ? crearEntrada({ passkeys, sesiones, codigoLanzador, registro, leerCuerpo, json, html }) : null;
   const rutasRemoto = crearRutasRemoto({ remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json });
+  // Al aprobar o desactivar una herramienta se rehace la configuración MCP: la usan las sesiones que se abran después.
+  const alCambiar = () => { try { prepararMcp?.(); } catch (e) { console.warn(`[panel] MCP: ${e.message}`); } };
+  const rutasHerramientas = crearRutasHerramientas({ trabajo, env, sesiones, registro, alCambiar, leerCuerpo, json });
   // Para la actualización automática: cuántas sesiones hay abiertas (la tarea de Windows no corta ninguna).
   let latido = null;
   if (actualizacion) {
@@ -198,7 +204,9 @@ export function crearServidor({
       if (!remota && req.method !== 'GET' && !escrituraPermitida(req, permitido)) { json(res, 403, { error: 'Petición no permitida.' }); return; }
 
       const soloCodigo = Boolean(acceso) && !remota && !hostPermitido(req.headers.host);
-      if (await rutasRemoto(req, res, p, { remota, sesion, soloCodigo, quien: quienEs(req, sesion) })) return;
+      const ctx = { remota, sesion, soloCodigo, quien: quienEs(req, sesion) };
+      if (await rutasRemoto(req, res, p, ctx)) return;
+      if (await rutasHerramientas(req, res, p, ctx)) return;
 
       // Chats abiertos: /api/chats/:id/(eventos|mensajes|cerrar)
       const m = p.match(/^\/api\/chats\/([0-9a-f-]{36})\/(eventos|mensajes|cerrar)$/);
@@ -248,13 +256,15 @@ if (esPrincipal) {
   const acceso = red ? crearAcceso(codigo) : null;
   const passkeys = dominio ? new Passkeys({ archivo: path.join(os.homedir(), '.nullraptor', 'passkeys.json'), dominio }) : null;
   const registro = new Registro({ carpeta: path.join(trabajo, 'registros'), avisoUrl: process.env.AVISO_NTFY || null });
+  // MCP de las sesiones (con las herramientas aprobadas), rehecho al abrir cada una y al aprobar o desactivar.
+  const prepararMcp = () => escribirMcp({ agente: path.resolve(AQUI, '..'), env: process.env, memoria, trabajo });
   // Las sesiones remotas mueren con el panel.
-  const remoto = new Remoto({ trabajo, memoria, registro });
+  const remoto = new Remoto({ trabajo, memoria, registro, prepararMcp });
   process.on('exit', () => remoto.cerrarTodas());
   for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(senal, () => remoto.cerrarTodas().then(() => process.exit(0)));
   const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;
   const actualizacion = new Actualizacion({ trabajo });
-  crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador, actualizacion }).listen(puerto, host, () => {
+  crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador, actualizacion, prepararMcp }).listen(puerto, host, () => {
     console.error(`Panel de Nullraptor en http://localhost:${puerto}  (Ctrl+C para cerrar)`);
     if (red) console.error(`Modo red: abierto a la red de casa con código de acceso (en ${archivoCodigo}).`);
     if (dominio) console.error(`Tailscale: https://${dominio} con passkey${passkeys.hay() ? '' : ` (primera passkey con el código de ${archivoCodigo})`}.`);

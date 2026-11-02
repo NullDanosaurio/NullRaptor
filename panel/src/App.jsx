@@ -1,10 +1,11 @@
 // Estructura del panel: barra lateral (abajo en el móvil) y la vista elegida por la ruta.
-import { BookOpen, FolderKanban, LayoutDashboard, MessagesSquare, MonitorSmartphone } from 'lucide-react';
+import { BookOpen, FolderKanban, LayoutDashboard, MessagesSquare, MonitorSmartphone, Wrench } from 'lucide-react';
 import { useDatos, useRuta } from './api.js';
 import AvisoActualizacion from './componentes/AvisoActualizacion.jsx';
 import { cx, Punto } from './componentes/ui.jsx';
 import Boveda from './vistas/Boveda.jsx';
 import Chat from './vistas/Chat.jsx';
+import Herramientas from './vistas/Herramientas.jsx';
 import Inicio from './vistas/Inicio.jsx';
 import Remoto from './vistas/Remoto.jsx';
 import Trabajo from './vistas/Trabajo.jsx';
@@ -15,6 +16,7 @@ const VISTAS = [
   { id: 'trabajo', nombre: 'Trabajo', icono: FolderKanban, componente: Trabajo },
   { id: 'boveda', nombre: 'Bóveda', icono: BookOpen, componente: Boveda },
   { id: 'remoto', nombre: 'Remoto', icono: MonitorSmartphone, componente: Remoto },
+  { id: 'herramientas', nombre: 'Herramientas', icono: Wrench, componente: Herramientas },
 ];
 
 function Logo() {
@@ -70,7 +72,7 @@ export default function App() {
             >
               {activa && <span aria-hidden="true" className="absolute top-2 bottom-2 left-0 hidden w-[3px] rounded-r-full bg-raptor md:block" />}
               <Icono className={cx('size-[18px] shrink-0', activa && 'text-raptor')} strokeWidth={1.8} />
-              <span className="md:hidden lg:inline">{nombre}</span>
+              <span className="max-w-full truncate md:hidden lg:inline">{nombre}</span>
             </a>
           );
         })}

@@ -83,8 +83,8 @@ const lanzarClaude = (args, opciones) => lanzarPty([CLAUDE, ...args], opciones);
 const sse = (res, tipo, datos) => res.write(`event: ${tipo}\ndata: ${JSON.stringify(datos ?? null)}\n\n`);
 
 export class Remoto {
-  constructor({ trabajo, memoria = null, env = process.env, lanzar = lanzarClaude, maxTotal = MAX_TOTAL, maxMs = MAX_MS, configDir, registro = null, tty = ttyDe, cambiarTamano = redimensionar, cortar = cortarPty } = {}) {
-    Object.assign(this, { trabajo, memoria, env, lanzar, maxTotal, maxMs, registro, tty, cambiarTamano, cortar });
+  constructor({ trabajo, memoria = null, env = process.env, lanzar = lanzarClaude, maxTotal = MAX_TOTAL, maxMs = MAX_MS, configDir, registro = null, tty = ttyDe, cambiarTamano = redimensionar, cortar = cortarPty, prepararMcp = null } = {}) {
+    Object.assign(this, { trabajo, memoria, env, lanzar, maxTotal, maxMs, registro, tty, cambiarTamano, cortar, prepararMcp });
     this.configDir = configDir ?? env.CLAUDE_CONFIG_DIR ?? os.homedir();
     this.adjuntos = path.join(trabajo, 'adjuntos');
     this.sesiones = new Map(); // id → { id, proyecto, url, entorno, inicio, estado, motivo, hijo, pantalla, clientes, reloj, fin, apunte }
@@ -111,7 +111,9 @@ export class Remoto {
     // Adjuntos (imágenes del panel): fuera del proyecto, en una carpeta que Claude puede leer.
     fs.mkdirSync(this.adjuntos, { recursive: true, mode: 0o700 });
     const args = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes, '--add-dir', this.adjuntos];
-    // MCP (Ruflo y los autorizados) desde fuera del proyecto: lo prepara scripts/ia.mjs al arrancar.
+    // MCP (Ruflo, los autorizados y las herramientas aprobadas) desde fuera del proyecto: scripts/ia.mjs lo prepara al
+    // arrancar y se rehace aquí, para que una herramienta recién aprobada llegue a la sesión nueva.
+    try { this.prepararMcp?.(); } catch (e) { console.warn(`[panel] MCP: ${e.message}`); }
     const mcp = path.join(this.trabajo, ARCHIVO_MCP);
     if (fs.existsSync(mcp)) args.push('--mcp-config', mcp);
     const hijo = this.lanzar(args, { cwd: ruta, env, cols, filas });
