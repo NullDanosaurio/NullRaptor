@@ -1,6 +1,7 @@
 // Terminal de una sesión remota (Claude Code en el contenedor) con xterm.js: la pantalla llega por SSE y las teclas
 // salen por POST, en orden. Por Tailscale, si el servidor pide confirmar la passkey, se pide con un botón (Safari
 // solo deja usar la passkey tras un toque). Copiar: Ctrl+C (o Cmd+C) con texto seleccionado copia en vez de interrumpir;
+// Ctrl+V pega lo copiado en tu equipo (las imágenes y archivos se suben y llegan por su ruta);
 // Claude Code captura el ratón, así que se selecciona con Mayús+arrastrar. En el móvil, «Texto» muestra la pantalla
 // como texto normal para seleccionarlo con el dedo. Debajo, el redactor (Redactor.jsx) para pegar, dictar y adjuntar
 // archivos (imágenes, PDF, Office, texto y código). Los enlaces se abren en otra pestaña (los normales y los OSC 8
@@ -77,6 +78,9 @@ export default function Terminal({ id, className }) {
     xterm.current = term;
     // Ctrl+C / Cmd+C con selección (o Ctrl+Mayús+C): copiar, sin mandar la interrupción a Claude.
     term.attachCustomKeyEventHandler((e) => {
+      // Ctrl+V (o Ctrl+Mayús+V): xterm mandaría ^V y Claude Code buscaría una imagen en el portapapeles del
+      // contenedor, que está vacío. Así el navegador pega lo copiado en tu equipo (texto, imagen o archivo).
+      if (e.key.toLowerCase() === 'v' && e.ctrlKey && !e.altKey && !e.metaKey) return false;
       const teclaC = e.key.toLowerCase() === 'c' && (e.ctrlKey || e.metaKey);
       if (!teclaC || !(term.hasSelection() || e.shiftKey)) return true;
       e.preventDefault();
@@ -102,6 +106,20 @@ export default function Terminal({ id, className }) {
     enviar.current = (d, enfocar = true) => { pendiente += d; vaciar(); if (enfocar) term.focus(); };
     term.onData((d) => enviar.current(d));
 
+    // Imágenes o archivos pegados en la terminal: se suben y Claude recibe su ruta (el texto lo pega xterm).
+    const alPegar = async (e) => {
+      const archivos = [...(e.clipboardData?.files ?? [])];
+      if (!archivos.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const rutas = [];
+        for (const a of archivos) rutas.push((await subir(`/api/remoto/${id}/archivo`, a, a.name || `pegado.${(a.type.split('/')[1] || 'bin').replace('jpeg', 'jpg')}`)).ruta);
+        enviar.current(`\x1b[200~${rutas.join(' ')} \x1b[201~`);
+      } catch (err) { if (err.reautenticar) setEstado('confirmar'); else setAviso(err.message); }
+    };
+    caja.current.addEventListener('paste', alPegar, true);
+
     let reloj;
     const tamano = () => post(`/api/remoto/${id}/tamano`, { cols: term.cols, filas: term.rows });
     const ajustar = () => {
@@ -125,7 +143,8 @@ export default function Terminal({ id, className }) {
       else if (e.estado === 404) { setEstado('fin'); setAviso(e.message); } else { setEstado('perdida'); setAviso(e.message); }
     });
 
-    return () => { vivo = false; xterm.current = null; clearTimeout(reloj); observador.disconnect(); fuente?.close(); term.dispose(); };
+    const elemento = caja.current;
+    return () => { vivo = false; xterm.current = null; elemento.removeEventListener('paste', alPegar, true); clearTimeout(reloj); observador.disconnect(); fuente?.close(); term.dispose(); };
   }, [id, intento]);
 
   const subirArchivo = useCallback(async (archivo, nombre) => {

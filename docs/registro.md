@@ -1,5 +1,12 @@
 # Registro de trabajo
 
+## 02/11/2026 — Pegar con Ctrl+V en la terminal
+- [U] Daniel no podía pegar en la terminal del panel lo copiado de otra sesión.
+- Causa: xterm convierte Ctrl+V en ^V y anula el pegado del navegador; Claude Code lo toma como «pegar imagen» del
+  portapapeles del contenedor, que está vacío. `Terminal.jsx` deja pasar Ctrl+V (y Ctrl+Mayús+V) al navegador, que
+  pega el texto como bracketed paste. Las imágenes o archivos pegados se suben como en el redactor y llega su ruta.
+- Pruebas [O]: 101/101. Web construida. Sin probar todavía en el navegador de Daniel.
+
 ## 02/11/2026 — Adjuntos en la terminal: más tipos de archivo
 - [U] Daniel pide adjuntar más que imágenes desde el redactor de la terminal.
 - `panel/lib/adjuntos.mjs`: imágenes (PNG, JPEG, GIF, WebP), PDF, Office (docx, xlsx, pptx, odt, ods, odp) y texto o
