@@ -12,7 +12,8 @@
   Ctrl+Z fue al menú.
 - Arreglos: `enfocar` usa AttachThreadInput (sin teclas). Instrucciones de la IA: antes de escribir, comprobar con una
   captura la ventana, el campo y que no haya nada seleccionado; para probar, un documento nuevo.
-- Carpeta `C:\Users\danoa\Nullraptor\Modelos3D` creada en el PC; falta que Daniel la comparta en Ajustes.
+- Carpeta `C:\Users\danoa\Nullraptor` compartida desde Ajustes → `/pc/Nullraptor`: probada en los dos sentidos. Con la
+  imagen 9137032, `enfocar` trae la ventana al frente sin activar los menús (probado con Docker Desktop).
 
 ## 02/11/2026 — Archivos con el PC sin límite de 50 MB
 - [U] ¿Por qué 50 MB? Era por precaución: el archivo iba entero en una línea JSON en base64, con varias copias en la
