@@ -3,6 +3,8 @@
 //   panel.json       lo escribe el panel cada poco: cuántas sesiones hay abiertas (terminales y chats).
 //   disponible.json  lo escribe la tarea cuando hay una imagen nueva: { imagen, fecha }.
 //   solicitada.json  lo escribe el panel cuando Daniel pulsa «Actualizar ahora».
+//   reanudar.json    lo escribe el panel al pararse (docker stop) con los proyectos que tenían sesión abierta; al
+//                    volver a arrancar las reabre con la conversación anterior (claude --continue) y lo borra.
 // La tarea recrea el contenedor si no hay sesiones abiertas o si se ha pedido; si no, el panel avisa.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,6 +36,22 @@ export class Actualizacion {
       ? { imagen: d.imagen, fecha: typeof d.fecha === 'string' ? d.fecha : null } : null;
     const s = disponible && leer(path.join(this.dir, 'solicitada.json'));
     return { disponible, solicitada: s?.fecha ?? null };
+  }
+
+  /** Al pararse: qué proyectos tenían sesión, para reabrirlas al volver. */
+  guardarReanudar(proyectos) {
+    const lista = [...new Set(proyectos)].filter((p) => typeof p === 'string' && p);
+    if (lista.length) this.#escribir('reanudar.json', { proyectos: lista, fecha: this.ahora().toISOString() });
+  }
+
+  /** Al arrancar: los proyectos que reabrir (solo si se paró hace poco: tras una parada larga no se sigue solo). */
+  tomarReanudar(maxMs = 30 * 60_000) {
+    const archivo = path.join(this.dir, 'reanudar.json');
+    const r = leer(archivo);
+    fs.rmSync(archivo, { force: true });
+    const edad = this.ahora() - new Date(r?.fecha);
+    if (!Array.isArray(r?.proyectos) || !(edad >= 0 && edad <= maxMs)) return [];
+    return r.proyectos.filter((p) => typeof p === 'string' && p);
   }
 
   /** «Actualizar ahora»: la tarea lo verá en su siguiente pasada (5 min como mucho). */

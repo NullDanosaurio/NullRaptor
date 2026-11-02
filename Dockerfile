@@ -12,9 +12,10 @@ RUN npm run build
 
 FROM node:24.22.1-bookworm-slim
 
-# git para memoria y proyectos. Sin compiladores: no se construyen módulos nativos.
+# git para memoria y proyectos. Nullraptor no construye módulos nativos; Python, curl y los compiladores son para lo
+# que la IA instale en los proyectos (sin root: npm y pip instalan en el volumen, ver NPM_CONFIG_PREFIX más abajo).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get install -y --no-install-recommends git ca-certificates curl unzip python3 python3-pip python3-venv build-essential \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /nullraptor
@@ -42,10 +43,19 @@ ENV HOME=/estado/home \
     DISABLE_AUTOUPDATER=1 \
     npm_config_update_notifier=false \
     PANEL_HOST=0.0.0.0 \
-    PATH=/nullraptor/node_modules/.bin:$PATH
-RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/ruflo/swarm /estado/ruflo/policy \
+    NPM_CONFIG_PREFIX=/estado/sistema \
+    PYTHONUSERBASE=/estado/sistema \
+    PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PATH=/nullraptor/node_modules/.bin:/estado/sistema/bin:/estado/home/.local/bin:$PATH
+# Lo que la IA instala (npm -g, pip, binarios sueltos en /estado/sistema/bin) va al volumen y sobrevive a las
+# actualizaciones. pip, sin permiso en el sistema, instala solo en PYTHONUSERBASE. apt no: hace falta root.
+# Estado de Ruflo (tareas, agentes, sesiones, memoria…): Ruflo lo escribe en .claude-flow/ de su carpeta, que es la
+# de la imagen; se enlaza al volumen para que no se pierda al actualizar. preparar.mjs crea las que falten.
+RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/sistema/bin /estado/ruflo/swarm /estado/ruflo/policy \
  && ln -s /estado/ruflo/swarm /nullraptor/.swarm \
- && ln -s /estado/ruflo/policy /nullraptor/.claude-flow/policy \
+ && for d in policy tasks agents sessions memory data coordination neural; do \
+      mkdir -p /estado/ruflo/$d && rm -rf /nullraptor/.claude-flow/$d && ln -s /estado/ruflo/$d /nullraptor/.claude-flow/$d; \
+    done \
  && chown -R node:node /nullraptor /estado
 USER node
 VOLUME /estado

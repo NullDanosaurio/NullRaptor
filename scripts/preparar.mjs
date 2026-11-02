@@ -4,7 +4,7 @@
 //  - sin terminal ni orden:  scripts/verificar.mjs
 // Configuración (en el cofre o en el entorno; el entorno manda): MEMORIA_REPO (obligatoria), GITHUB_ORG,
 // GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, AGENTE_GIT_NOMBRE, AGENTE_GIT_EMAIL, TRABAJO_DIR, CREDENCIALES.
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -40,6 +40,12 @@ if (env.AGENTE_GIT_NOMBRE) env.GIT_AUTHOR_NAME = env.GIT_COMMITTER_NAME = env.AG
 if (env.AGENTE_GIT_EMAIL) env.GIT_AUTHOR_EMAIL = env.GIT_COMMITTER_EMAIL = env.AGENTE_GIT_EMAIL;
 
 const trabajo = path.resolve(env.TRABAJO_DIR ?? '/trabajo');
+// En Docker, .claude-flow/<x> del agente apunta al volumen (Dockerfile): un volumen anterior no tiene las carpetas nuevas.
+for (const nombre of fs.readdirSync(path.join(agente, '.claude-flow'))) {
+  const enlace = path.join(agente, '.claude-flow', nombre);
+  try { if (fs.lstatSync(enlace).isSymbolicLink()) fs.mkdirSync(path.resolve(path.dirname(enlace), fs.readlinkSync(enlace)), { recursive: true }); }
+  catch (e) { console.warn(`Aviso: no se pudo preparar ${enlace} (${e.message}).`); }
+}
 if (!env.MEMORIA_REPO) { console.error(`Falta MEMORIA_REPO. ¿Está el cofre en ${rutaCofre}? (ver «Cofre de credenciales» en LEEME.md)`); process.exit(1); }
 
 // El token va por variables de entorno de git: no queda en disco, en .git/config ni en los argumentos.
@@ -83,7 +89,18 @@ console.error(`Memoria lista (rama ${RAMA_MEMORIA}).`);
 // Instrucciones globales y MCP de la IA, desde fuera de los proyectos (también para las sesiones del panel).
 const mcp = prepararIA({ agente, env, memoria, trabajo });
 
-const ejecutar = (orden, args, cwd) => spawnSync(orden, args, { cwd, stdio: 'inherit', env: { ...env, BOVEDA_DIR: memoria, TRABAJO_DIR: trabajo }, shell: /\.(cmd|bat)$/i.test(orden) }).status ?? 1; // shell solo para .cmd (Windows)
+const entornoHijo = { ...env, BOVEDA_DIR: memoria, TRABAJO_DIR: trabajo };
+const ejecutar = (orden, args, cwd) => spawnSync(orden, args, { cwd, stdio: 'inherit', env: entornoHijo, shell: /\.(cmd|bat)$/i.test(orden) }).status ?? 1; // shell solo para .cmd (Windows)
+// Para las órdenes del contenedor (el panel): «docker stop» manda SIGTERM a este proceso (PID 1), que con spawnSync
+// no podía pasárselo; el panel moría a la fuerza sin cerrar ni apuntar sus sesiones. Aquí se reenvía.
+function ejecutarReenviando(orden, args, cwd) {
+  const hijo = spawn(orden, args, { cwd, stdio: 'inherit', env: entornoHijo });
+  for (const senal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(senal, () => { try { hijo.kill(senal); } catch { /* ya terminado */ } });
+  return new Promise((listo) => {
+    hijo.on('error', (e) => { console.error(e.message); listo(1); });
+    hijo.on('exit', (codigo, senal) => listo(codigo ?? (senal ? 0 : 1)));
+  });
+}
 
 // El propio agente queda descargado desde el primer arranque (menú y panel; no en la verificación), aparte de los
 // proyectos. Antes iba en proyectos/Nullraptor: se mueve una vez.
@@ -95,7 +112,7 @@ if (process.argv.length > 2 || process.stdin.isTTY) {
   catch (e) { console.warn(`Aviso: no se pudo descargar ${nullraptor.nombre} (${e.message.split('\n')[0]}).`); }
 }
 
-if (process.argv.length > 2) process.exit(ejecutar(process.argv[2], process.argv.slice(3), agente));
+if (process.argv.length > 2) process.exit(await ejecutarReenviando(process.argv[2], process.argv.slice(3), agente));
 if (!process.stdin.isTTY) process.exit(ejecutar(process.execPath, ['scripts/verificar.mjs'], agente));
 
 // Hueco diario: recomendar 3 servidores MCP (una vez al día; si falla, se sigue sin ellos).

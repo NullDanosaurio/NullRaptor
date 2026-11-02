@@ -68,6 +68,7 @@ $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force $casa | Out-Null
 $tmp = docker create $imagen
 docker cp "${tmp}:/nullraptor/scripts/arrancar.ps1" $lanzador
+docker cp "${tmp}:/nullraptor/scripts/puente.ps1" (Join-Path $casa 'puente.ps1') # puente con el PC (lo arranca el lanzador)
 $icono = Join-Path $casa 'raptor.ico'
 try { docker cp "${tmp}:/nullraptor/panel/dist/raptor.ico" $icono } catch { }
 try { docker cp "${tmp}:/nullraptor/scripts/instalar.ps1" $PSCommandPath } catch { }

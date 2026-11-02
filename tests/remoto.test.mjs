@@ -235,3 +235,15 @@ test('cerrarTodas: mueren todas al parar el panel y se espera a que terminen', a
   assert.ok(remoto.lista().every((s) => s.estado === 'terminada'));
   await fin;
 });
+
+test('abrir con continuar: retoma la última conversación y, si hay aviso, lo manda como primer mensaje', () => {
+  const e = entorno();
+  const { remoto, lanzados } = nuevo(e);
+  remoto.abrir('A');
+  assert.ok(!lanzados[0].args.includes('--continue'));
+  remoto.cerrar(remoto.lista()[0].id);
+  remoto.abrir('A', { continuar: true, aviso: '  Sigue donde lo dejaste.  ' });
+  const { args } = lanzados[1];
+  assert.ok(args.includes('--continue'));
+  assert.deepEqual(args.slice(-2), ['--', 'Sigue donde lo dejaste.']);
+});

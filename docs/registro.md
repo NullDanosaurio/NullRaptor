@@ -1,5 +1,25 @@
 # Registro de trabajo
 
+## 02/11/2026 — Instalar, puente con el PC, reinicios sin perder trabajo, Ruflo y tareas
+- [U] Daniel: la IA no puede instalar casi nada, no puede hablar con el PC, las actualizaciones cortan a los agentes
+  y lo dejan a medias sin acordarse, y en los proyectos no se usa Ruflo ni se listan las tareas al pedir un desarrollo.
+- Causas [O]: usuario `node` sin sudo, sin Python ni curl y con `npm -g` en `/usr/local` (sin permiso). En el PC no
+  escuchaba nada. Al actualizar, `docker rm -f` mataba el contenedor; además `preparar.mjs` (PID 1) lanzaba el panel
+  con `spawnSync` y no podía pasarle SIGTERM, así que tampoco cerraba nada en orden. Las tareas de Ruflo se guardaban
+  en `/nullraptor/.claude-flow/tasks`, dentro de la imagen: se perdían en cada actualización. Las instrucciones
+  decían «Ruflo cuando aporte, no por rutina» y nada de listas de tareas.
+- Instalar [U: en el volumen]: Dockerfile con curl, unzip, Python 3 y build-essential; `npm -g` y `pip` en
+  `/estado/sistema` (en el PATH).
+- Puente [U: lista blanca]: `scripts/puente.ps1` (Windows, 127.0.0.1:4329, token) + `scripts/pc.mjs` (contenedor).
+- Reinicios: `docker stop -t 30` antes de recrear; `preparar.mjs` reenvía las señales; el panel guarda
+  `reanudar.json` y al volver reabre las sesiones con `claude --continue` y un aviso para seguir. Botón «Continuar la
+  anterior» en el proyecto. Estado de Ruflo enlazado a `/estado/ruflo` (`preparar.mjs` crea las carpetas que falten).
+- `config/claude-global.md`: en cada desarrollo, lista de tareas visible (TodoWrite y en la respuesta), tareas en
+  Ruflo (`task_create` con el proyecto), estado en su memoria (`proyecto-<Proyecto>`/`en-curso`) y commits por tarea;
+  al empezar, mirar si hay algo a medias. Cómo instalar y cómo usar el puente.
+- Pruebas [O]: 108/108. Web construida. Desde el contenedor se llega a `host.docker.internal`. [?] Sin probar en
+  Windows (`puente.ps1`, lanzador) ni la reanudación con una imagen real; llega con la imagen nueva.
+
 ## 02/11/2026 — Puerto de las apps de los proyectos
 - [U] Daniel quiere ver Roleplay (servidor en 4777) desde el PC igual que el panel; solo se publicaba el 4321.
 - `scripts/arrancar.ps1` publica también `127.0.0.1:4777:4777`, siempre solo en el equipo (también en modo red),

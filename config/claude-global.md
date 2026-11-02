@@ -9,6 +9,42 @@ Trabajas dentro del contenedor de Nullraptor (Docker), el agente personal de Dan
 - No dejes en un proyecto archivos de Nullraptor ni de herramientas de IA (`.claude/`, `.claude-flow/`, `.swarm/`,
   `.agents/`, `.mcp.json`…), salvo que Daniel lo pida para ese proyecto. El proyecto tiene que funcionar sin IA.
 
+## Desarrollo: lista de tareas y Ruflo
+
+Cuando Daniel pida un desarrollo (funcionalidad, arreglo o cambio de más de un paso), en cualquier proyecto:
+
+1. **Antes de tocar código, enséñale la lista de tareas**: desglósala con TodoWrite (se ve en la terminal) y escríbela
+   también en tu respuesta, en orden. Mantenla al día: una tarea en curso cada vez, marcada en cuanto se termina.
+2. **Regístrala en Ruflo**, que guarda en el volumen y sobrevive a reinicios y actualizaciones:
+   - cada tarea con `mcp__ruflo__task_create` (`tags: ["<Proyecto>"]`, la descripción empieza por `[<Proyecto>]`),
+     y `task_update` / `task_complete` según avances;
+   - el estado con `mcp__ruflo__memory_store` (namespace `proyecto-<Proyecto>`, clave `en-curso`, `upsert: true`):
+     objetivo, rama, qué está hecho, qué falta y decisiones. Actualízalo al acabar cada tarea.
+3. Si hay partes independientes y grandes, repártelas con los agentes de Ruflo (`swarm_init`, `agent_spawn`,
+   `task_assign`); para lo pequeño, no hace falta.
+4. Commit pequeño por cada tarea terminada (con las pruebas del proyecto pasando): lo que está en commit no se pierde.
+5. Al terminar, `memory_store` con el resumen final y las tareas cerradas.
+
+**Al empezar en un proyecto** (y siempre que la sesión se reabra tras un reinicio), mira primero
+`task_list` (filtra las de `[<Proyecto>]`) y `memory_retrieve` (`proyecto-<Proyecto>` / `en-curso`). Si hay algo
+a medias, dile a Daniel dónde se quedó y propón seguir.
+
+## El contenedor
+
+- **Instalar**: no hay root ni sudo, y `apt` no funciona. Sí: `npm install -g`, `pip install` (va solo a
+  `/estado/sistema`) y binarios sueltos en `/estado/sistema/bin` (está en el PATH). Todo eso vive en el volumen y
+  sobrevive a las actualizaciones. Ya vienen git, curl, unzip, Python 3 (con venv) y compiladores (build-essential).
+  En un proyecto, mejor sus dependencias locales (`npm install`, `python3 -m venv .venv`) que las globales.
+  Si algo solo se instala con apt, dile a Daniel qué paquete hace falta para añadirlo a la imagen.
+- **El PC (Windows)**: `node /nullraptor/scripts/pc.mjs <orden>` (sin orden, la ayuda). Lista blanca: `estado`,
+  `sistema`, `procesos`, `puertos`, `programas [filtro=…]`, `winget-buscar texto=…`, `abrir-url url=…`,
+  `notificar texto=… [titulo=…]`. No ejecuta órdenes libres ni instala en el PC: si hace falta, díselo a Daniel.
+  Los servicios del PC se alcanzan en `host.docker.internal:<puerto>` (mira `puertos`). Las carpetas de Windows
+  que Daniel comparte en Ajustes están en `/pc/<nombre>`.
+- **Reinicios**: una actualización reinicia el contenedor; las sesiones abiertas se reabren solas con su
+  conversación, pero los procesos en marcha (servidores, compilaciones) se pierden. Por eso: tareas en Ruflo, estado
+  en su memoria y commits frecuentes.
+
 ## Bóveda
 
 - Memoria compartida (Obsidian) en `$BOVEDA_DIR`, rama `agente`; Daniel fusiona en `main`.
@@ -17,8 +53,8 @@ Trabajas dentro del contenedor de Nullraptor (Docker), el agente personal de Dan
 
 ## Herramientas
 
-- El MCP de Ruflo (`mcp__ruflo__*`) está disponible: memoria, coordinación de agentes, análisis de cambios.
-  Úsalo cuando aporte a la tarea, no por rutina.
+- El MCP de Ruflo (`mcp__ruflo__*`) está disponible: tareas, memoria, coordinación de agentes, análisis de cambios.
+  En los desarrollos se usa siempre (ver «Desarrollo»); para una pregunta o un cambio de una línea, no hace falta.
 - Las herramientas propias aprobadas llegan como MCP `herramienta-<id>`.
 
 ### Crear una herramienta propia

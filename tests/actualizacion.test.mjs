@@ -64,3 +64,17 @@ test('API: estado y botón, con la cabecera del panel', async (t) => {
   assert.equal(ok.estado, 200);
   assert.equal(JSON.parse(fs.readFileSync(path.join(trabajo, 'actualizacion', 'solicitada.json'), 'utf8')).quien, 'este equipo');
 });
+
+test('reanudar: al pararse apunta los proyectos con sesión; al arrancar los da una vez y solo si fue hace poco', () => {
+  const { trabajo, a } = nueva();
+  a.guardarReanudar([]);
+  assert.ok(!fs.existsSync(path.join(trabajo, 'actualizacion', 'reanudar.json'))); // sin sesiones, nada
+  a.guardarReanudar(['A', 'B', 'A', 7]);
+  assert.deepEqual(a.tomarReanudar(), ['A', 'B']);
+  assert.deepEqual(a.tomarReanudar(), []); // ya tomado: se borra
+  escribir(trabajo, 'reanudar.json', { proyectos: ['A'], fecha: '2026-10-31T10:00:00Z' }); // hace 2 h
+  assert.deepEqual(a.tomarReanudar(), []);
+  assert.ok(!fs.existsSync(path.join(trabajo, 'actualizacion', 'reanudar.json')));
+  escribir(trabajo, 'reanudar.json', 'no es json');
+  assert.deepEqual(a.tomarReanudar(), []);
+});

@@ -87,6 +87,31 @@ function Calcular-Carpetas {
 }
 Calcular-Carpetas
 
+# Puente con el PC (scripts/puente.ps1): la IA del contenedor consulta este equipo con una lista blanca de órdenes
+# (scripts/pc.mjs). Escucha solo en 127.0.0.1; el contenedor llega por host.docker.internal con el token de
+# puente.token, que se crea una vez. Se arranca en cada pasada (también la de -Actualizar) si no está vivo, y se
+# cambia por uno nuevo cuando puente.ps1 cambia. Registro en %LOCALAPPDATA%\Nullraptor\puente.log.
+$puertoPuente = if ($env:NULLRAPTOR_PUERTO_PUENTE -match '^\d{2,5}$') { $env:NULLRAPTOR_PUERTO_PUENTE } else { '4329' }
+$archivoPuente = Join-Path $PSScriptRoot 'puente.ps1'
+$tokenPuente = Join-Path $env:LOCALAPPDATA 'Nullraptor\puente.token'
+function Arrancar-Puente {
+  if (-not (Test-Path $archivoPuente)) { return }
+  try {
+    if (-not (Test-Path $tokenPuente)) {
+      $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+      (($b | ForEach-Object { $_.ToString('x2') }) -join '') | Set-Content $tokenPuente
+    }
+    $pidPuente = Join-Path $env:LOCALAPPDATA 'Nullraptor\puente.pid'
+    $antes = @(if (Test-Path $pidPuente) { (Get-Content $pidPuente -Raw).Trim() -split ' ' })
+    # Solo cuenta si ese PID sigue siendo el puente (un PID viejo puede ser ya otro programa).
+    $vivo = $antes.Count -eq 2 -and $antes[0] -match '^\d+$' -and "$((Get-CimInstance Win32_Process -Filter "ProcessId=$($antes[0])").CommandLine)" -like '*puente.ps1*'
+    if ($vivo -and $antes[1] -eq (Get-FileHash $archivoPuente -Algorithm SHA256).Hash) { return }
+    if ($vivo) { Stop-Process -Id $antes[0] -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500 }
+    # conhost --headless: sin ventana. Sigue vivo aunque se cierre el lanzador.
+    Start-Process conhost.exe -ArgumentList '--headless', 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$archivoPuente`"", '-Puerto', $puertoPuente
+  } catch { Anotar "Puente con el PC: $($_.Exception.Message)" }
+}
+
 # 127.0.0.1 y no localhost: .NET prueba antes ::1, que no está publicado, y agota la espera.
 function Panel-Listo { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$puerto" | Out-Null; return $true } catch { return $false } }
 
@@ -216,6 +241,8 @@ if (-not (Docker-Listo)) {
   }
 }
 
+Arrancar-Puente
+
 # Actualización automática y ajustes pedidos: solo si hay algo nuevo y nadie está trabajando (o se ha pedido «ahora»).
 if ($Actualizar) {
   if (-not (En-Marcha)) { exit 0 } # parado a propósito: no se toca
@@ -317,21 +344,34 @@ if ($SinActualizar) {
 }
 if ($PSCommandPath -eq $instalado) {
   $tmp = docker create $imagen
-  if (-not $LASTEXITCODE) { docker cp "${tmp}:/nullraptor/scripts/arrancar.ps1" $instalado *> $null; docker rm $tmp *> $null }
+  if (-not $LASTEXITCODE) {
+    docker cp "${tmp}:/nullraptor/scripts/arrancar.ps1" $instalado *> $null
+    docker cp "${tmp}:/nullraptor/scripts/puente.ps1" (Join-Path (Split-Path $instalado) 'puente.ps1') *> $null
+    docker rm $tmp *> $null
+  }
 }
 
 # 5. Servidor y panel web dentro del contenedor, en segundo plano. Todo lo del equipo queda en el volumen
 #    nullraptor (/estado). El puerto se publica solo en este equipo (127.0.0.1) o, en modo red, en la red de casa.
 #    Los de las apps ($puertosApps), siempre solo en este equipo.
 #    NULLRAPTOR_LANZADOR y NULLRAPTOR_CARPETAS le dicen al panel (Ajustes) cómo está montado.
+# Parada ordenada antes de recrearlo: el panel recibe SIGTERM, apunta las sesiones abiertas y las cierra; al volver
+# las reabre con su conversación (reanudar.json). Con «rm -f» directo morían a la fuerza y no quedaba nada.
+docker stop -t 30 $nombre *> $null
 docker rm -f $nombre *> $null
+# Puente con el PC: dirección y token para la IA (el token, por el entorno como la clave, no en los argumentos).
+$conPuente = @()
+if (Test-Path $tokenPuente) {
+  $env:NULLRAPTOR_PUENTE_TOKEN = (Get-Content $tokenPuente -Raw).Trim()
+  $conPuente = '-e', "NULLRAPTOR_PUENTE=host.docker.internal:$puertoPuente", '-e', 'NULLRAPTOR_PUENTE_TOKEN'
+}
 $publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
 $publicaApps = @(foreach ($p in $puertosApps) { '-p'; "127.0.0.1:${p}:${p}" })
 docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" --label "nullraptor.carpetas=$etiquetaCarpetas" `
-  -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -e NULLRAPTOR_LANZADOR=windows -e "NULLRAPTOR_CARPETAS=$etiquetaCarpetas" `
+  -e AGENTE_CLAVE @conPuente -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -e NULLRAPTOR_LANZADOR=windows -e "NULLRAPTOR_CARPETAS=$etiquetaCarpetas" `
   -v nullraptor:/estado -v $montaCofre @montaCarpetas -p $publica @publicaApps $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE
-Remove-Item Env:AGENTE_CLAVE -ErrorAction SilentlyContinue
+Remove-Item Env:AGENTE_CLAVE, Env:NULLRAPTOR_PUENTE_TOKEN -ErrorAction SilentlyContinue
 if ($codigo) { Salir "No se pudo arrancar el contenedor ($codigo). ¿Está ocupado el puerto $puerto o alguno de $($puertosApps -join ', ')?" $codigo }
 Write-Host 'Preparando la memoria y los proyectos (la primera vez tarda un poco)...'
 for ($i = 0; -not (Panel-Listo); $i++) {

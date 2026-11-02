@@ -51,7 +51,8 @@ equipo la instala solo. La copia instalada del lanzador registra la tarea progra
 tu usuario, sin administrador), que cada 5 minutos ejecuta `arrancar.ps1 -Actualizar` sin ventana: baja la imagen y,
 si es nueva, recrea el contenedor con los mismos ajustes (red, Tailscale, carpetas y la clave recordada) **solo si no
 hay sesiones de Claude ni chats abiertos**. Si los hay, el panel muestra «Hay una versión nueva» con el botón
-«Actualizar ahora», que la instala en la siguiente pasada aunque haya sesiones (se cierran). Si el contenedor está
+«Actualizar ahora», que la instala en la siguiente pasada aunque haya sesiones (se cierran y se reabren solas: ver
+«Reinicios sin perder el trabajo»). Si el contenedor está
 parado, no lo arranca. Se hablan por archivos del volumen (`$TRABAJO_DIR/actualizacion`: `panel.json`,
 `disponible.json`, `solicitada.json`; `panel/lib/actualizacion.mjs`). Registro en
 `%LOCALAPPDATA%\Nullraptor\actualizar.log`. `-SinActualizar` quita la tarea (se recuerda; `-ConActualizar` la vuelve a
@@ -96,6 +97,27 @@ Límite: quien tenga tu móvil desbloqueado y la passkey entra, y dentro del con
 
 **Proyectos:** el menú y el panel muestran primero **Nullraptor** (el propio agente, descargado en el primer
 arranque) y la **Bóveda** (se trabaja sobre la memoria, rama `agente`), y después el resto de la memoria.
+
+**Reinicios sin perder el trabajo** (02/11/2026): antes de recrear el contenedor, el lanzador lo para con
+`docker stop -t 30`; `preparar.mjs` (PID 1) pasa la señal al panel, que apunta los proyectos con sesión abierta en
+`$TRABAJO_DIR/actualizacion/reanudar.json` y las cierra. Al volver (antes de 30 minutos), las reabre con
+`claude --continue` y un primer mensaje que le pide revisar sus tareas y seguir con la pendiente (o esperar si no
+había nada). En el panel, «Continuar la anterior» hace lo mismo a mano. Las tareas y el estado de Ruflo
+(`.claude-flow/tasks`, `agents`, `sessions`, `memory`…) se enlazan a `/estado/ruflo`: antes vivían en la imagen
+y se perdían en cada actualización.
+
+**Instalar programas** (decisión [U] 02/11/2026: en el volumen, sin root): la imagen trae curl, unzip, Python 3 (pip,
+venv) y build-essential. `NPM_CONFIG_PREFIX` y `PYTHONUSERBASE` apuntan a `/estado/sistema` (en el PATH), así que
+`npm install -g`, `pip install` y los binarios sueltos en `/estado/sistema/bin` sobreviven a las actualizaciones.
+`apt` no: lo que solo exista como paquete del sistema se añade al Dockerfile.
+
+**Puente con el PC** (decisión [U] 02/11/2026: lista blanca): el lanzador arranca `scripts/puente.ps1` en segundo
+plano (sin ventana ni administrador), que escucha en `127.0.0.1:4329` (`NULLRAPTOR_PUERTO_PUENTE`) con un token de
+`%LOCALAPPDATA%\Nullraptor\puente.token`. El contenedor recibe `NULLRAPTOR_PUENTE` (`host.docker.internal:4329`) y
+`NULLRAPTOR_PUENTE_TOKEN`, y la IA usa `node /nullraptor/scripts/pc.mjs <orden>`. Solo órdenes fijas: `estado`,
+`sistema`, `procesos`, `puertos`, `programas`, `winget-buscar` (no instala), `abrir-url` (solo http/https) y
+`notificar`. Nada de órdenes libres ni instalar en el PC. Registro en `%LOCALAPPDATA%\Nullraptor\puente.log`. Cuando
+cambia `puente.ps1`, el lanzador cambia el que está en marcha. Cortarlo: borrar `puente.token` y recrear el contenedor.
 
 ## Arranque en cualquier equipo con Docker
 

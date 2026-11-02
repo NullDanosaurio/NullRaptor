@@ -257,6 +257,11 @@ export function crearServidor({
   return servidor;
 }
 
+/** Primer mensaje de una sesión reabierta tras reiniciar el contenedor. */
+export const AVISO_REANUDAR = 'Nullraptor se ha reiniciado (actualización o parada) y esta sesión se ha reabierto con la conversación anterior. '
+  + 'Si estabas a mitad de un trabajo: revisa la lista de tareas de este proyecto (tu lista y las de Ruflo), di en una línea dónde lo dejaste y sigue con la siguiente pendiente. '
+  + 'Si no había nada en curso, no hagas nada y espera instrucciones.';
+
 const esPrincipal = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (esPrincipal) {
   const trabajo = path.resolve(process.env.TRABAJO_DIR ?? path.join(AQUI, '..', '..'));
@@ -275,12 +280,22 @@ if (esPrincipal) {
   const registro = new Registro({ carpeta: path.join(trabajo, 'registros'), avisoUrl: process.env.AVISO_NTFY || null });
   // MCP de las sesiones (con las herramientas aprobadas), rehecho al abrir cada una y al aprobar o desactivar.
   const prepararMcp = () => escribirMcp({ agente: path.resolve(AQUI, '..'), env: process.env, memoria, trabajo });
-  // Las sesiones remotas mueren con el panel.
+  // Las sesiones remotas mueren con el panel, pero al pararlo (actualización, docker stop) se apunta cuáles había
+  // para reabrirlas al volver con su conversación: así el trabajo a medias no se queda olvidado.
   const remoto = new Remoto({ trabajo, memoria, registro, prepararMcp });
-  process.on('exit', () => remoto.cerrarTodas());
-  for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(senal, () => remoto.cerrarTodas().then(() => process.exit(0)));
-  const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;
   const actualizacion = new Actualizacion({ trabajo });
+  process.on('exit', () => remoto.cerrarTodas());
+  for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.once(senal, () => {
+      try { actualizacion.guardarReanudar(remoto.activas().map((s) => s.proyecto)); } catch (e) { console.warn(`[panel] reanudar: ${e.message}`); }
+      remoto.cerrarTodas().then(() => process.exit(0));
+    });
+  }
+  for (const proyecto of actualizacion.tomarReanudar()) {
+    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', continuar: true, aviso: AVISO_REANUDAR }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
+    catch (e) { console.warn(`[panel] No se pudo reanudar la sesión de ${proyecto}: ${e.message}`); }
+  }
+  const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;
   crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador, actualizacion, prepararMcp }).listen(puerto, host, () => {
     console.error(`Panel de Nullraptor en http://localhost:${puerto}  (Ctrl+C para cerrar)`);
     if (red) console.error(`Modo red: abierto a la red de casa con código de acceso (en ${archivoCodigo}).`);
