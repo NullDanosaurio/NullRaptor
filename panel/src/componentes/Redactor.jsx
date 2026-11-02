@@ -1,30 +1,41 @@
 // Caja de escritura bajo la terminal: lo que el teclado del móvil no puede hacer dentro de xterm. Se escribe, se pega
-// o se dicta como en cualquier campo de texto, se adjuntan imágenes (galería, cámara o pegadas) y se manda todo de
-// una vez a Claude Code como texto pegado. Las imágenes se suben al panel y Claude las recibe por su ruta.
-import { ClipboardPaste, ImagePlus, Loader2, Mic, MicOff, SendHorizontal, X } from 'lucide-react';
+// o se dicta como en cualquier campo de texto, se adjuntan archivos (imágenes de la galería, la cámara o pegadas, PDF,
+// Word/Excel/PowerPoint, texto y código) y se manda todo de una vez a Claude Code como texto pegado. Los archivos se
+// suben al panel (que comprueba su contenido) y Claude los recibe por su ruta.
+import { ClipboardPaste, FileText, Loader2, Mic, MicOff, Paperclip, SendHorizontal, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { EXTENSIONES } from '../../lib/adjuntos.mjs';
 import { Boton, cx } from './ui.jsx';
 
 const Reconocimiento = typeof window !== 'undefined' ? (window.SpeechRecognition ?? window.webkitSpeechRecognition) : null;
 const tactil = () => window.matchMedia?.('(pointer: coarse)').matches;
 const LADO_MAX = 2000; // Claude reduce las imágenes grandes igualmente: así suben antes desde el móvil
+const MAX_MB = 20;
+const ACEPTA = ['image/*', ...EXTENSIONES.map((e) => `.${e}`)].join(',');
+// Lo pegado no suele traer nombre: se le pone según su tipo.
+const POR_TIPO = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'application/pdf': 'pdf', 'text/plain': 'txt' };
 
-/** Fotos grandes → JPEG de 2000 px como mucho; capturas pequeñas, tal cual. */
-async function preparar(archivo) {
-  if (!/^image\/(png|jpeg|gif|webp)$/.test(archivo.type) || archivo.type === 'image/gif') return archivo;
+const extension = (nombre) => (/\.([^.]+)$/.exec(nombre)?.[1] ?? '').toLowerCase();
+const nombreDe = (archivo) => (extension(archivo.name ?? '') ? archivo.name : `pegado.${POR_TIPO[archivo.type] ?? 'bin'}`);
+const esImagen = (nombre) => ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension(nombre));
+
+/** Fotos grandes → JPEG de 2000 px como mucho; capturas pequeñas, GIF y el resto de archivos, tal cual. */
+async function preparar(archivo, nombre) {
+  if (!esImagen(nombre) || extension(nombre) === 'gif') return [archivo, nombre];
   try {
     const bmp = await createImageBitmap(archivo);
     const escala = Math.min(1, LADO_MAX / Math.max(bmp.width, bmp.height));
-    if (escala === 1 && archivo.size < 3 * 1024 * 1024) return archivo;
+    if (escala === 1 && archivo.size < 3 * 1024 * 1024) return [archivo, nombre];
     const lienzo = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * escala), height: Math.round(bmp.height * escala) });
     lienzo.getContext('2d').drawImage(bmp, 0, 0, lienzo.width, lienzo.height);
-    return await new Promise((r) => lienzo.toBlob((b) => r(b ?? archivo), 'image/jpeg', 0.85));
-  } catch { return archivo; }
+    const jpeg = await new Promise((r) => lienzo.toBlob(r, 'image/jpeg', 0.85));
+    return jpeg ? [jpeg, nombre.replace(/\.[^.]+$/, '.jpg')] : [archivo, nombre];
+  } catch { return [archivo, nombre]; }
 }
 
-export default function Redactor({ activo, enviar, subirImagen }) {
+export default function Redactor({ activo, enviar, subirArchivo }) {
   const [texto, setTexto] = useState('');
-  const [imagenes, setImagenes] = useState([]); // { clave, vista, ruta | null, error }
+  const [adjuntos, setAdjuntos] = useState([]); // { clave, nombre, vista (solo imágenes), ruta | null, error }
   const [dictando, setDictando] = useState(false);
   const [provisional, setProvisional] = useState('');
   const [aviso, setAviso] = useState(null);
@@ -39,22 +50,25 @@ export default function Redactor({ activo, enviar, subirImagen }) {
     t.style.height = 'auto';
     t.style.height = `${Math.min(t.scrollHeight, 140)}px`;
   }, [texto, provisional]);
-  useEffect(() => () => { oido.current?.abort(); imagenes.forEach((i) => URL.revokeObjectURL(i.vista)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { oido.current?.abort(); adjuntos.forEach((i) => i.vista && URL.revokeObjectURL(i.vista)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const adjuntar = async (archivos) => {
+    setAviso(null);
+    const cambio = (clave, datos) => setAdjuntos((l) => l.map((i) => (i.clave === clave ? { ...i, ...datos } : i)));
     for (const archivo of archivos) {
-      if (!archivo.type.startsWith('image/')) { setAviso('Solo imágenes.'); continue; }
+      const nombre = nombreDe(archivo);
+      if (!EXTENSIONES.includes(extension(nombre))) { setAviso(`«${nombre}» no se puede adjuntar: imágenes, PDF, Office, texto o código.`); continue; }
+      if (archivo.size > MAX_MB * 1024 * 1024) { setAviso(`«${nombre}» pasa de ${MAX_MB} MB.`); continue; }
       const clave = crypto.randomUUID();
-      setImagenes((l) => [...l, { clave, vista: URL.createObjectURL(archivo), ruta: null, error: null }]);
+      setAdjuntos((l) => [...l, { clave, nombre, vista: esImagen(nombre) ? URL.createObjectURL(archivo) : null, ruta: null, error: null }]);
       try {
-        const ruta = await subirImagen(await preparar(archivo));
-        setImagenes((l) => l.map((i) => (i.clave === clave ? { ...i, ruta } : i)));
+        cambio(clave, { ruta: await subirArchivo(...(await preparar(archivo, nombre))) });
       } catch (e) {
-        setImagenes((l) => l.map((i) => (i.clave === clave ? { ...i, error: e.message } : i)));
+        cambio(clave, { error: e.message });
       }
     }
   };
-  const quitar = (clave) => setImagenes((l) => l.filter((i) => { if (i.clave === clave) URL.revokeObjectURL(i.vista); return i.clave !== clave; }));
+  const quitar = (clave) => setAdjuntos((l) => l.filter((i) => { if (i.clave === clave && i.vista) URL.revokeObjectURL(i.vista); return i.clave !== clave; }));
 
   const pegar = async () => {
     setAviso(null);
@@ -75,10 +89,10 @@ export default function Redactor({ activo, enviar, subirImagen }) {
   };
 
   const alPegar = (e) => {
-    const fotos = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-    if (!fotos.length) return;
+    const archivos = [...(e.clipboardData?.files ?? [])];
+    if (!archivos.length) return;
     e.preventDefault();
-    adjuntar(fotos);
+    adjuntar(archivos);
   };
 
   const dictar = () => {
@@ -100,21 +114,21 @@ export default function Redactor({ activo, enviar, subirImagen }) {
     setDictando(true);
   };
 
-  const subiendo = imagenes.some((i) => !i.ruta && !i.error);
-  const listas = imagenes.filter((i) => i.ruta);
+  const subiendo = adjuntos.some((i) => !i.ruta && !i.error);
+  const listas = adjuntos.filter((i) => i.ruta);
   const puede = activo && !subiendo && (texto.trim() || listas.length);
 
   const mandar = () => {
     if (!puede) return;
     oido.current?.stop();
     const rutas = listas.map((i) => i.ruta);
-    const mensaje = [texto.trim(), rutas.length ? `Imágenes adjuntas: ${rutas.join(' ')}` : ''].filter(Boolean).join('\n\n');
+    const mensaje = [texto.trim(), rutas.length ? `Archivos adjuntos: ${rutas.join(' ')}` : ''].filter(Boolean).join('\n\n');
     // Como texto pegado (bracketed paste): los saltos de línea no envían por el camino; luego Intro.
     enviar(`\x1b[200~${mensaje}\x1b[201~`);
     setTimeout(() => enviar('\r'), 150);
     setTexto('');
-    imagenes.forEach((i) => URL.revokeObjectURL(i.vista));
-    setImagenes([]);
+    adjuntos.forEach((i) => i.vista && URL.revokeObjectURL(i.vista));
+    setAdjuntos([]);
   };
 
   const tecla = (e) => {
@@ -123,13 +137,20 @@ export default function Redactor({ activo, enviar, subirImagen }) {
 
   return (
     <div className="rounded-xl border border-borde bg-panel p-2">
-      {imagenes.length > 0 && (
+      {adjuntos.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
-          {imagenes.map((i) => (
-            <div key={i.clave} className="relative">
-              <img src={i.vista} alt="" className={cx('size-14 rounded-lg border object-cover', i.error ? 'border-fallo' : 'border-borde')} />
+          {adjuntos.map((i) => (
+            <div key={i.clave} className="relative" title={i.nombre}>
+              {i.vista
+                ? <img src={i.vista} alt="" className={cx('size-14 rounded-lg border object-cover', i.error ? 'border-fallo' : 'border-borde')} />
+                : (
+                  <div className={cx('flex size-14 flex-col items-center justify-center gap-0.5 rounded-lg border bg-elevado px-1', i.error ? 'border-fallo' : 'border-borde')}>
+                    <FileText className="size-5 text-tenue" />
+                    <span className="w-full truncate text-center text-[9px] text-tenue">{i.nombre}</span>
+                  </div>
+                )}
               {!i.ruta && !i.error && <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50"><Loader2 className="size-4 animate-spin text-white" /></span>}
-              <button type="button" onClick={() => quitar(i.clave)} aria-label="Quitar imagen" className="absolute -top-1.5 -right-1.5 rounded-full border border-borde bg-elevado p-0.5 text-tenue"><X className="size-3" /></button>
+              <button type="button" onClick={() => quitar(i.clave)} aria-label={`Quitar ${i.nombre}`} className="absolute -top-1.5 -right-1.5 rounded-full border border-borde bg-elevado p-0.5 text-tenue"><X className="size-3" /></button>
               {i.error && <p className="mt-0.5 max-w-14 truncate text-[10px] text-fallo" title={i.error}>{i.error}</p>}
             </div>
           ))}
@@ -143,8 +164,8 @@ export default function Redactor({ activo, enviar, subirImagen }) {
       />
       {aviso && <p className="px-1.5 pt-1 text-[12px] text-aviso">{aviso}</p>}
       <div className="mt-1.5 flex items-center gap-1">
-        <input ref={selector} type="file" accept="image/*" multiple hidden onChange={(e) => { adjuntar([...e.target.files]); e.target.value = ''; }} />
-        <Boton tam="sm" variante="fantasma" disabled={!activo} onClick={() => selector.current?.click()} title="Adjuntar imagen (galería o cámara)"><ImagePlus className="size-4" /></Boton>
+        <input ref={selector} type="file" accept={ACEPTA} multiple hidden onChange={(e) => { adjuntar([...e.target.files]); e.target.value = ''; }} />
+        <Boton tam="sm" variante="fantasma" disabled={!activo} onClick={() => selector.current?.click()} title="Adjuntar archivos: imágenes, PDF, Office, texto o código"><Paperclip className="size-4" /></Boton>
         <Boton tam="sm" variante="fantasma" disabled={!activo} onClick={pegar} title="Pegar texto o imagen"><ClipboardPaste className="size-4" /></Boton>
         {Reconocimiento && (
           <Boton tam="sm" variante={dictando ? 'peligro' : 'fantasma'} disabled={!activo} onClick={dictar} title={dictando ? 'Parar el dictado' : 'Dictar'}>

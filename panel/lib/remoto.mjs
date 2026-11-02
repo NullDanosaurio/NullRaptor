@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { clasificar } from './adjuntos.mjs';
 import { cortarPty, lanzarPty, redimensionar, tamanoValido, ttyDe } from './pty.mjs';
 import { rutaProyecto } from './trabajo.mjs';
 import { ARCHIVO_MCP } from '../../scripts/ia.mjs';
@@ -18,12 +19,6 @@ export const MAX_TOTAL = 3;
 export const MAX_MS = 4 * 60 * 60_000;
 const MAX_PANTALLA = 512 * 1024; // lo último de la terminal, para repintarla al conectarse
 const MAX_ENTRADA = 64 * 1024;
-export const MAX_IMAGEN = 10 * 1024 * 1024;
-// Imágenes que se pueden adjuntar: extensión y primeros bytes (no basta con el tipo que diga el navegador).
-const IMAGENES = {
-  'image/png': ['png', [0x89, 0x50, 0x4e, 0x47]], 'image/jpeg': ['jpg', [0xff, 0xd8, 0xff]],
-  'image/gif': ['gif', [0x47, 0x49, 0x46, 0x38]], 'image/webp': ['webp', [0x52, 0x49, 0x46, 0x46]],
-};
 
 const fallo = (mensaje, codigo) => Object.assign(new Error(mensaje), { codigo });
 const sinAnsi = (s) => s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]/g, '');
@@ -187,19 +182,21 @@ export class Remoto {
     s.hijo.stdin.write(datos);
   }
 
-  /** Guarda una imagen adjuntada desde el panel y devuelve su ruta, para pasársela a Claude en el mensaje. */
-  guardarImagen(id, tipo, datos, quien) {
+  /**
+   * Guarda un archivo adjuntado desde el panel (imagen, PDF, Office o texto; adjuntos.mjs) y devuelve su ruta, para
+   * pasársela a Claude en el mensaje. Se numeran para que dos con el mismo nombre no se pisen.
+   */
+  guardarAdjunto(id, nombre, datos, quien) {
     const s = this.viva(id);
-    const [ext, firma] = IMAGENES[tipo] ?? [];
-    const valida = ext && Buffer.isBuffer(datos) && datos.length <= MAX_IMAGEN && firma.every((b, i) => datos[i] === b);
-    if (!valida) throw fallo('Solo imágenes PNG, JPEG, GIF o WebP de hasta 10 MB.', 400);
+    const ok = clasificar(nombre, datos);
+    if (!ok) throw fallo('Ese archivo no se puede adjuntar: imágenes, PDF, Word/Excel/PowerPoint o texto y código, de hasta 20 MB.', 400);
     const dir = path.join(this.adjuntos, id);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    s.imagenes = (s.imagenes ?? 0) + 1;
-    const ruta = path.join(dir, `imagen-${s.imagenes}.${ext}`);
+    s.adjuntos = (s.adjuntos ?? 0) + 1;
+    const ruta = path.join(dir, `${s.adjuntos}-${ok.nombre}`);
     fs.writeFileSync(ruta, datos, { mode: 0o600 });
-    s.apunte('imagen', { ruta, bytes: datos.length, quien });
-    return ruta;
+    s.apunte('adjunto', { ruta, clase: ok.clase, bytes: datos.length, quien });
+    return { ruta, clase: ok.clase };
   }
 
   async tamano(id, cols, filas) {

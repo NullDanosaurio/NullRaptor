@@ -38,10 +38,10 @@ export const post = (ruta, cuerpo) => fetch(ruta, {
   body: JSON.stringify(cuerpo ?? {}),
 }).then(respuesta);
 
-/** Sube un archivo tal cual (cuerpo binario con su tipo). */
-export const subir = (ruta, archivo) => fetch(ruta, {
+/** Sube un archivo tal cual; su nombre va en X-Nombre (el servidor decide por la extensión y el contenido). */
+export const subir = (ruta, archivo, nombre = archivo.name ?? '') => fetch(ruta, {
   method: 'POST',
-  headers: { 'Content-Type': archivo.type || 'application/octet-stream', 'X-Nullraptor': '1' },
+  headers: { 'Content-Type': archivo.type || 'application/octet-stream', 'X-Nombre': encodeURIComponent(nombre), 'X-Nullraptor': '1' },
   body: archivo,
 }).then(respuesta);
 

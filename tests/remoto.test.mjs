@@ -121,7 +121,7 @@ test('teclas y tamaño: van al proceso; se validan', async () => {
   await assert.rejects(remoto.tamano('no-existe', 90, 25), (err) => err.codigo === 404);
 });
 
-test('imágenes adjuntas: fuera del proyecto, legibles por Claude (--add-dir) y borradas al cerrar', async () => {
+test('archivos adjuntos: fuera del proyecto, legibles por Claude (--add-dir) y borrados al cerrar', async () => {
   const e = entorno();
   const { remoto, lanzados } = nuevo(e);
   const { id } = remoto.abrir('A');
@@ -129,15 +129,17 @@ test('imágenes adjuntas: fuera del proyecto, legibles por Claude (--add-dir) y 
   const args = lanzados[0].args;
   assert.equal(args[args.indexOf('--add-dir') + 1], adjuntos);
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-  const ruta = remoto.guardarImagen(id, 'image/png', png, 'yo');
-  assert.equal(ruta, path.join(adjuntos, id, 'imagen-1.png'));
-  assert.deepEqual(fs.readFileSync(ruta), png);
-  assert.equal(remoto.guardarImagen(id, 'image/jpeg', Buffer.from([0xff, 0xd8, 0xff, 0xe0]), 'yo'), path.join(adjuntos, id, 'imagen-2.jpg'));
-  // Tipo raro, contenido que no casa con el tipo, vacío o enorme: no.
-  for (const [tipo, datos] of [['text/html', png], ['image/png', Buffer.from('<svg>')], ['image/png', Buffer.alloc(0)], ['image/svg+xml', Buffer.from('<svg/>')]]) {
-    assert.throws(() => remoto.guardarImagen(id, tipo, datos), (err) => err.codigo === 400, tipo);
+  const r1 = remoto.guardarAdjunto(id, 'captura.png', png, 'yo');
+  assert.deepEqual(r1, { ruta: path.join(adjuntos, id, '1-captura.png'), clase: 'imagen' });
+  assert.deepEqual(fs.readFileSync(r1.ruta), png);
+  // Mismo nombre: no se pisan.
+  assert.equal(remoto.guardarAdjunto(id, 'captura.png', png, 'yo').ruta, path.join(adjuntos, id, '2-captura.png'));
+  assert.equal(remoto.guardarAdjunto(id, 'notas.md', Buffer.from('# hola'), 'yo').clase, 'texto');
+  // Extensión rara, contenido que no casa, vacío o sin nombre: no.
+  for (const [nombre, datos] of [['x.exe', png], ['x.png', Buffer.from('<svg>')], ['x.png', Buffer.alloc(0)], ['', png]]) {
+    assert.throws(() => remoto.guardarAdjunto(id, nombre, datos), (err) => err.codigo === 400, nombre);
   }
-  assert.throws(() => remoto.guardarImagen('no-existe', 'image/png', png), (err) => err.codigo === 404);
+  assert.throws(() => remoto.guardarAdjunto('no-existe', 'x.png', png), (err) => err.codigo === 404);
   remoto.cerrar(id);
   await espera(); await espera();
   assert.equal(fs.existsSync(path.join(adjuntos, id)), false);

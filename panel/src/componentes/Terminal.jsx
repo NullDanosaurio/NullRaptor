@@ -3,7 +3,8 @@
 // solo deja usar la passkey tras un toque). Copiar: Ctrl+C (o Cmd+C) con texto seleccionado copia en vez de interrumpir;
 // Claude Code captura el ratón, así que se selecciona con Mayús+arrastrar. En el móvil, «Texto» muestra la pantalla
 // como texto normal para seleccionarlo con el dedo. Debajo, el redactor (Redactor.jsx) para pegar, dictar y adjuntar
-// imágenes. Los enlaces se abren en otra pestaña (los normales y los OSC 8 que pinta Claude Code).
+// archivos (imágenes, PDF, Office, texto y código). Los enlaces se abren en otra pestaña (los normales y los OSC 8
+// que pinta Claude Code).
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal as XTerm } from '@xterm/xterm';
@@ -127,8 +128,8 @@ export default function Terminal({ id, className }) {
     return () => { vivo = false; xterm.current = null; clearTimeout(reloj); observador.disconnect(); fuente?.close(); term.dispose(); };
   }, [id, intento]);
 
-  const subirImagen = useCallback(async (archivo) => {
-    try { return (await subir(`/api/remoto/${id}/imagen`, archivo)).ruta; } catch (e) {
+  const subirArchivo = useCallback(async (archivo, nombre) => {
+    try { return (await subir(`/api/remoto/${id}/archivo`, archivo, nombre)).ruta; } catch (e) {
       if (e.reautenticar) setEstado('confirmar');
       throw e;
     }
@@ -176,7 +177,7 @@ export default function Terminal({ id, className }) {
           <FileText className="size-3.5" /> Texto
         </Boton>
       </div>
-      <Redactor activo={estado === 'viva'} enviar={(d) => enviar.current(d, false)} subirImagen={subirImagen} />
+      <Redactor activo={estado === 'viva'} enviar={(d) => enviar.current(d, false)} subirArchivo={subirArchivo} />
     </div>
   );
 }

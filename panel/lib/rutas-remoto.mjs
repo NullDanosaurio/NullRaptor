@@ -3,16 +3,17 @@
 //  - Por Tailscale (petición remota con passkey): abrir, ver o escribir en la terminal y gestionar passkeys exige
 //    haber confirmado la passkey en la última hora (reautenticar).
 //  - Por la red de casa con solo el código (PANEL_RED): la terminal no se puede usar.
+import { MAX_ADJUNTO } from './adjuntos.mjs';
 const ID = '([0-9a-f-]{36})';
 
-/** Cuerpo binario (imágenes adjuntas), con tope. */
+/** Cuerpo binario (archivos adjuntos), con tope. */
 function leerBinario(req, max) {
   return new Promise((resolve, reject) => {
     const trozos = [];
     let tam = 0;
     req.on('data', (t) => {
       tam += t.length;
-      if (tam > max) { reject(Object.assign(new Error('Imagen demasiado grande (máximo 10 MB).'), { codigo: 413 })); req.destroy(); return; }
+      if (tam > max) { reject(Object.assign(new Error('Archivo demasiado grande (máximo 20 MB).'), { codigo: 413 })); req.destroy(); return; }
       trozos.push(t);
     });
     req.on('end', () => resolve(Buffer.concat(trozos)));
@@ -20,7 +21,7 @@ function leerBinario(req, max) {
   });
 }
 
-export function crearRutasRemoto({ maxImagen = 10 * 1024 * 1024, remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json }) {
+export function crearRutasRemoto({ maxAdjunto = MAX_ADJUNTO, remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json }) {
   const reautenticar = { error: 'Confirma con tu passkey para seguir.', reautenticar: true };
 
   /** ctx: { remota, sesion, soloCodigo, quien }. Devuelve true si atendió la petición. */
@@ -50,7 +51,7 @@ export function crearRutasRemoto({ maxImagen = 10 * 1024 * 1024, remoto, passkey
       json(res, 201, s);
       return true;
     }
-    const m = p.match(new RegExp(`^/api/remoto/${ID}/(cerrar|terminal|entrada|tamano|imagen)$`));
+    const m = p.match(new RegExp(`^/api/remoto/${ID}/(cerrar|terminal|entrada|tamano|archivo)$`));
     if (m) {
       const [, id, accion] = m;
       if (accion === 'cerrar') {
@@ -61,10 +62,11 @@ export function crearRutasRemoto({ maxImagen = 10 * 1024 * 1024, remoto, passkey
       if (no) return responder(no);
       if (accion === 'terminal') { if (metodo('GET')) remoto.suscribir(id, res, quien); return true; }
       if (!metodo('POST')) return true;
-      if (accion === 'imagen') {
-        const tipo = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
-        const ruta = remoto.guardarImagen(id, tipo, await leerBinario(req, maxImagen), quien);
-        return responder([201, { ruta }]);
+      if (accion === 'archivo') {
+        // El nombre llega en X-Nombre (codificado como URL): de él sale la extensión, que se comprueba con el contenido.
+        let nombre = '';
+        try { nombre = decodeURIComponent(String(req.headers['x-nombre'] ?? '')); } catch { /* nombre vacío: se rechaza */ }
+        return responder([201, remoto.guardarAdjunto(id, nombre, await leerBinario(req, maxAdjunto), quien)]);
       }
       const cuerpo = await leerCuerpo(req);
       if (accion === 'entrada') { remoto.escribir(id, cuerpo.datos, quien); json(res, 202, { ok: true }); return true; }
