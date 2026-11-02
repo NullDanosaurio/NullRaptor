@@ -48,7 +48,8 @@ test('pedir: sin puente configurado, sin conexión o sin respuesta, un error cla
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { preparar, terminar } from '../scripts/pc.mjs';
+import { createHash } from 'node:crypto';
+import { enviarArchivo, preparar, terminar, traerArchivo } from '../scripts/pc.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pc-'));
 
@@ -60,16 +61,59 @@ test('ejecutar: el script llega por la entrada estándar; sale con el código de
   assert.equal(terminar('ejecutar', {}, { codigo: null, salida: '', errores: '', agotado: true }).codigo, 124);
 });
 
-test('enviar y traer: el archivo local va y vuelve en base64; las rutas locales no viajan al PC', () => {
+/** Puente falso por trozos, con la misma lógica que puente.ps1 (enviar/traer), sobre un «disco» en memoria. */
+function puenteTrozos({ dañar = false } = {}) {
+  const disco = new Map();
+  const sha = (b) => createHash('sha256').update(b).digest('hex');
+  const peticiones = [];
+  return {
+    disco, peticiones,
+    pedirA: async (orden, a) => {
+      peticiones.push([orden, a.posicion]);
+      if (orden === 'enviar') {
+        const previo = a.posicion === 0 ? Buffer.alloc(0) : disco.get(`${a.destino}.parcial`);
+        if (previo.length !== a.posicion) throw new Error('posición');
+        const nuevo = Buffer.concat([previo, Buffer.from(a.datos, 'base64')]);
+        disco.set(`${a.destino}.parcial`, nuevo);
+        if (!a.final) return { recibido: nuevo.length };
+        disco.delete(`${a.destino}.parcial`);
+        disco.set(a.destino, nuevo);
+        return { destino: a.destino, bytes: nuevo.length, sha256: dañar ? 'x' : sha(nuevo) };
+      }
+      const todo = disco.get(a.origen);
+      const parte = todo.subarray(a.posicion, a.posicion + a.tamano);
+      const r = { origen: a.origen, total: todo.length, posicion: a.posicion, datos: (dañar ? Buffer.from('zz') : parte).toString('base64') };
+      if (a.posicion + parte.length >= todo.length) r.sha256 = sha(todo);
+      return r;
+    },
+  };
+}
+
+test('enviar y traer: por trozos, de ida y vuelta, y comprobados con SHA-256 (también vacíos)', async () => {
   const d = tmp();
-  fs.writeFileSync(path.join(d, 'a.stl'), Buffer.from([0, 1, 2, 255]));
-  const ida = preparar('enviar', { origen: path.join(d, 'a.stl'), destino: 'C:\\M\\a.stl' });
-  assert.deepEqual(ida, { destino: 'C:\\M\\a.stl', datos: 'AAEC/w==' });
-  assert.deepEqual(preparar('traer', { origen: 'C:\\M\\b.gcode', destino: path.join(d, 'x', 'b.gcode') }), { origen: 'C:\\M\\b.gcode' });
-  const fin = terminar('traer', { destino: path.join(d, 'x', 'b.gcode') }, { origen: 'C:\\M\\b.gcode', bytes: 4, datos: 'AAEC/w==' });
-  assert.deepEqual([...fs.readFileSync(path.join(d, 'x', 'b.gcode'))], [0, 1, 2, 255]);
-  assert.equal(JSON.parse(fin.salida).bytes, 4);
-  assert.throws(() => preparar('enviar', { origen: 'x' }), /Uso/);
+  for (const tam of [0, 5, 16, 17, 100]) {
+    const datos = Buffer.from(Array.from({ length: tam }, (_, i) => (i * 7) % 256));
+    fs.writeFileSync(path.join(d, 'a.bin'), datos);
+    const p = puenteTrozos();
+    const ida = await enviarArchivo(path.join(d, 'a.bin'), 'C:\\M\\a.bin', { pedirA: p.pedirA, trozo: 16 });
+    assert.equal(ida.bytes, tam);
+    assert.deepEqual(p.disco.get('C:\\M\\a.bin'), datos);
+    assert.equal(p.peticiones.length, Math.max(1, Math.ceil(tam / 16)));
+    const vuelta = await traerArchivo('C:\\M\\a.bin', path.join(d, 'x', 'b.bin'), { pedirA: p.pedirA, trozo: 16 });
+    assert.equal(vuelta.sha256, ida.sha256);
+    assert.deepEqual(fs.readFileSync(path.join(d, 'x', 'b.bin')), datos);
+    assert.ok(!fs.existsSync(path.join(d, 'x', 'b.bin.parcial')));
+  }
+});
+
+test('enviar y traer: si llega distinto, error y no queda el archivo a medias', async () => {
+  const d = tmp();
+  fs.writeFileSync(path.join(d, 'a.bin'), 'hola mundo');
+  await assert.rejects(enviarArchivo(path.join(d, 'a.bin'), 'C:\\a', { pedirA: puenteTrozos({ dañar: true }).pedirA }), /llegó distinto/);
+  const p = puenteTrozos({ dañar: true });
+  p.disco.set('C:\\b', Buffer.from('hola'));
+  await assert.rejects(traerArchivo('C:\\b', path.join(d, 'b.bin'), { pedirA: p.pedirA }), /dañado/);
+  assert.ok(!fs.existsSync(path.join(d, 'b.bin')) && !fs.existsSync(path.join(d, 'b.bin.parcial')));
 });
 
 test('captura: el PNG se guarda en disco y la salida dice dónde y cómo pasar a coordenadas de pantalla', () => {

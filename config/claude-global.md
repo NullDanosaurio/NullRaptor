@@ -41,8 +41,10 @@ a medias, dile a Daniel dónde se quedó y propón seguir.
   - Ejecutar: `ejecutar` con PowerShell por la entrada estándar (`pc.mjs ejecutar cwd=C:\… <<'FIN' … FIN`), p. ej.
     Blender en segundo plano (`& 'C:\Program Files\Blender Foundation\Blender 4.4\blender.exe' -b …`) o la línea
     de órdenes de un slicer. Programas con ventana: `iniciar programa=… args="…"`.
-  - Archivos: `enviar` / `traer` (hasta 50 MB) o las carpetas compartidas en Ajustes (`/pc/<nombre>`). Trabaja en
-    una carpeta propia del PC (p. ej. `%USERPROFILE%\Nullraptor\<Proyecto>`).
+  - Archivos: la carpeta compartida `/pc/Nullraptor` (= `C:\Users\danoa\Nullraptor`, sin límite y directa) o
+    `enviar` / `traer` (por trozos y comprobados; para archivos sueltos fuera de ella). Trabaja en
+    `/pc/Nullraptor/<Proyecto>` (en Windows, `C:\Users\danoa\Nullraptor\<Proyecto>`): los programas del PC leen
+    y escriben ahí mismo. Si `/pc/Nullraptor` no existe, la carpeta aún no está compartida: díselo a Daniel.
   - Pantalla: `ventanas`, `enfocar ventana=…`, `captura [ventana=…]` (guarda un PNG: ábrelo con Read para verlo),
     `raton accion=clic x=… y=…` (coordenadas de pantalla: pásalas desde la captura con su `escala`), `teclado
     texto=…` o `teclas=^s`. Mira con una captura antes y después de cada acción.

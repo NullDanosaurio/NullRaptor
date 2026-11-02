@@ -123,7 +123,7 @@ en segundo plano (sin ventana ni administrador, como tu usuario de Windows), que
 | Modo | Órdenes |
 |---|---|
 | consulta y completo | `estado`, `sistema`, `procesos`, `puertos`, `programas`, `winget-buscar`, `abrir-url`, `notificar` |
-| solo completo (por defecto) | `ejecutar` (PowerShell libre, proceso aparte, hasta 30 min), `iniciar` (programa con ventana), `enviar` / `traer` (archivos hasta 50 MB), `ventanas`, `enfocar`, `captura` (PNG), `raton`, `teclado` |
+| solo completo (por defecto) | `ejecutar` (PowerShell libre, proceso aparte, hasta 30 min), `iniciar` (programa con ventana), `enviar` / `traer` (archivos por trozos, sin límite práctico, comprobados con SHA-256), `ventanas`, `enfocar`, `captura` (PNG), `raton`, `teclado` |
 
 La aprobación de cada orden la da Claude Code: las sesiones del panel van en modo `manual` y preguntan antes de cada
 orden. Riesgo aceptado: en modo completo la IA puede leer cualquier archivo de tu usuario, también la clave recordada

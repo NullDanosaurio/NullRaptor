@@ -22,7 +22,7 @@ $archivoToken = Join-Path $dir 'puente.token'
 $registro = Join-Path $dir 'puente.log'
 $archivoConsulta = Join-Path $dir 'puente-consulta'
 $ORDENES_CONSULTA = 'estado', 'sistema', 'procesos', 'puertos', 'programas', 'winget-buscar', 'abrir-url', 'notificar'
-$MAX_ARCHIVO = 50MB
+$MAX_TROZO = 8MB   # enviar/traer van por trozos de hasta esto: sin límite de tamaño de archivo y con poca memoria
 $MAX_SALIDA = 2MB
 
 $mutex = [Threading.Mutex]::new($false, 'Local\NullraptorPuente')
@@ -70,6 +70,13 @@ function Entero($args_, [string]$clave, [int]$min, [int]$max, $defecto = $null) 
   if ($null -eq $v -or "$v" -eq '') { if ($null -ne $defecto) { return $defecto } throw "Falta «$clave»." }
   $n = 0
   if (-not [int]::TryParse("$v", [ref]$n) -or $n -lt $min -or $n -gt $max) { throw "«$clave» tiene que ser un número entre $min y $max." }
+  return $n
+}
+function Largo($args_, [string]$clave, $defecto) {
+  $v = $args_.$clave
+  if ($null -eq $v -or "$v" -eq '') { return [long]$defecto }
+  $n = [long]0
+  if (-not [long]::TryParse("$v", [ref]$n) -or $n -lt 0) { throw "«$clave» tiene que ser un número de 0 en adelante." }
   return $n
 }
 function Ruta($args_, [string]$clave) {
@@ -180,20 +187,47 @@ $ordenes = [ordered]@{
     $p = Start-Process @o
     @{ pid = $p.Id; programa = $o.FilePath }
   }
+  # Archivos por trozos (pc.mjs los parte): cada trozo es una petición, así que el puente atiende otras órdenes entre
+  # medias y nunca tiene más de un trozo en memoria. Al acabar se da el SHA-256 para comprobarlo en el contenedor.
   enviar = { param($a)
     $destino = Ruta $a 'destino'
-    $bytes = [Convert]::FromBase64String((Texto $a 'datos' ([int]($MAX_ARCHIVO * 1.4))))
-    $carpeta = Split-Path $destino
-    if ($carpeta) { New-Item -ItemType Directory -Force $carpeta | Out-Null }
-    [IO.File]::WriteAllBytes($destino, $bytes)
-    @{ destino = $destino; bytes = $bytes.Length }
+    $parcial = "$destino.parcial"
+    $posicion = Largo $a 'posicion' 0
+    $b64 = "$($a.datos)"
+    if ($b64.Length -gt $MAX_TROZO * 1.4) { throw "Trozo de más de $($MAX_TROZO / 1MB) MB." }
+    $bytes = [Convert]::FromBase64String($b64)
+    if ($posicion -eq 0) {
+      $carpeta = Split-Path $destino
+      if ($carpeta) { New-Item -ItemType Directory -Force $carpeta | Out-Null }
+      Remove-Item -LiteralPath $parcial -ErrorAction SilentlyContinue
+    }
+    $fs = [IO.File]::Open($parcial, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::Write)
+    try {
+      if ($fs.Length -ne $posicion) { throw "El trozo empieza en $posicion, pero hay $($fs.Length) bytes recibidos: vuelve a enviar desde el principio." }
+      $fs.Seek($posicion, [IO.SeekOrigin]::Begin) | Out-Null
+      $fs.Write($bytes, 0, $bytes.Length)
+    } finally { $fs.Close() }
+    if ($a.final -eq $true) {
+      Move-Item -LiteralPath $parcial -Destination $destino -Force
+      @{ destino = $destino; bytes = (Get-Item -LiteralPath $destino).Length; sha256 = (Get-FileHash -LiteralPath $destino -Algorithm SHA256).Hash.ToLower() }
+    } else { @{ recibido = $posicion + $bytes.Length } }
   }
   traer = { param($a)
     $origen = Ruta $a 'origen'
     $i = Get-Item -LiteralPath $origen
-    if ($i.PSIsContainer) { throw "$origen es una carpeta: usa ejecutar con Get-ChildItem o Compress-Archive." }
-    if ($i.Length -gt $MAX_ARCHIVO) { throw "$origen ocupa más de $($MAX_ARCHIVO / 1MB) MB." }
-    @{ origen = $origen; bytes = $i.Length; datos = [Convert]::ToBase64String([IO.File]::ReadAllBytes($origen)) }
+    if ($i.PSIsContainer) { throw "$origen es una carpeta: comprímela antes con ejecutar (Compress-Archive)." }
+    $posicion = Largo $a 'posicion' 0
+    $quedan = [math]::Max([long]0, $i.Length - $posicion)
+    $buf = New-Object byte[] ([long][math]::Min([long](Entero $a 'tamano' 1 $MAX_TROZO $MAX_TROZO), $quedan))
+    $fs = [IO.File]::Open($origen, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    try {
+      $fs.Seek($posicion, [IO.SeekOrigin]::Begin) | Out-Null
+      $n = 0
+      while ($n -lt $buf.Length) { $leidos = $fs.Read($buf, $n, $buf.Length - $n); if ($leidos -le 0) { break }; $n += $leidos }
+    } finally { $fs.Close() }
+    $r = @{ origen = $origen; total = $i.Length; posicion = $posicion; datos = [Convert]::ToBase64String($buf, 0, $n) }
+    if ($posicion + $n -ge $i.Length) { $r.sha256 = (Get-FileHash -LiteralPath $origen -Algorithm SHA256).Hash.ToLower() }
+    $r
   }
   ventanas = { param($a)
     ,@(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle } | ForEach-Object {
@@ -273,7 +307,7 @@ function Atender($cliente) {
   $flujo = $cliente.GetStream()
   $lector = [IO.StreamReader]::new($flujo, [Text.Encoding]::UTF8)
   $linea = $lector.ReadLine()
-  if (-not $linea -or $linea.Length -gt $MAX_ARCHIVO * 1.5) { return }
+  if (-not $linea -or $linea.Length -gt $MAX_TROZO * 2) { return }
   try { $p = $json.DeserializeObject($linea); if ($p -isnot [Collections.IDictionary]) { throw 'no es un objeto' } } catch { Contestar $flujo @{ ok = $false; error = 'Petición no válida.' }; return }
   if ("$($p.token)" -cne $token) { Anotar 'rechazada: token incorrecto'; Contestar $flujo @{ ok = $false; error = 'Token no válido.' }; return }
   $orden = "$($p.orden)"

@@ -1,5 +1,14 @@
 # Registro de trabajo
 
+## 02/11/2026 — Archivos con el PC sin límite de 50 MB
+- [U] ¿Por qué 50 MB? Era por precaución: el archivo iba entero en una línea JSON en base64, con varias copias en la
+  memoria de PowerShell y el puente bloqueado mientras tanto. [U] Daniel pide las dos alternativas:
+- `enviar`/`traer` por trozos (4 MB por petición; el puente acepta hasta 8 MB): poca memoria, el puente atiende otras
+  órdenes entre trozo y trozo, `.parcial` que se renombra al final y comprobación SHA-256 en los dos lados.
+- Carpeta compartida `C:\\Users\\danoa\\Nullraptor` → `/pc/Nullraptor` para el trabajo diario (Modelos3D): montaje directo,
+  sin límite. Se crea y se pide desde Ajustes cuando esté la imagen nueva (hace falta `ejecutar` en el PC).
+- Pruebas [O]: 116/116 (puente falso por trozos con la misma lógica que `puente.ps1`).
+
 ## 02/11/2026 — Control completo del PC y sudo (para Modelos3D)
 - [U] Daniel: Modelos3D necesita más (bóveda: libGL para build123d, ElegooSlicer y Blender del PC, archivos,
   capturas). «Quiero que la IA pueda usar un equipo completamente funcional como lo haría un humano», aunque sea con

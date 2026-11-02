@@ -5,6 +5,7 @@
 //   NULLRAPTOR_PUENTE        host:puerto (host.docker.internal:4329)
 //   NULLRAPTOR_PUENTE_TOKEN  secreto compartido; sin él, el puente no contesta.
 // Protocolo: una línea JSON { token, orden, args } y una línea JSON de vuelta { ok, resultado | error }.
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -23,8 +24,8 @@ export const ORDENES = {
   notificar: 'Muestra un aviso en el escritorio. texto=<mensaje> [titulo=<título>].',
   ejecutar: 'PowerShell libre en el PC. Script por la entrada estándar (o script=…). [cwd=C:\\…] [tiempo=<s, máx. 1800>]. Sale con su código.',
   iniciar: 'Lanza un programa sin esperar (ventanas). programa=<ruta o nombre> [args=<argumentos>] [cwd=C:\\…].',
-  enviar: 'Copia un archivo del contenedor al PC (máx. 50 MB). origen=<ruta local> destino=C:\\…',
-  traer: 'Copia un archivo del PC al contenedor (máx. 50 MB). origen=C:\\… destino=<ruta local>',
+  enviar: 'Copia un archivo del contenedor al PC, por trozos y comprobado (SHA-256). origen=<ruta local> destino=C:\\…',
+  traer: 'Copia un archivo del PC al contenedor, por trozos y comprobado (SHA-256). origen=C:\\… destino=<ruta local>',
   ventanas: 'Ventanas abiertas: título, proceso, posición y tamaño (píxeles reales).',
   enfocar: 'Trae una ventana al frente. ventana=<parte del título>.',
   captura: 'Captura la pantalla o una ventana a PNG. [ventana=<título>] [ancho=<máx., 1600>] [salida=<archivo.png>].',
@@ -81,15 +82,6 @@ export function preparar(orden, args, { leerEntrada = () => fs.readFileSync(0, '
     a.script = leerEntrada();
     if (!a.script.trim()) throw new Error('Falta el script: pásalo por la entrada estándar o con script=…');
   }
-  if (orden === 'enviar') {
-    if (!a.origen || !a.destino) throw new Error('Uso: enviar origen=<ruta local> destino=C:\\…');
-    a.datos = fs.readFileSync(a.origen).toString('base64');
-    delete a.origen;
-  }
-  if (orden === 'traer') {
-    if (!a.origen || !a.destino) throw new Error('Uso: traer origen=C:\\… destino=<ruta local>');
-    delete a.destino; // es local
-  }
   if (orden === 'captura') delete a.salida;
   return a;
 }
@@ -101,11 +93,6 @@ export function terminar(orden, args, r, { ahora = new Date() } = {}) {
     const aviso = r.agotado ? '\n[Tiempo agotado: se paró el proceso en el PC]' : '';
     return { salida: r.salida ?? '', errores: (r.errores ?? '') + aviso, codigo };
   }
-  if (orden === 'traer') {
-    fs.mkdirSync(path.dirname(path.resolve(args.destino)), { recursive: true });
-    fs.writeFileSync(args.destino, Buffer.from(r.datos, 'base64'));
-    return { salida: JSON.stringify({ origen: r.origen, destino: path.resolve(args.destino), bytes: r.bytes }, null, 2), codigo: 0 };
-  }
   if (orden === 'captura') {
     const archivo = path.resolve(args.salida ?? path.join(os.tmpdir(), `captura-pc-${ahora.toISOString().replace(/[:.]/g, '-')}.png`));
     fs.mkdirSync(path.dirname(archivo), { recursive: true });
@@ -114,6 +101,64 @@ export function terminar(orden, args, r, { ahora = new Date() } = {}) {
     return { salida: JSON.stringify({ archivo, ...datos, nota: 'Píxel (px, py) de la imagen = pantalla (x + px / escala, y + py / escala).' }, null, 2), codigo: 0 };
   }
   return { salida: typeof r === 'string' ? r : JSON.stringify(r, null, 2), codigo: 0 };
+}
+
+export const TROZO = 4 * 1024 * 1024; // por petición (el puente acepta hasta 8 MB)
+const progreso = (hecho, total, aviso) => { if (total > 64 * TROZO && aviso) aviso(`${Math.floor((hecho / total) * 100)} % (${(hecho / 1048576).toFixed(0)} de ${(total / 1048576).toFixed(0)} MB)`); };
+
+/** Contenedor → PC por trozos. Comprueba al final que el SHA-256 del PC es el del archivo local. */
+export async function enviarArchivo(origen, destino, { pedirA = pedir, trozo = TROZO, aviso = null } = {}) {
+  const total = fs.statSync(origen).size;
+  const hash = createHash('sha256');
+  const fd = fs.openSync(origen, 'r');
+  const buf = Buffer.alloc(trozo);
+  let posicion = 0;
+  let r;
+  try {
+    do {
+      const n = fs.readSync(fd, buf, 0, trozo, posicion);
+      hash.update(buf.subarray(0, n));
+      const final = posicion + n >= total;
+      r = await pedirA('enviar', { destino, posicion, datos: buf.subarray(0, n).toString('base64'), final });
+      posicion += n;
+      if (!final) progreso(posicion, total, aviso);
+      if (final) break;
+      if (n === 0) throw new Error('El archivo local ha cambiado mientras se enviaba.');
+    } while (true); // eslint-disable-line no-constant-condition
+  } finally { fs.closeSync(fd); }
+  const local = hash.digest('hex');
+  if (r?.sha256 !== local) throw new Error(`El archivo llegó distinto al PC (SHA-256 ${r?.sha256 ?? '¿?'} en vez de ${local}).`);
+  return { origen: path.resolve(origen), destino: r.destino, bytes: r.bytes, sha256: local };
+}
+
+/** PC → contenedor por trozos, a un «.parcial» que se renombra cuando el SHA-256 coincide. */
+export async function traerArchivo(origen, destino, { pedirA = pedir, trozo = TROZO, aviso = null } = {}) {
+  const final = path.resolve(destino);
+  const parcial = `${final}.parcial`;
+  fs.mkdirSync(path.dirname(final), { recursive: true });
+  const hash = createHash('sha256');
+  const fd = fs.openSync(parcial, 'w');
+  let posicion = 0;
+  let r;
+  try {
+    for (;;) {
+      r = await pedirA('traer', { origen, posicion, tamano: trozo });
+      const datos = Buffer.from(r.datos ?? '', 'base64');
+      fs.writeSync(fd, datos, 0, datos.length, posicion);
+      hash.update(datos);
+      posicion += datos.length;
+      if (r.sha256) break;
+      if (!datos.length) throw new Error('El PC dejó de mandar datos antes de acabar.');
+      progreso(posicion, r.total, aviso);
+    }
+  } finally { fs.closeSync(fd); }
+  const local = hash.digest('hex');
+  if (posicion !== r.total || r.sha256 !== local) {
+    fs.rmSync(parcial, { force: true });
+    throw new Error('El archivo cambió en el PC mientras se traía o llegó dañado: vuelve a intentarlo.');
+  }
+  fs.renameSync(parcial, final);
+  return { origen, destino: final, bytes: posicion, sha256: local };
 }
 
 function ayuda() {
@@ -128,8 +173,15 @@ if (esPrincipal) {
   try {
     const args = leerArgs(resto);
     const ms = orden === 'ejecutar' ? (Number(args.tiempo) || 120) * 1000 + 30_000 : 5 * 60_000;
-    const r = await pedir(orden, preparar(orden, args), { ms });
-    const fin = terminar(orden, args, r);
+    let fin;
+    if (orden === 'enviar' || orden === 'traer') {
+      if (!args.origen || !args.destino) throw new Error(`Uso: ${ORDENES[orden]}`);
+      const aviso = (t) => process.stderr.write(`${t}\n`);
+      const r = orden === 'enviar' ? await enviarArchivo(args.origen, args.destino, { aviso }) : await traerArchivo(args.origen, args.destino, { aviso });
+      fin = { salida: JSON.stringify(r, null, 2), codigo: 0 };
+    } else {
+      fin = terminar(orden, args, await pedir(orden, preparar(orden, args), { ms }));
+    }
     if (fin.salida) process.stdout.write(fin.salida.endsWith('\n') ? fin.salida : `${fin.salida}\n`);
     if (fin.errores) process.stderr.write(fin.errores.endsWith('\n') ? fin.errores : `${fin.errores}\n`);
     process.exitCode = fin.codigo;
