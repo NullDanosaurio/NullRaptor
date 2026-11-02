@@ -18,8 +18,10 @@
 # los mismos ajustes cuando no hay sesiones de Claude abiertas o cuando se pide desde el panel; si no, el panel avisa.
 # Si el contenedor está parado no lo arranca. Registro en %LOCALAPPDATA%\Nullraptor\actualizar.log.
 # -SinActualizar quita la tarea y se recuerda; -ConActualizar la vuelve a poner.
+# Puente con el PC: -PuenteConsulta corta el control completo al momento (solo órdenes de consulta) y se recuerda;
+# -PuenteCompleto lo devuelve. Solo desde Windows: en consulta la IA no puede ejecutar nada para quitarlo.
 param([switch]$Red, [switch]$SoloEquipo, [switch]$Tailscale, [switch]$SinTailscale, [string[]]$Carpeta, [switch]$SinCarpetas,
-  [switch]$Actualizar, [switch]$SinActualizar, [switch]$ConActualizar)
+  [switch]$Actualizar, [switch]$SinActualizar, [switch]$ConActualizar, [switch]$PuenteConsulta, [switch]$PuenteCompleto)
 $imagen = if ($env:NULLRAPTOR_IMAGEN) { $env:NULLRAPTOR_IMAGEN } else { 'ghcr.io/nulldanosaurio/nullraptor:main' }
 $cofre = if ($env:CREDENCIALES) { $env:CREDENCIALES } else { Join-Path $HOME '.nullraptor\credenciales.cifrado' }
 $guardada = Join-Path $env:LOCALAPPDATA 'Nullraptor\clave.dpapi'
@@ -94,6 +96,9 @@ Calcular-Carpetas
 $puertoPuente = if ($env:NULLRAPTOR_PUERTO_PUENTE -match '^\d{2,5}$') { $env:NULLRAPTOR_PUERTO_PUENTE } else { '4329' }
 $archivoPuente = Join-Path $PSScriptRoot 'puente.ps1'
 $tokenPuente = Join-Path $env:LOCALAPPDATA 'Nullraptor\puente.token'
+$archivoConsulta = Join-Path $env:LOCALAPPDATA 'Nullraptor\puente-consulta'
+if ($PuenteConsulta) { New-Item -ItemType File -Force $archivoConsulta | Out-Null; Write-Host 'Puente con el PC en modo solo consulta (-PuenteCompleto lo devuelve).' }
+elseif ($PuenteCompleto) { Remove-Item $archivoConsulta -ErrorAction SilentlyContinue; Write-Host 'Puente con el PC en modo completo: la IA puede usar el PC (Claude pregunta antes de cada orden).' }
 function Arrancar-Puente {
   if (-not (Test-Path $archivoPuente)) { return }
   try {

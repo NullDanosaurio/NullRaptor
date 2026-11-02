@@ -31,16 +31,25 @@ a medias, dile a Daniel dónde se quedó y propón seguir.
 
 ## El contenedor
 
-- **Instalar**: no hay root ni sudo, y `apt` no funciona. Sí: `npm install -g`, `pip install` (va solo a
-  `/estado/sistema`) y binarios sueltos en `/estado/sistema/bin` (está en el PATH). Todo eso vive en el volumen y
-  sobrevive a las actualizaciones. Ya vienen git, curl, unzip, Python 3 (con venv) y compiladores (build-essential).
-  En un proyecto, mejor sus dependencias locales (`npm install`, `python3 -m venv .venv`) que las globales.
-  Si algo solo se instala con apt, dile a Daniel qué paquete hace falta para añadirlo a la imagen.
-- **El PC (Windows)**: `node /nullraptor/scripts/pc.mjs <orden>` (sin orden, la ayuda). Lista blanca: `estado`,
-  `sistema`, `procesos`, `puertos`, `programas [filtro=…]`, `winget-buscar texto=…`, `abrir-url url=…`,
-  `notificar texto=… [titulo=…]`. No ejecuta órdenes libres ni instala en el PC: si hace falta, díselo a Daniel.
-  Los servicios del PC se alcanzan en `host.docker.internal:<puerto>` (mira `puertos`). Las carpetas de Windows
-  que Daniel comparte en Ajustes están en `/pc/<nombre>`.
+- **Instalar**: hay `sudo` sin contraseña. Paquetes del sistema con `paquetes instalar <nombre…>` (usa apt y los
+  apunta para reinstalarlos solos tras cada actualización; `sudo apt install` a secas se pierde al actualizar).
+  `npm install -g`, `pip install` (va a `/estado/sistema`) y binarios en `/estado/sistema/bin` también duran.
+  Vienen git, curl, unzip, Python 3 (con venv), compiladores y libGL/EGL/X11. En un proyecto, mejor sus
+  dependencias locales (`npm install`, `uv sync`, `python3 -m venv .venv`) que las globales.
+- **El PC (Windows) entero**, como lo usaría una persona: `node /nullraptor/scripts/pc.mjs <orden>` (sin orden, la
+  ayuda; `estado` dice el modo). Corre como el usuario de Windows de Daniel, con sus programas y su potencia.
+  - Ejecutar: `ejecutar` con PowerShell por la entrada estándar (`pc.mjs ejecutar cwd=C:\… <<'FIN' … FIN`), p. ej.
+    Blender en segundo plano (`& 'C:\Program Files\Blender Foundation\Blender 4.4\blender.exe' -b …`) o la línea
+    de órdenes de un slicer. Programas con ventana: `iniciar programa=… args="…"`.
+  - Archivos: `enviar` / `traer` (hasta 50 MB) o las carpetas compartidas en Ajustes (`/pc/<nombre>`). Trabaja en
+    una carpeta propia del PC (p. ej. `%USERPROFILE%\Nullraptor\<Proyecto>`).
+  - Pantalla: `ventanas`, `enfocar ventana=…`, `captura [ventana=…]` (guarda un PNG: ábrelo con Read para verlo),
+    `raton accion=clic x=… y=…` (coordenadas de pantalla: pásalas desde la captura con su `escala`), `teclado
+    texto=…` o `teclas=^s`. Mira con una captura antes y después de cada acción.
+  - Cuidado: no toques `%LOCALAPPDATA%\Nullraptor` (clave del cofre, token del puente), `~\.nullraptor` ni
+    credenciales; no instales, desinstales ni borres nada en el PC sin decírselo antes a Daniel, y no cambies la
+    configuración de Windows. Si el puente dice «modo solo consulta», Daniel lo ha cortado: no intentes saltártelo.
+  - Los servicios del PC se alcanzan en `host.docker.internal:<puerto>` (mira `puertos`).
 - **Reinicios**: una actualización reinicia el contenedor; las sesiones abiertas se reabren solas con su
   conversación, pero los procesos en marcha (servidores, compilaciones) se pierden. Por eso: tareas en Ruflo, estado
   en su memoria y commits frecuentes.

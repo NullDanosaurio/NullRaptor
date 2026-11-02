@@ -106,18 +106,31 @@ había nada). En el panel, «Continuar la anterior» hace lo mismo a mano. Las t
 (`.claude-flow/tasks`, `agents`, `sessions`, `memory`…) se enlazan a `/estado/ruflo`: antes vivían en la imagen
 y se perdían en cada actualización.
 
-**Instalar programas** (decisión [U] 02/11/2026: en el volumen, sin root): la imagen trae curl, unzip, Python 3 (pip,
-venv) y build-essential. `NPM_CONFIG_PREFIX` y `PYTHONUSERBASE` apuntan a `/estado/sistema` (en el PATH), así que
-`npm install -g`, `pip install` y los binarios sueltos en `/estado/sistema/bin` sobreviven a las actualizaciones.
-`apt` no: lo que solo exista como paquete del sistema se añade al Dockerfile.
+**Instalar programas** (decisiones [U] 02/11/2026): la imagen trae curl, unzip, Python 3 (pip, venv),
+build-essential y libGL/EGL/X11 (CAD con build123d, programas gráficos sin pantalla). `NPM_CONFIG_PREFIX` y
+`PYTHONUSERBASE` apuntan a `/estado/sistema` (en el PATH), así que `npm install -g`, `pip install` y los binarios
+sueltos en `/estado/sistema/bin` sobreviven a las actualizaciones. Hay **sudo sin contraseña**; `paquetes instalar
+<nombre…>` (`scripts/paquetes.mjs`) instala con apt y lo apunta en `/estado/sistema/apt-paquetes.txt`, y al
+arrancar se reinstala en segundo plano lo que falte (registro en `/estado/sistema/apt.log`).
 
-**Puente con el PC** (decisión [U] 02/11/2026: lista blanca): el lanzador arranca `scripts/puente.ps1` en segundo
-plano (sin ventana ni administrador), que escucha en `127.0.0.1:4329` (`NULLRAPTOR_PUERTO_PUENTE`) con un token de
-`%LOCALAPPDATA%\Nullraptor\puente.token`. El contenedor recibe `NULLRAPTOR_PUENTE` (`host.docker.internal:4329`) y
-`NULLRAPTOR_PUENTE_TOKEN`, y la IA usa `node /nullraptor/scripts/pc.mjs <orden>`. Solo órdenes fijas: `estado`,
-`sistema`, `procesos`, `puertos`, `programas`, `winget-buscar` (no instala), `abrir-url` (solo http/https) y
-`notificar`. Nada de órdenes libres ni instalar en el PC. Registro en `%LOCALAPPDATA%\Nullraptor\puente.log`. Cuando
-cambia `puente.ps1`, el lanzador cambia el que está en marcha. Cortarlo: borrar `puente.token` y recrear el contenedor.
+**Puente con el PC** (decisiones [U] 02/11/2026: primero lista blanca; después **control completo**, «que la IA
+pueda usar un equipo completamente funcional como lo haría un humano»): el lanzador arranca `scripts/puente.ps1`
+en segundo plano (sin ventana ni administrador, como tu usuario de Windows), que escucha en `127.0.0.1:4329`
+(`NULLRAPTOR_PUERTO_PUENTE`) con un token de `%LOCALAPPDATA%\Nullraptor\puente.token`. El contenedor recibe
+`NULLRAPTOR_PUENTE` (`host.docker.internal:4329`) y `NULLRAPTOR_PUENTE_TOKEN`, y la IA usa
+`node /nullraptor/scripts/pc.mjs <orden>`:
+
+| Modo | Órdenes |
+|---|---|
+| consulta y completo | `estado`, `sistema`, `procesos`, `puertos`, `programas`, `winget-buscar`, `abrir-url`, `notificar` |
+| solo completo (por defecto) | `ejecutar` (PowerShell libre, proceso aparte, hasta 30 min), `iniciar` (programa con ventana), `enviar` / `traer` (archivos hasta 50 MB), `ventanas`, `enfocar`, `captura` (PNG), `raton`, `teclado` |
+
+La aprobación de cada orden la da Claude Code: las sesiones del panel van en modo `manual` y preguntan antes de cada
+orden. Riesgo aceptado: en modo completo la IA puede leer cualquier archivo de tu usuario, también la clave recordada
+del cofre (`clave.dpapi`); las instrucciones le prohíben tocar `%LOCALAPPDATA%\Nullraptor` y `~\.nullraptor`.
+**Corte inmediato**: `arrancar.ps1 -PuenteConsulta` (crea `puente-consulta`; se mira en cada petición y en consulta
+la IA no puede ejecutar nada para quitarlo); `-PuenteCompleto` lo devuelve. Una orden cada vez. Registro en
+`%LOCALAPPDATA%\Nullraptor\puente.log`. Cuando cambia `puente.ps1`, el lanzador cambia el que está en marcha.
 
 ## Arranque en cualquier equipo con Docker
 

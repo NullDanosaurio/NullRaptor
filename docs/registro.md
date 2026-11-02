@@ -1,5 +1,20 @@
 # Registro de trabajo
 
+## 02/11/2026 — Control completo del PC y sudo (para Modelos3D)
+- [U] Daniel: Modelos3D necesita más (bóveda: libGL para build123d, ElegooSlicer y Blender del PC, archivos,
+  capturas). «Quiero que la IA pueda usar un equipo completamente funcional como lo haría un humano», aunque sea con
+  sudo o control del equipo; si Docker limita usar el PC con sus apps y su potencia, no le gusta.
+- Decisión: Docker se queda como cerebro (portátil, se actualiza solo) y el puente pasa a brazo completo sobre
+  Windows. [U] Orden libre con la aprobación de Claude Code; pantalla con ratón y teclado; sudo con paquetes
+  persistentes.
+- Imagen: sudo, libGL/EGL/X11 (OCP pedía libGL.so.1 y libX11.so.6), `paquetes` (`scripts/paquetes.mjs`).
+- `puente.ps1`: ejecutar, iniciar, enviar/traer, ventanas, enfocar, captura, raton, teclado; modo consulta con
+  `puente-consulta` (`-PuenteConsulta`/`-PuenteCompleto`); JSON con JavaScriptSerializer (sin el límite de 2 MB de
+  PowerShell 5.1); coordenadas en píxeles reales (SetProcessDPIAware). `pc.mjs`: script por la entrada estándar,
+  capturas a PNG, archivos de ida y vuelta.
+- Pruebas [O]: 115/115. [?] `puente.ps1` sin probar: en el contenedor no hay PowerShell (se denegó descargarlo);
+  revisado a mano. Se prueba contra el PC en cuanto se instale la imagen (tarea 5 en Ruflo).
+
 ## 02/11/2026 — Puente con el PC probado
 - [O] Desde el contenedor, contra MAQUINOTE (Windows 11 Pro): responden `estado`, `sistema`, `procesos`, `puertos`,
   `programas`, `winget-buscar` y `notificar`. Se rechazan una orden fuera de la lista, un token incorrecto y una
