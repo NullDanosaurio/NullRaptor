@@ -1,14 +1,14 @@
-// Chat de grupo con Claude y Codex sobre un proyecto (misma lógica que scripts/chat.mjs), y chats guardados.
+// Chat sobre un proyecto con la IA que elijas, Claude o Codex (misma lógica que scripts/chat.mjs), y chats guardados.
+// Rutas: #/chat · #/chat/nuevo[/<proyecto>] · #/chat/<id> · #/chat/guardado/<archivo>.
 import { ArrowLeft, ArrowUp, BookCheck, ChevronDown, History, MessagesSquare, Plus, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { enlace, get, haceCuanto, ir, post, useDatos } from '../api.js';
 import Markdown from '../componentes/Markdown.jsx';
 import { Avatar, Boton, Cargando, cx, Fallo, Insignia, PERSONAS, Punto, Vacio } from '../componentes/ui.jsx';
 
-const DESTINOS = [
-  { id: 'ambas', nombre: 'Las dos', ayuda: 'Contestan las dos, alternando quién empieza' },
-  { id: 'claude', nombre: 'Claude', ayuda: 'Solo Claude' },
-  { id: 'codex', nombre: 'Codex', ayuda: 'Solo Codex' },
+const IAS = [
+  { id: 'claude', ayuda: 'Claude Code, con tu suscripción de Claude.' },
+  { id: 'codex', ayuda: 'Codex, con tu suscripción de ChatGPT.' },
 ];
 
 function Mensaje({ m }) {
@@ -67,13 +67,13 @@ function ChatAbierto({ id }) {
   const [error, setError] = useState(null);
   const [perdido, setPerdido] = useState(false);
   const [texto, setTexto] = useState('');
-  const [destino, setDestino] = useState('ambas');
+  const [ia, setIa] = useState(null);
   const scroll = useAlFinal(`${historial.length}-${escribiendo}`);
 
   useEffect(() => {
     const fuente = new EventSource(`/api/chats/${id}/eventos`);
     const datos = (e) => JSON.parse(e.data);
-    fuente.addEventListener('estado', (e) => { const d = datos(e); setHistorial(d.historial); setEscribiendo(d.escribiendo); setProyecto(d.proyecto); setConectado(true); });
+    fuente.addEventListener('estado', (e) => { const d = datos(e); setHistorial(d.historial); setEscribiendo(d.escribiendo); setProyecto(d.proyecto); setIa(d.ia); setConectado(true); });
     fuente.addEventListener('mensaje', (e) => setHistorial((h) => [...h, datos(e)]));
     fuente.addEventListener('escribiendo', (e) => setEscribiendo(datos(e)));
     fuente.addEventListener('fallo', (e) => { const d = datos(e); setHistorial((h) => [...h, { quien: 'sistema', texto: `${PERSONAS[d.quien]?.nombre ?? ''}: ${d.texto}` }]); });
@@ -93,7 +93,7 @@ function ChatAbierto({ id }) {
     if (!limpio || ocupado) return;
     setError(null);
     try {
-      await post(`/api/chats/${id}/mensajes`, { texto: destino === 'ambas' ? limpio : `@${destino} ${limpio}` });
+      await post(`/api/chats/${id}/mensajes`, { texto: limpio });
       setTexto('');
     } catch (err) { setError(err); }
   };
@@ -135,10 +135,10 @@ function ChatAbierto({ id }) {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-borde px-4 py-3 md:px-6">
         <a href="#/chat" className="text-apagado hover:text-texto md:hidden" aria-label="Volver"><ArrowLeft className="size-5" /></a>
-        <div className="flex -space-x-2"><Avatar quien="claude" /><Avatar quien="codex" /></div>
+        {ia && <Avatar quien={ia} />}
         <div className="min-w-0">
           <p className="truncate font-medium text-white">{proyecto || 'Chat'}</p>
-          <p className="flex items-center gap-1.5 text-[12px] text-apagado"><Punto tono={conectado ? 'ok' : 'fallo'} />{conectado ? 'Claude y Codex leen el proyecto (sin modificarlo)' : 'Reconectando…'}</p>
+          <p className="flex items-center gap-1.5 text-[12px] text-apagado"><Punto tono={conectado ? 'ok' : 'fallo'} />{conectado ? `${PERSONAS[ia]?.nombre ?? 'La IA'} lee el proyecto (sin modificarlo)` : 'Reconectando…'}</p>
         </div>
         <Boton className="ml-auto" tam="sm" onClick={cerrar} disabled={ocupado || cerrando} title="Cierra el chat y guarda un resumen en el Diario de la bóveda">
           {cerrando ? 'Resumiendo…' : <><Square className="size-3" /> Terminar y resumir</>}
@@ -148,7 +148,7 @@ function ChatAbierto({ id }) {
       <div ref={scroll.ref} onScroll={scroll.alDesplazar} className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6 md:px-6">
           {historial.length === 0 && !ocupado && (
-            <Vacio icono={MessagesSquare} titulo="Empieza la conversación">Sin destinatario contestan las dos y cada una lee lo que dijo la otra. Elige abajo si quieres hablar solo con una.</Vacio>
+            <Vacio icono={MessagesSquare} titulo="Empieza la conversación">{PERSONAS[ia]?.nombre ?? 'La IA'} lee el proyecto para contestarte, sin modificarlo. Para que cambie cosas, abre una sesión desde Proyectos.</Vacio>
           )}
           {historial.map((m, i) => <Mensaje key={`${i}-${m.hora ?? ''}`} m={m} />)}
           {escribiendo && <Pensando quien={escribiendo} />}
@@ -167,26 +167,11 @@ function ChatAbierto({ id }) {
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); enviar(); } }}
             rows={Math.min(8, Math.max(1, texto.split('\n').length))}
             maxLength={20000}
-            placeholder={ocupado ? `Esperando a ${PERSONAS[escribiendo].nombre}…` : 'Escribe a Claude y Codex…'}
+            placeholder={ocupado ? `Esperando a ${PERSONAS[escribiendo].nombre}…` : `Escribe a ${PERSONAS[ia]?.nombre ?? 'la IA'}…`}
             aria-label="Mensaje"
             className="block max-h-56 w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-6 text-texto outline-none placeholder:text-apagado"
           />
           <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
-            <div role="radiogroup" aria-label="A quién" className="flex gap-1 rounded-full bg-elevado p-0.5">
-              {DESTINOS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={destino === d.id}
-                  title={d.ayuda}
-                  onClick={() => setDestino(d.id)}
-                  className={cx('h-7 rounded-full px-3 text-[12px] font-medium transition-colors', destino === d.id ? (d.id === 'claude' ? 'bg-claude/20 text-claude' : d.id === 'codex' ? 'bg-codex/20 text-codex' : 'bg-borde-fuerte text-white') : 'text-apagado hover:text-texto')}
-                >
-                  {d.nombre}
-                </button>
-              ))}
-            </div>
             <span className="ml-auto hidden text-[11px] text-apagado sm:inline">Intro envía · Mayús+Intro, nueva línea</span>
             <button type="submit" aria-label="Enviar" disabled={!texto.trim() || ocupado} className="ml-2 flex size-8 items-center justify-center rounded-full bg-raptor text-fondo transition-[scale,opacity] duration-150 ease-salida active:scale-[0.92] disabled:opacity-30">
               <ArrowUp className="size-4" strokeWidth={2.5} />
@@ -218,30 +203,42 @@ function ChatGuardado({ archivo }) {
   );
 }
 
-function NuevoChat() {
+function NuevoChat({ proyectoInicial }) {
   const { datos } = useDatos('/api/proyectos');
+  const [ia, setIa] = useState('claude');
   const [error, setError] = useState(null);
   const [creando, setCreando] = useState(null);
   const locales = (datos ?? []).filter((p) => p.local);
   const crear = async (nombre) => {
     setCreando(nombre);
     setError(null);
-    try { const { id } = await post('/api/chats', { proyecto: nombre }); ir(`chat/${id}`); } catch (e) { setError(e); setCreando(null); }
+    try { const { id } = await post('/api/chats', { proyecto: nombre, ia }); ir(`chat/${id}`); } catch (e) { setError(e); setCreando(null); }
   };
   return (
-    <div className="flex h-full items-center justify-center p-6">
-      <div className="w-full max-w-md text-center">
-        <div className="mb-4 flex justify-center -space-x-2"><Avatar quien="claude" className="size-10 text-[15px]" /><Avatar quien="dano" className="size-10 text-[15px]" /><Avatar quien="codex" className="size-10 text-[15px]" /></div>
-        <h2 className="text-lg font-semibold text-white">Chat con Claude y Codex</h2>
-        <p className="mt-1 text-[13px] text-apagado">Elige el proyecto. Las dos lo leen sin modificarlo; al terminar, Claude escribe un resumen en el Diario de la bóveda. Cada mensaje gasta cuota de las dos suscripciones.</p>
-        <Fallo error={error} className="mt-4 text-left" />
-        <div className="mt-5 grid gap-2">
+    <div className="flex h-full items-center justify-center overflow-y-auto p-6">
+      <div className="w-full max-w-md">
+        <h2 className="text-center text-lg font-semibold text-white">Nuevo chat</h2>
+        <p className="mt-1 text-center text-[13px] text-apagado">Lee el proyecto sin modificarlo; al terminar, escribe un resumen en el Diario de la bóveda.</p>
+        <div role="radiogroup" aria-label="Con quién" className="mt-5 grid grid-cols-2 gap-2">
+          {IAS.map((x) => (
+            <button key={x.id} type="button" role="radio" aria-checked={ia === x.id} onClick={() => setIa(x.id)}
+              className={cx('flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition-colors', ia === x.id ? (x.id === 'claude' ? 'border-claude/50 bg-claude/10' : 'border-codex/50 bg-codex/10') : 'border-borde bg-panel hover:bg-elevado')}>
+              <Avatar quien={x.id} className="size-10 text-[15px]" />
+              <span className={cx('font-medium', PERSONAS[x.id].texto)}>{PERSONAS[x.id].nombre}</span>
+              <span className="text-[11px] text-apagado">{x.ayuda}</span>
+            </button>
+          ))}
+        </div>
+        <Fallo error={error} className="mt-4" />
+        <p className="mt-5 mb-2 text-[12px] text-apagado">Proyecto</p>
+        <div className="grid gap-2">
           {!datos && <Cargando className="justify-center" />}
           {datos && !locales.length && <p className="text-[13px] text-apagado">No hay proyectos descargados en este equipo.</p>}
           {locales.map((p) => (
-            <button key={p.nombre} type="button" disabled={Boolean(creando)} onClick={() => crear(p.nombre)} className="flex items-center gap-3 rounded-xl border border-borde bg-panel px-4 py-3 text-left transition-colors hover:border-raptor/40 hover:bg-elevado disabled:opacity-50">
+            <button key={p.nombre} type="button" disabled={Boolean(creando)} onClick={() => crear(p.nombre)}
+              className={cx('flex items-center gap-3 rounded-xl border bg-panel px-4 py-3 text-left transition-colors hover:border-raptor/40 hover:bg-elevado disabled:opacity-50', p.nombre === proyectoInicial ? 'border-raptor/40' : 'border-borde')}>
               <span className="flex-1 font-medium text-texto">{p.nombre}</span>
-              <span className="text-[12px] text-apagado">{creando === p.nombre ? 'Abriendo…' : 'Abrir chat →'}</span>
+              <span className="text-[12px] text-apagado">{creando === p.nombre ? 'Abriendo…' : `Hablar con ${PERSONAS[ia].nombre} →`}</span>
             </button>
           ))}
         </div>
@@ -254,7 +251,8 @@ export default function Chat({ resto }) {
   const { datos } = useDatos('/api/chats', { cada: 5000 });
   const guardado = resto.startsWith('guardado/') ? resto.slice('guardado/'.length) : null;
   const id = !guardado && /^[0-9a-f-]{36}$/.test(resto) ? resto : null;
-  const seleccion = guardado ?? id ?? (resto === 'nuevo' ? 'nuevo' : null);
+  const nuevo = resto === 'nuevo' || resto.startsWith('nuevo/');
+  const seleccion = guardado ?? id ?? (nuevo ? 'nuevo' : null);
 
   return (
     <div className="flex h-full">
@@ -267,7 +265,7 @@ export default function Chat({ resto }) {
           {datos?.abiertos?.length > 0 && <p className="px-2 pt-2 pb-1 text-[11px] font-medium tracking-wider text-apagado uppercase">Abiertos</p>}
           {datos?.abiertos?.map((c) => (
             <a key={c.id} href={enlace('chat', c.id)} className={cx('flex items-center gap-2.5 rounded-xl px-3 py-2.5', id === c.id ? 'bg-elevado' : 'hover:bg-elevado/60')}>
-              <Punto tono="raptor" vivo={c.ocupado} />
+              <Avatar quien={c.ia} className="size-6 text-[11px]" />
               <span className="min-w-0 flex-1"><span className="block truncate text-[13px] text-texto">{c.proyecto}</span><span className="text-[11px] text-apagado">{c.mensajes} mensajes · {haceCuanto(c.creado)}</span></span>
               {c.ocupado && <Insignia tono="raptor">pensando</Insignia>}
             </a>
@@ -283,7 +281,7 @@ export default function Chat({ resto }) {
         </div>
       </aside>
       <section className={cx('min-w-0 flex-1', !seleccion && 'hidden md:block')}>
-        {id ? <ChatAbierto key={id} id={id} /> : guardado ? <ChatGuardado key={guardado} archivo={guardado} /> : <NuevoChat />}
+        {id ? <ChatAbierto key={id} id={id} /> : guardado ? <ChatGuardado key={guardado} archivo={guardado} /> : <NuevoChat key={resto} proyectoInicial={nuevo ? resto.slice('nuevo/'.length) : null} />}
       </section>
     </div>
   );

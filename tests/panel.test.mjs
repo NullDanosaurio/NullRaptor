@@ -127,9 +127,11 @@ test('API del panel', async (t) => {
   assert.equal((await pedir(port, 'POST', '/api/chats', { cuerpo: { proyecto: 'x'.repeat(70_000) }, cab }).catch(() => ({ estado: 413 }))).estado, 413);
 
   // Chat abierto (sin enviar mensajes: no se llama a ninguna IA).
-  const creado = await pedir(port, 'POST', '/api/chats', { cuerpo: { proyecto: 'Demo' }, cab });
+  assert.equal((await pedir(port, 'POST', '/api/chats', { cuerpo: { proyecto: 'Demo' }, cab })).estado, 400); // sin elegir IA
+  const creado = await pedir(port, 'POST', '/api/chats', { cuerpo: { proyecto: 'Demo', ia: 'claude' }, cab });
   assert.equal(creado.estado, 201);
   assert.equal((await pedir(port, 'GET', '/api/chats')).datos.abiertos[0].proyecto, 'Demo');
+  assert.equal((await pedir(port, 'GET', '/api/chats')).datos.abiertos[0].ia, 'claude');
   assert.equal((await pedir(port, 'POST', `/api/chats/${creado.datos.id}/mensajes`, { cuerpo: { texto: '   ' }, cab })).estado, 400);
   assert.equal((await pedir(port, 'POST', `/api/chats/${creado.datos.id}/cerrar`, { cab })).estado, 200);
   assert.equal((await pedir(port, 'POST', `/api/chats/${creado.datos.id}/cerrar`, { cab })).estado, 404);

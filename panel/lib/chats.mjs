@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Chat, DIAS_LOCAL, NOMBRE } from '../../scripts/chat.mjs';
+import { Chat, DIAS_LOCAL, IAS, NOMBRE } from '../../scripts/chat.mjs';
 
 const MAX_ABIERTOS = 8;
 const QUIEN = Object.fromEntries(Object.entries(NOMBRE).map(([k, v]) => [v, k]));
@@ -14,10 +14,12 @@ export class Chats {
     this.abiertos = new Map(); // id → { chat, clientes: Set<res>, creado }
   }
 
-  crear(ruta) {
+  /** Abre un chat sobre el proyecto con una sola IA ('claude' o 'codex'), elegida por Daniel. */
+  crear(ruta, ia) {
+    if (!IAS.includes(ia)) throw Object.assign(new Error('Elige con quién hablar: Claude o Codex.'), { codigo: 400 });
     if (this.abiertos.size >= MAX_ABIERTOS) throw new Error(`Máximo ${MAX_ABIERTOS} chats abiertos: cierra alguno.`);
     const id = randomUUID();
-    const chat = new Chat({ ruta, carpeta: this.carpeta });
+    const chat = new Chat({ ruta, carpeta: this.carpeta, ia });
     const entrada = { chat, clientes: new Set(), creado: new Date().toISOString() };
     const emitir = (tipo) => (datos) => { for (const res of entrada.clientes) enviarEvento(res, tipo, datos); };
     chat.on('mensaje', emitir('mensaje'));
@@ -31,13 +33,13 @@ export class Chats {
     const e = this.abiertos.get(id);
     if (!e) return null;
     const { chat } = e;
-    return { id, proyecto: chat.proyecto.nombre, creado: e.creado, historial: chat.historial, escribiendo: chat.escribiendo, ocupado: chat.ocupado };
+    return { id, proyecto: chat.proyecto.nombre, ia: chat.ia, creado: e.creado, historial: chat.historial, escribiendo: chat.escribiendo, ocupado: chat.ocupado };
   }
 
   lista() {
     return [...this.abiertos.keys()].map((id) => {
       const r = this.resumen(id);
-      return { id, proyecto: r.proyecto, creado: r.creado, mensajes: r.historial.length, ocupado: r.ocupado };
+      return { id, proyecto: r.proyecto, ia: r.ia, creado: r.creado, mensajes: r.historial.length, ocupado: r.ocupado };
     });
   }
 

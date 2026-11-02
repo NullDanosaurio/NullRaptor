@@ -68,7 +68,7 @@ HTTPS en https://login.tailscale.com/admin/dns. El lanzador ejecuta `tailscale s
 publicado solo en `127.0.0.1` y Tailscale lo sirve por HTTPS en `https://<pc>.<tailnet>.ts.net` únicamente a tus
 dispositivos; no se abre ningún puerto del router. Todo lo que llega por ese dominio exige **passkey** (huella, cara
 o PIN; `panel/lib/passkey.mjs`, WebAuthn sin dependencias): la primera se crea en `/entrar` con el código que
-muestra el lanzador; las siguientes, con un código de un solo uso (10 min, QR) que se saca en Remoto → Seguridad
+muestra el lanzador; las siguientes, con un código de un solo uso (10 min, QR) que se saca en Ajustes → Passkeys
 desde un dispositivo que ya tenga passkey. Sesión en cookie `__Host-` (Secure, HttpOnly, SameSite=Strict) de 12 h
 como mucho y 2 h sin uso; abrir o usar la terminal y gestionar passkeys piden confirmar la passkey cada hora. Las
 escrituras exigen Origin exacto (`https://<dominio>`) y `X-Nullraptor`; 10 fallos por minuto como mucho. Desde
@@ -163,7 +163,7 @@ stdio en Node (`scripts/herramientas.mjs` explica el formato; `config/claude-glo
 - **Quién aprueba**: desde este equipo, o por Tailscale con la passkey confirmada en la última hora. Desde la red de
   casa con solo el código, no (desactivar sí). Todo queda en el registro de accesos.
 - **Límite**: desde dentro del contenedor, una sesión podría llamar a la API del panel; lo que lo impide es que
-  Claude va en modo manual y pregunta antes de cada orden. Llegan a las sesiones de Claude (Remoto y el menú); el chat
+  Claude va en modo manual y pregunta antes de cada orden. Llegan a las sesiones de Claude (Proyectos y el menú); el chat
   del panel y el flujo automático no cargan MCP.
 
 ## Chat con Claude y Codex a la vez
@@ -180,15 +180,27 @@ registro de chats → la conversación completa queda solo en el equipo (`$TRABA
 al cerrar Claude escribe en `Diario/AAAA-MM-DD.md` de la memoria un resumen de 2-5 viñetas; si ve una lección
 reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cuota de ambas suscripciones.
 
-## Panel web: chat, trabajo y bóveda en un solo sitio
+## Panel web: una sola interfaz
 
-`panel/` (añadido el 29/10/2026). Servidor Node sin dependencias (`panel/servidor.mjs`) + web React/Vite/Tailwind
-(`panel/src`, diseño a partir de componentes de 21st.dev Magic). Secciones: **Inicio** (proyectos, flujo en curso,
-últimos cambios de la bóveda, MCP del día, chats), **Chat** (el mismo de `chat.mjs`: Claude y Codex en solo lectura,
-«Terminar y resumir» escribe en el Diario), **Trabajo** (tareas y fases del flujo en vivo, commits), **Bóveda**
-(árbol, búsqueda, notas con `[[enlaces]]` y retroenlaces; solo lectura) y **Remoto**.
+`panel/` (añadido el 29/10/2026; reorganizado en la fase 4, 02/11/2026). Servidor Node sin dependencias
+(`panel/servidor.mjs`) + web React/Vite/Tailwind (`panel/src`, diseño a partir de componentes de 21st.dev Magic).
+Cinco pestañas:
 
-**Remoto** (`panel/lib/remoto.mjs`, `pty.mjs`): «Abrir sesión» lanza `claude --remote-control --permission-mode
+- **Resumen**: sesiones de Claude abiertas (con acceso a su terminal), proyectos y su flujo, buscador y últimos
+  cambios de la bóveda, chats y MCP del día. La bóveda no tiene pestaña: sus notas (árbol, `[[enlaces]]` y
+  retroenlaces; solo lectura) se abren en `#/boveda/<ruta>` desde el buscador, los cambios o un proyecto.
+- **Proyectos**: los del equipo y los que conoce la bóveda. En cada uno, abrir una **sesión de Claude Code** (abajo),
+  chat, su nota de la bóveda, el flujo en vivo y los commits. **Traer**: crear uno nuevo (repositorio privado en
+  GitHub con `GITHUB_TOKEN` + nota en `Proyectos/` + copia en el equipo), clonar uno por URL `https` o descargar uno
+  que solo está en la bóveda (`panel/lib/proyectos.mjs`). Piden lo mismo que la terminal.
+- **Chat**: eliges **Claude o Codex** y el proyecto; contesta solo esa, en solo lectura, y «Terminar y resumir»
+  escribe en el Diario. (`node scripts/chat.mjs` en la terminal sigue con las dos.)
+- **Herramientas**: las propias, para revisarlas y aprobarlas (ver «Herramientas propias»).
+- **Ajustes**: versión (commit de la imagen) y actualización, acceso y passkeys, carpetas y servidores MCP.
+
+Las rutas de antes (`#/inicio`, `#/trabajo`, `#/remoto`) llevan a su sitio nuevo.
+
+**Sesión de Claude Code** (`panel/lib/remoto.mjs`, `pty.mjs`): «Abrir sesión» lanza `claude --remote-control --permission-mode
 manual` en `$TRABAJO_DIR/proyectos/<P>` dentro de una terminal real (`script`, sin módulos nativos) con el entorno de
 `preparar.mjs` (tokens y `BOVEDA_DIR`, nunca `AGENTE_CLAVE`). Se ve y se maneja en la terminal del panel (xterm.js,
 con teclas Esc/Tab/flechas/Ctrl+C para el móvil) y a la vez desde claude.ai/code o la app (enlace y QR). Bajo la

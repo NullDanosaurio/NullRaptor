@@ -51,5 +51,8 @@ USER node
 VOLUME /estado
 # Panel web (node panel/servidor.mjs): publicar solo en el equipo, -p 127.0.0.1:4321:4321.
 EXPOSE 4321
+# Commit con el que se construyó (lo pasa la CI); el panel lo enseña en Ajustes. Al final, para no romper la caché.
+ARG REVISION=local
+ENV NULLRAPTOR_REVISION=$REVISION
 
 ENTRYPOINT ["node", "/nullraptor/scripts/preparar.mjs"]

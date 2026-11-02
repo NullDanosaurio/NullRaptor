@@ -19,7 +19,9 @@ import { crearEntrada, esRemota, hostDominio, quienEs } from './lib/entrada.mjs'
 import { Passkeys, Sesiones } from './lib/passkey.mjs';
 import { Registro } from './lib/registro.mjs';
 import { Remoto } from './lib/remoto.mjs';
+import { Proyectos } from './lib/proyectos.mjs';
 import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
+import { crearRutasProyectos } from './lib/rutas-proyectos.mjs';
 import { crearRutasRemoto } from './lib/rutas-remoto.mjs';
 import { escribirMcp } from '../scripts/ia.mjs';
 import { detalleProyecto, estadoMcp, listarProyectos, rutaProyecto } from './lib/trabajo.mjs';
@@ -123,7 +125,7 @@ async function entrar(req, res, url, acceso, permitido) {
 export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
   dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
-  env = process.env, prepararMcp = null,
+  env = process.env, prepararMcp = null, proyectos = new Proyectos({ trabajo, memoria, env }),
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -134,6 +136,7 @@ export function crearServidor({
   // Al aprobar o desactivar una herramienta se rehace la configuración MCP: la usan las sesiones que se abran después.
   const alCambiar = () => { try { prepararMcp?.(); } catch (e) { console.warn(`[panel] MCP: ${e.message}`); } };
   const rutasHerramientas = crearRutasHerramientas({ trabajo, env, sesiones, registro, alCambiar, leerCuerpo, json });
+  const rutasProyectos = crearRutasProyectos({ proyectos, sesiones, registro, leerCuerpo, json });
   // Para la actualización automática: cuántas sesiones hay abiertas (la tarea de Windows no corta ninguna).
   let latido = null;
   if (actualizacion) {
@@ -154,6 +157,14 @@ export function crearServidor({
       remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
       hoy: new Date().toISOString().slice(0, 10),
     }),
+    // Ajustes: versión de la imagen, cómo se entra, carpetas y servidores MCP.
+    'GET /api/ajustes': () => ({
+      version: /^[0-9a-f]{7,40}$/.test(env.NULLRAPTOR_REVISION ?? '') ? env.NULLRAPTOR_REVISION : null, // «local» sin la CI
+      acceso: { red: Boolean(acceso), dominio },
+      carpetas: { trabajo, boveda: memoria },
+      mcp: estadoMcp(memoria),
+      github: Boolean(env.GITHUB_TOKEN),
+    }),
     'GET /api/actualizacion': () => actualizacion?.estado() ?? { disponible: null, solicitada: null },
     'POST /api/actualizacion/ahora': (_q, _c, { quien }) => (actualizacion ? actualizacion.solicitar(quien) : [404, { error: 'Sin actualización automática.' }]),
     'GET /api/proyectos': () => listarProyectos(trabajo, memoria),
@@ -167,7 +178,7 @@ export function crearServidor({
     'POST /api/chats': async (_q, cuerpo) => {
       const ruta = rutaProyecto(trabajo, cuerpo.proyecto, memoria);
       if (!ruta) return [404, { error: 'Proyecto no encontrado en este equipo.' }];
-      return [201, { id: chats.crear(ruta) }];
+      return [201, { id: chats.crear(ruta, cuerpo.ia) }];
     },
   };
 
@@ -207,6 +218,7 @@ export function crearServidor({
       const ctx = { remota, sesion, soloCodigo, quien: quienEs(req, sesion) };
       if (await rutasRemoto(req, res, p, ctx)) return;
       if (await rutasHerramientas(req, res, p, ctx)) return;
+      if (await rutasProyectos(req, res, p, ctx)) return;
 
       // Chats abiertos: /api/chats/:id/(eventos|mensajes|cerrar)
       const m = p.match(/^\/api\/chats\/([0-9a-f-]{36})\/(eventos|mensajes|cerrar)$/);

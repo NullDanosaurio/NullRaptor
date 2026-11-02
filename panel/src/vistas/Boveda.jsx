@@ -61,7 +61,7 @@ function Rama({ nodo, ruta, actual, abiertas, alternar, nivel }) {
   );
 }
 
-function Busqueda({ consulta }) {
+export function Busqueda({ consulta }) {
   const [diferida, setDiferida] = useState(consulta);
   useEffect(() => { const t = setTimeout(() => setDiferida(consulta), 220); return () => clearTimeout(t); }, [consulta]);
   const { datos, cargando } = useDatos(diferida.trim().length >= 2 ? `/api/boveda/buscar?q=${encodeURIComponent(diferida)}` : null);

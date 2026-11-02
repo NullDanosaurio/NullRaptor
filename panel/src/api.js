@@ -75,8 +75,8 @@ export function useDatos(ruta, { cada = 0 } = {}) {
 /** Rutas con almohadilla: #/chat, #/boveda/Proyectos/X.md … → { vista, resto }. */
 export function useRuta() {
   const leer = () => {
-    const [vista = 'inicio', ...resto] = decodeURIComponent(window.location.hash.replace(/^#\/?/, '')).split('/');
-    return { vista: vista || 'inicio', resto: resto.join('/') };
+    const [vista = 'resumen', ...resto] = decodeURIComponent(window.location.hash.replace(/^#\/?/, '')).split('/');
+    return { vista: vista || 'resumen', resto: resto.join('/') };
   };
   const [ruta, setRuta] = useState(leer);
   useEffect(() => {

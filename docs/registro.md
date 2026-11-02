@@ -1,5 +1,18 @@
 # Registro de trabajo
 
+## 02/11/2026 — Fase 4: una sola interfaz (F4-1 a F4-3)
+- [U] Decisiones de Daniel: la terminal de Claude va dentro de Proyectos (sin pestaña Remoto); la bóveda se reparte
+  (nota en cada proyecto; buscador y cambios en Resumen; sin pestaña); en el Chat se elige Claude o Codex (sin «Las dos»).
+- F4-1: traer proyectos desde el panel (`panel/lib/proyectos.mjs`): descargar uno de la bóveda, clonar por URL https
+  (con su nota) y crear uno nuevo en GitHub. Mismo permiso que la terminal. `/api/ajustes`; la imagen lleva su commit
+  (`NULLRAPTOR_REVISION`; falta que la CI lo pase con `build-args: REVISION=${{ github.sha }}`: el token del cofre no
+  tiene permiso `workflow` y GitHub rechazó subir ese cambio, lo hace Daniel).
+- F4-2: el chat del panel abre con una sola IA; `scripts/chat.mjs` en la terminal sigue con las dos.
+- F4-3: pestañas Resumen, Proyectos, Chat, Herramientas y Ajustes; las rutas antiguas redirigen.
+- Pruebas [O]: 93/93. Real: panel en otro puerto; «Descargar al equipo» clonó TuRinconDeLectura de GitHub en 11 s.
+- [?] Sin probar en un navegador (no hay en el contenedor) ni «Clonar por URL»/«Nuevo» contra GitHub y la bóveda
+  reales (escribirían en ellos); sí con repositorios locales en las pruebas.
+
 ## 02/11/2026 — Fase 3 terminada: herramientas en caliente (F3-3, F3-4, F3-5)
 - [O] Las tareas F3-x/F4/F5 que se crearon en Ruflo no están (`task_list` vacía); queda la nota del plan en su
   memoria. Lo que faltaba de la fase se reconstruye desde el código.

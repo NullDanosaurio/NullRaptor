@@ -27,9 +27,9 @@ export function opcionesDelMenu(memoria, agenteRepo = AGENTE_REPO) {
   return [agente, { nombre: 'Bóveda', boveda: true }, ...conocidos.filter((p) => p !== agente)];
 }
 
-const NOMBRE_VALIDO =/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+export const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
-async function crearRepositorio(nombre, env) {
+export async function crearRepositorio(nombre, env) {
   const { GITHUB_TOKEN: token, GITHUB_ORG: org } = env;
   if (!token) throw new Error('Para crear proyectos hace falta GITHUB_TOKEN en el cofre.');
   const api = env.GITHUB_API ?? 'https://api.github.com';
@@ -46,15 +46,17 @@ async function crearRepositorio(nombre, env) {
 }
 
 // Nota del proyecto nuevo desde la plantilla de la memoria; se guarda en la rama del agente.
-function registrarEnMemoria(memoria, nombre, repo, git) {
+// `git` puede ser síncrono (menú) o devolver una promesa (panel, para no bloquear el servidor).
+export async function registrarEnMemoria(memoria, nombre, repo, git) {
   const hoy = new Date().toISOString().slice(0, 10);
   const plantilla = path.join(memoria, 'Plantillas', 'Proyecto.md');
   const base = fs.existsSync(plantilla) ? fs.readFileSync(plantilla, 'utf8') : '---\ntipo: proyecto\nactualizado: {{date}}\n---\n# {{title}}\n';
   const nota = base.replaceAll('{{title}}', nombre).replaceAll('{{date}}', hoy).replace(/^---\r?\n/, `---\nrepo: ${repo}\n`);
+  fs.mkdirSync(path.join(memoria, 'Proyectos'), { recursive: true });
   fs.writeFileSync(path.join(memoria, 'Proyectos', `${nombre}.md`), nota);
-  git(['add', path.join('Proyectos', `${nombre}.md`)], memoria);
-  git(['commit', '-m', `Proyecto nuevo: ${nombre}`], memoria);
-  try { git(['push', '-u', 'origin', 'HEAD'], memoria); } catch { console.warn('Aviso: la nota se guardó, pero no se pudo subir la rama de la memoria.'); }
+  await git(['add', path.join('Proyectos', `${nombre}.md`)], memoria);
+  await git(['commit', '-m', `Proyecto nuevo: ${nombre}`], memoria);
+  try { await git(['push', '-u', 'origin', 'HEAD'], memoria); return true; } catch { console.warn('Aviso: la nota se guardó, pero no se pudo subir la rama de la memoria.'); return false; }
 }
 
 // Recomendaciones MCP del día: ver detalles e instalar solo si Daniel escribe «instalar».
@@ -120,7 +122,7 @@ export async function elegirProyecto({ memoria, trabajo, env, git, clonar }) {
         if (!NOMBRE_VALIDO.test(nombre)) { console.error('Nombre no válido (letras, números, . _ -).'); continue; }
         if (lista.some((p) => p.nombre.toLowerCase() === nombre.toLowerCase())) { console.error('Ya existe.'); continue; }
         const url = await crearRepositorio(nombre, env);
-        registrarEnMemoria(memoria, nombre, url, git);
+        await registrarEnMemoria(memoria, nombre, url, git);
         clonar(url, destino(nombre));
         return destino(nombre);
       }

@@ -1,7 +1,11 @@
-// Inicio: todo de un vistazo — proyectos y su flujo, cambios de la bóveda, chats y MCP del día.
-import { ArrowUpRight, BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Sparkles } from 'lucide-react';
+// Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
+// chats y MCP del día.
+import { ArrowUpRight, BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
+import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
-import { Cabecera, Cargando, Fallo, Insignia, Punto, Tarjeta, Vacio } from '../componentes/ui.jsx';
+import { enlaceTerminal } from '../componentes/Sesiones.jsx';
+import { Avatar, Cabecera, Cargando, Fallo, Insignia, Punto, Tarjeta, Vacio } from '../componentes/ui.jsx';
+import { Busqueda } from './Boveda.jsx';
 
 function saludo() {
   const h = new Date().getHours();
@@ -25,7 +29,7 @@ function TarjetaProyecto({ p }) {
   const pct = f?.tareas ? Math.round((f.integradas / f.tareas) * 100) : 0;
   const vivo = f?.bloqueo?.vivo;
   return (
-    <a href={p.local ? enlace('trabajo', p.nombre) : p.nota ? enlace('boveda', p.nota) : '#/trabajo'} className="group flex flex-col gap-3 rounded-2xl border border-borde bg-elevado/40 p-4 transition-colors hover:border-borde-fuerte hover:bg-elevado/70">
+    <a href={enlace('proyectos', p.nombre)} className="group flex flex-col gap-3 rounded-2xl border border-borde bg-elevado/40 p-4 transition-colors hover:border-borde-fuerte hover:bg-elevado/70">
       <div className="flex items-start gap-2">
         <div className="min-w-0">
           <p className="truncate font-medium text-white">{p.nombre}</p>
@@ -44,14 +48,29 @@ function TarjetaProyecto({ p }) {
           <div className="h-1.5 overflow-hidden rounded-full bg-borde"><div className="h-full rounded-full bg-raptor/80 transition-[width] duration-500" style={{ width: `${pct}%` }} /></div>
         </div>
       ) : (
-        <p className="text-[12px] text-apagado">{p.local ? 'Sin tareas en el flujo' : p.repo ? 'Se descarga al elegirlo en el menú' : ''}</p>
+        <p className="text-[12px] text-apagado">{p.local ? 'Sin tareas en el flujo' : p.repo ? 'Se descarga desde Proyectos' : ''}</p>
       )}
       {p.ultimo && <p className="truncate border-t border-borde pt-2.5 text-[12px] text-apagado"><span className="font-mono text-tenue">{p.ultimo.hash}</span> {p.ultimo.asunto}</p>}
     </a>
   );
 }
 
-export default function Inicio() {
+/** Buscador de la bóveda: los resultados abren la nota. */
+function BuscarBoveda() {
+  const [consulta, setConsulta] = useState('');
+  return (
+    <Tarjeta titulo="Bóveda" icono={BookOpen} cuerpo="p-2" accion={<a href="#/boveda" className="text-[12px] text-apagado hover:text-raptor">Explorar →</a>}>
+      <label className="mx-1 mb-1 flex h-9 items-center gap-2 rounded-xl border border-borde bg-elevado/60 px-3 focus-within:border-raptor/40">
+        <Search className="size-4 text-apagado" />
+        <input value={consulta} onChange={(e) => setConsulta(e.target.value)} placeholder="Buscar en las notas…" aria-label="Buscar en la bóveda" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-apagado" />
+        {consulta && <button type="button" onClick={() => setConsulta('')} aria-label="Borrar búsqueda" className="text-apagado hover:text-texto"><X className="size-3.5" /></button>}
+      </label>
+      {consulta && <div className="max-h-80 overflow-y-auto"><Busqueda consulta={consulta} /></div>}
+    </Tarjeta>
+  );
+}
+
+export default function Resumen() {
   const { datos, error, cargando } = useDatos('/api/resumen', { cada: 5000 });
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
@@ -66,28 +85,29 @@ export default function Inicio() {
         <Cabecera titulo={`${saludo()}, Dano`} subtitulo={<span className="capitalize">{fecha}</span>} />
         <Fallo error={error} className="mb-4" />
         {remoto.length > 0 && (
-          <a href="#/remoto" className="mb-4 flex items-center gap-2.5 rounded-xl border border-aviso/25 bg-aviso/10 px-3 py-2 text-[13px] text-aviso hover:bg-aviso/15">
-            <MonitorSmartphone className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">
-              {remoto.length === 1 ? '1 sesión remota abierta' : `${remoto.length} sesiones remotas abiertas`}: {remoto.map((s) => s.proyecto).join(', ')}
-            </span>
-            <span className="shrink-0">Ver →</span>
-          </a>
+          <div className="mb-4 rounded-xl border border-aviso/25 bg-aviso/10 px-3 py-2 text-[13px] text-aviso">
+            <p className="flex items-center gap-2.5"><MonitorSmartphone className="size-4 shrink-0" />{remoto.length === 1 ? '1 sesión de Claude abierta' : `${remoto.length} sesiones de Claude abiertas`}</p>
+            <ul className="mt-1.5 flex flex-wrap gap-2">
+              {remoto.map((s) => (
+                <li key={s.id}><a href={enlaceTerminal(s)} className="flex items-center gap-1.5 rounded-lg border border-aviso/25 px-2.5 py-1 hover:bg-aviso/15"><SquareTerminal className="size-3.5" /> {s.proyecto}</a></li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Cifra etiqueta="Proyectos" valor={proyectos.length} detalle={`${proyectos.filter((p) => p.local).length} en este equipo`} icono={FolderGit2} href="#/trabajo" />
-          <Cifra etiqueta="Flujo" valor={enCurso.length} detalle={enCurso.length ? enCurso.map((p) => p.nombre).join(', ') : 'Nada ejecutándose'} icono={Sparkles} href="#/trabajo" />
+          <Cifra etiqueta="Proyectos" valor={proyectos.length} detalle={`${proyectos.filter((p) => p.local).length} en este equipo`} icono={FolderGit2} href="#/proyectos" />
+          <Cifra etiqueta="Flujo" valor={enCurso.length} detalle={enCurso.length ? enCurso.map((p) => p.nombre).join(', ') : 'Nada ejecutándose'} icono={Sparkles} href="#/proyectos" />
           <Cifra etiqueta="Notas en la bóveda" valor={boveda?.notas ?? '—'} detalle={boveda?.cambios?.[0] ? `Último cambio ${haceCuanto(boveda.cambios[0].fecha)}` : 'Sin bóveda'} icono={BookOpen} href="#/boveda" />
           <Cifra etiqueta="Chats" valor={chats.length} detalle={chats.length ? 'abiertos ahora' : `${guardados.length} guardados recientes`} icono={MessagesSquare} href="#/chat" />
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
           <div className="space-y-6">
-            <Tarjeta titulo="Proyectos" icono={FolderGit2} accion={<a href="#/trabajo" className="text-[12px] text-apagado hover:text-raptor">Ver trabajo →</a>}>
+            <Tarjeta titulo="Proyectos" icono={FolderGit2} accion={<a href="#/proyectos" className="text-[12px] text-apagado hover:text-raptor">Ver proyectos →</a>}>
               {proyectos.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">{proyectos.map((p) => <TarjetaProyecto key={p.nombre} p={p} />)}</div>
-              ) : <Vacio icono={FolderGit2} titulo="Aún no hay proyectos">Elige o crea uno desde el menú de la terminal.</Vacio>}
+              ) : <Vacio icono={FolderGit2} titulo="Aún no hay proyectos">Créalo o clónalo desde Proyectos → Traer.</Vacio>}
             </Tarjeta>
 
             {mcp?.hoy?.length > 0 && (
@@ -109,6 +129,7 @@ export default function Inicio() {
           </div>
 
           <div className="space-y-6">
+            <BuscarBoveda />
             <Tarjeta titulo="Bóveda: últimos cambios" icono={GitCommitHorizontal} cuerpo="p-2">
               {boveda?.cambios?.length ? (
                 <ol>
@@ -128,13 +149,13 @@ export default function Inicio() {
               {chats.length + guardados.length ? (
                 <ul>
                   {chats.map((c) => (
-                    <li key={c.id}><a href={enlace('chat', c.id)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 hover:bg-elevado/70"><Punto tono="raptor" vivo={c.ocupado} /><span className="flex-1 truncate text-[13px]">{c.proyecto}</span><span className="text-[11px] text-apagado">{c.mensajes} mensajes</span></a></li>
+                    <li key={c.id}><a href={enlace('chat', c.id)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 hover:bg-elevado/70"><Avatar quien={c.ia} className="size-5 text-[10px]" /><span className="flex-1 truncate text-[13px]">{c.proyecto}</span>{c.ocupado && <Punto tono="raptor" vivo />}<span className="text-[11px] text-apagado">{c.mensajes} mensajes</span></a></li>
                   ))}
                   {guardados.map((g) => (
                     <li key={g.archivo}><a href={enlace('chat', `guardado/${g.archivo}`)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 hover:bg-elevado/70"><Punto tono="apagado" /><span className="flex-1 truncate text-[13px] text-tenue">{g.proyecto}</span><span className="text-[11px] text-apagado">{haceCuanto(g.cambiado)}</span></a></li>
                   ))}
                 </ul>
-              ) : <Vacio titulo="Sin chats todavía">Habla con Claude y Codex a la vez sobre un proyecto.</Vacio>}
+              ) : <Vacio titulo="Sin chats todavía">Habla con Claude o con Codex sobre un proyecto.</Vacio>}
             </Tarjeta>
           </div>
         </div>

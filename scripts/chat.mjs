@@ -134,8 +134,11 @@ export function limpiarChats(carpeta) {
  * Solo un mensaje a la vez (las IA contestan por turnos).
  */
 export class Chat extends EventEmitter {
-  constructor({ ruta, carpeta }) {
+  /** `ia`: con 'claude' o 'codex' contesta solo esa (el panel); sin ella, las dos por turnos (la terminal). */
+  constructor({ ruta, carpeta, ia = null }) {
     super();
+    if (ia !== null && !IAS.includes(ia)) throw new Error(`IA desconocida: ${ia}`);
+    this.ia = ia;
     this.proyecto = { ruta, nombre: path.basename(ruta) };
     this.carpeta = carpeta;
     limpiarChats(carpeta);
@@ -157,7 +160,8 @@ export class Chat extends EventEmitter {
   /** Envía una línea de Dano y espera las respuestas. Devuelve false si no había nada que enviar. */
   async enviar(linea) {
     if (this.ocupado) throw new Error('Espera a que terminen de contestar.');
-    const { destino, texto } = destinatarios(String(linea ?? '').trim(), this.turno);
+    const limpia = String(linea ?? '').trim();
+    const { destino, texto } = this.ia ? { destino: [this.ia], texto: limpia } : destinatarios(limpia, this.turno);
     if (!texto) return false;
     if (texto.length > MAX_MENSAJE) throw new Error(`Mensaje demasiado largo (máx. ${MAX_MENSAJE} caracteres).`);
     this.ocupado = true;

@@ -1,27 +1,33 @@
-// Estructura del panel: barra lateral (abajo en el móvil) y la vista elegida por la ruta.
-import { BookOpen, FolderKanban, LayoutDashboard, MessagesSquare, MonitorSmartphone, Wrench } from 'lucide-react';
+// Estructura del panel: barra lateral (abajo en el móvil) y la vista elegida por la ruta. Cinco pestañas: Resumen,
+// Proyectos (con la terminal de Claude y la nota de cada uno), Chat, Herramientas y Ajustes. La bóveda no tiene
+// pestaña: se busca desde Resumen y sus notas se leen en #/boveda/<ruta>.
+import { FolderKanban, LayoutDashboard, MessagesSquare, Settings, Wrench } from 'lucide-react';
+import { useEffect } from 'react';
 import { useDatos, useRuta } from './api.js';
 import AvisoActualizacion from './componentes/AvisoActualizacion.jsx';
 import { cx, Punto } from './componentes/ui.jsx';
+import Ajustes from './vistas/Ajustes.jsx';
 import Boveda from './vistas/Boveda.jsx';
 import Chat from './vistas/Chat.jsx';
 import Herramientas from './vistas/Herramientas.jsx';
-import Inicio from './vistas/Inicio.jsx';
-import Remoto from './vistas/Remoto.jsx';
-import Trabajo from './vistas/Trabajo.jsx';
+import Proyectos from './vistas/Proyectos.jsx';
+import Resumen from './vistas/Resumen.jsx';
 
 const VISTAS = [
-  { id: 'inicio', nombre: 'Inicio', icono: LayoutDashboard, componente: Inicio },
+  { id: 'resumen', nombre: 'Resumen', icono: LayoutDashboard, componente: Resumen },
+  { id: 'proyectos', nombre: 'Proyectos', icono: FolderKanban, componente: Proyectos },
   { id: 'chat', nombre: 'Chat', icono: MessagesSquare, componente: Chat },
-  { id: 'trabajo', nombre: 'Trabajo', icono: FolderKanban, componente: Trabajo },
-  { id: 'boveda', nombre: 'Bóveda', icono: BookOpen, componente: Boveda },
-  { id: 'remoto', nombre: 'Remoto', icono: MonitorSmartphone, componente: Remoto },
   { id: 'herramientas', nombre: 'Herramientas', icono: Wrench, componente: Herramientas },
+  { id: 'ajustes', nombre: 'Ajustes', icono: Settings, componente: Ajustes },
+  { id: 'boveda', nombre: 'Bóveda', componente: Boveda, oculta: true, padre: 'resumen' },
 ];
+
+// Rutas de antes de la fase 4 (enlaces guardados, marcadores): a su sitio nuevo.
+const ANTIGUAS = { inicio: 'resumen', trabajo: 'proyectos', remoto: 'proyectos' };
 
 function Logo() {
   return (
-    <a href="#/inicio" className="flex items-center gap-2.5 px-2" aria-label="Nullraptor, inicio">
+    <a href="#/resumen" className="flex items-center gap-2.5 px-2" aria-label="Nullraptor, inicio">
       <img src="/raptor.svg" alt="" className="size-8 rounded-lg ring-1 ring-raptor/30" />
       <span className="hidden flex-col leading-tight lg:flex">
         <span className="text-[15px] font-semibold tracking-tight text-white">Nullraptor</span>
@@ -51,15 +57,19 @@ function EstadoBoveda() {
 
 export default function App() {
   const { vista, resto } = useRuta();
+  useEffect(() => {
+    if (ANTIGUAS[vista]) window.location.replace(`#/${ANTIGUAS[vista]}${vista === 'trabajo' && resto ? `/${encodeURIComponent(resto)}` : ''}`);
+  }, [vista, resto]);
   const actual = VISTAS.find((v) => v.id === vista) ?? VISTAS[0];
+  const marcada = actual.oculta ? actual.padre : actual.id;
   const Vista = actual.componente;
 
   return (
     <div className="flex h-full flex-col md:flex-row">
       <nav aria-label="Secciones" className="order-last flex shrink-0 items-center gap-1 border-t border-borde bg-panel/95 px-2 pt-1.5 pb-[max(0.4rem,env(safe-area-inset-bottom))] backdrop-blur md:order-first md:h-full md:w-[72px] md:flex-col md:items-stretch md:gap-1.5 md:border-t-0 md:border-r md:px-3 md:py-4 lg:w-60">
         <div className="hidden pb-5 md:block"><Logo /></div>
-        {VISTAS.map(({ id, nombre, icono: Icono }) => {
-          const activa = id === actual.id;
+        {VISTAS.filter((v) => !v.oculta).map(({ id, nombre, icono: Icono }) => {
+          const activa = id === marcada;
           return (
             <a
               key={id}
