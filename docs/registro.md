@@ -1,5 +1,13 @@
 # Registro de trabajo
 
+## 02/11/2026 — Puerto de las apps de los proyectos
+- [U] Daniel quiere ver Roleplay (servidor en 4777) desde el PC igual que el panel; solo se publicaba el 4321.
+- `scripts/arrancar.ps1` publica también `127.0.0.1:4777:4777`, siempre solo en el equipo (también en modo red),
+  porque las apps no tienen control de acceso. `NULLRAPTOR_PUERTOS` (p. ej. `4777,5173`) cambia la lista. La app
+  tiene que escuchar en `0.0.0.0` dentro del contenedor (Roleplay: `HOST=0.0.0.0`).
+- Pruebas [O]: 103/103. [?] Sin probar en Windows (no hay PowerShell en el contenedor); llega al recrear el
+  contenedor con la imagen nueva.
+
 ## 02/11/2026 — Copiar desde la terminal
 - [U] Ya se pega, pero no se copia nada de la terminal del panel.
 - Causa: Claude Code 2.1 va a pantalla completa y captura el ratón (`?1049h`, `?1000h`–`?1006h`): al arrastrar

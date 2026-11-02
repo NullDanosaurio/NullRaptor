@@ -39,6 +39,10 @@ function Docker-Listo { docker info *> $null; return $LASTEXITCODE -eq 0 }
 function En-Marcha { return (docker inspect -f '{{.State.Running}}' $nombre 2>$null) -eq 'true' }
 $nombre = 'nullraptor'
 $puerto = if ($env:PANEL_PUERTO) { $env:PANEL_PUERTO } else { '4321' }
+# Apps de los proyectos (Roleplay en 4777). Solo en este equipo (127.0.0.1), también en modo red: no piden acceso.
+# NULLRAPTOR_PUERTOS cambia la lista (p. ej. «4777,5173»). Dentro del contenedor la app escucha en 0.0.0.0.
+$listaApps = if ($env:NULLRAPTOR_PUERTOS) { $env:NULLRAPTOR_PUERTOS } else { '4777' }
+$puertosApps = @($listaApps -split '[,; ]+' | Where-Object { $_ -match '^\d{2,5}$' })
 $url = "http://localhost:$puerto"
 $archivoRed = Join-Path $env:LOCALAPPDATA 'Nullraptor\red'
 New-Item -ItemType Directory -Force (Split-Path $archivoRed) | Out-Null
@@ -318,15 +322,17 @@ if ($PSCommandPath -eq $instalado) {
 
 # 5. Servidor y panel web dentro del contenedor, en segundo plano. Todo lo del equipo queda en el volumen
 #    nullraptor (/estado). El puerto se publica solo en este equipo (127.0.0.1) o, en modo red, en la red de casa.
+#    Los de las apps ($puertosApps), siempre solo en este equipo.
 #    NULLRAPTOR_LANZADOR y NULLRAPTOR_CARPETAS le dicen al panel (Ajustes) cómo está montado.
 docker rm -f $nombre *> $null
 $publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
+$publicaApps = @(foreach ($p in $puertosApps) { '-p'; "127.0.0.1:${p}:${p}" })
 docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" --label "nullraptor.carpetas=$etiquetaCarpetas" `
   -e AGENTE_CLAVE -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -e NULLRAPTOR_LANZADOR=windows -e "NULLRAPTOR_CARPETAS=$etiquetaCarpetas" `
-  -v nullraptor:/estado -v $montaCofre @montaCarpetas -p $publica $imagen node panel/servidor.mjs | Out-Null
+  -v nullraptor:/estado -v $montaCofre @montaCarpetas -p $publica @publicaApps $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE
 Remove-Item Env:AGENTE_CLAVE -ErrorAction SilentlyContinue
-if ($codigo) { Salir "No se pudo arrancar el contenedor ($codigo). ¿Está ocupado el puerto $puerto?" $codigo }
+if ($codigo) { Salir "No se pudo arrancar el contenedor ($codigo). ¿Está ocupado el puerto $puerto o alguno de $($puertosApps -join ', ')?" $codigo }
 Write-Host 'Preparando la memoria y los proyectos (la primera vez tarda un poco)...'
 for ($i = 0; -not (Panel-Listo); $i++) {
   if (-not (En-Marcha)) { docker logs --tail 30 $nombre; Salir 'Nullraptor se ha parado al arrancar (arriba, su registro).' }
