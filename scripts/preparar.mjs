@@ -14,6 +14,7 @@ import { abrirCofre } from './credenciales.mjs';
 import { carpetaAgente, elegirProyecto, opcionesDelMenu } from './menu.mjs';
 import { prepararIA } from './ia.mjs';
 import { explorarDelDia, leerEstado } from './mcp.mjs';
+import { SISTEMA, leerLista } from './paquetes.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAMA_MEMORIA = 'agente'; // el agente nunca escribe en main: Daniel fusiona.
@@ -85,6 +86,16 @@ avanzar(memoria, [`origin/${RAMA_MEMORIA}`, principal]);
 if (env.AGENTE_GIT_NOMBRE) git(['config', 'user.name', env.AGENTE_GIT_NOMBRE], memoria);
 if (env.AGENTE_GIT_EMAIL) git(['config', 'user.email', env.AGENTE_GIT_EMAIL], memoria);
 console.error(`Memoria lista (rama ${RAMA_MEMORIA}).`);
+
+// Paquetes apt que la IA instaló con «paquetes instalar»: la imagen nueva no los trae. Se reinstalan en segundo plano
+// (no retrasan el arranque); registro en /estado/sistema/apt.log.
+if (fs.existsSync('/etc/sudoers.d/nullraptor') && leerLista().length) {
+  try {
+    const log = fs.openSync(path.join(SISTEMA, 'apt.log'), 'a');
+    spawn(process.execPath, [path.join(agente, 'scripts', 'paquetes.mjs'), 'restaurar'], { detached: true, stdio: ['ignore', log, log] }).unref();
+    console.error('Reinstalando en segundo plano los paquetes apt apuntados…');
+  } catch (e) { console.warn(`Aviso: no se pudieron restaurar los paquetes apt (${e.message}).`); }
+}
 
 // Instrucciones globales y MCP de la IA, desde fuera de los proyectos (también para las sesiones del panel).
 const mcp = prepararIA({ agente, env, memoria, trabajo });

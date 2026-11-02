@@ -13,10 +13,16 @@ RUN npm run build
 FROM node:24.22.1-bookworm-slim
 
 # git para memoria y proyectos. Nullraptor no construye módulos nativos; Python, curl y los compiladores son para lo
-# que la IA instale en los proyectos (sin root: npm y pip instalan en el volumen, ver NPM_CONFIG_PREFIX más abajo).
+# que la IA instale en los proyectos (npm y pip instalan en el volumen, ver NPM_CONFIG_PREFIX más abajo).
+# libGL/EGL/X11: CAD con build123d (OCP necesita libGL.so.1 y libX11.so.6) y programas gráficos sin pantalla (Blender).
+# sudo (decisión [U] 02/11/2026): la IA puede usar apt; con «paquetes instalar» lo instalado se reinstala solo tras
+# cada actualización (scripts/paquetes.mjs, lista en /estado/sistema/apt-paquetes.txt).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates curl unzip python3 python3-pip python3-venv build-essential \
- && rm -rf /var/lib/apt/lists/*
+      sudo libgl1 libegl1 libglu1-mesa libx11-6 libxrender1 libxext6 libxi6 libxxf86vm1 libxfixes3 libxkbcommon0 libsm6 libfontconfig1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/nullraptor && chmod 0440 /etc/sudoers.d/nullraptor \
+ && printf '#!/bin/sh\nexec node /nullraptor/scripts/paquetes.mjs "$@"\n' > /usr/local/bin/paquetes && chmod 0755 /usr/local/bin/paquetes
 
 WORKDIR /nullraptor
 COPY package.json package-lock.json ./
@@ -48,7 +54,7 @@ ENV HOME=/estado/home \
     PIP_BREAK_SYSTEM_PACKAGES=1 \
     PATH=/nullraptor/node_modules/.bin:/estado/sistema/bin:/estado/home/.local/bin:$PATH
 # Lo que la IA instala (npm -g, pip, binarios sueltos en /estado/sistema/bin) va al volumen y sobrevive a las
-# actualizaciones. pip, sin permiso en el sistema, instala solo en PYTHONUSERBASE. apt no: hace falta root.
+# actualizaciones. pip, sin permiso en el sistema, instala solo en PYTHONUSERBASE. apt, con sudo y «paquetes».
 # Estado de Ruflo (tareas, agentes, sesiones, memoria…): Ruflo lo escribe en .claude-flow/ de su carpeta, que es la
 # de la imagen; se enlaza al volumen para que no se pierda al actualizar. preparar.mjs crea las que falten.
 RUN mkdir -p /estado/home/.claude /estado/trabajo /estado/sistema/bin /estado/ruflo/swarm /estado/ruflo/policy \
