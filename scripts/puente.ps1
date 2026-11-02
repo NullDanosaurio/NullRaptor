@@ -48,6 +48,19 @@ namespace Nullraptor {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, IntPtr pid);
+    [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool unir);
+    [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+    [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+    // Windows no deja a un proceso de fondo pasar otra ventana al frente. Se engancha un momento a la entrada del hilo
+    // de la ventana activa, que sí puede. (Antes se pulsaba Alt: activaba los atajos del menú de la ventana.)
+    public static bool AlFrente(IntPtr h) {
+      uint yo = GetCurrentThreadId(), activo = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
+      bool unido = activo != 0 && activo != yo && AttachThreadInput(yo, activo, true);
+      try { BringWindowToTop(h); return SetForegroundWindow(h); }
+      finally { if (unido) AttachThreadInput(yo, activo, false); }
+    }
   }
 }
 '@
@@ -239,10 +252,9 @@ $ordenes = [ordered]@{
     $v = Buscar-Ventana (Texto $a 'ventana' 200)
     $h = $v.MainWindowHandle
     if ([Nullraptor.U32]::IsIconic($h)) { [Nullraptor.U32]::ShowWindow($h, 9) | Out-Null } # SW_RESTORE
-    # Windows no deja a un proceso de fondo pasar otra ventana al frente; una pulsación de Alt lo desbloquea.
-    [Nullraptor.U32]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [Nullraptor.U32]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-    $ok = [Nullraptor.U32]::SetForegroundWindow($h)
-    @{ titulo = $v.MainWindowTitle; enfocada = $ok }
+    $ok = [Nullraptor.U32]::AlFrente($h)
+    Start-Sleep -Milliseconds 100
+    @{ titulo = $v.MainWindowTitle; enfocada = ($ok -and [Nullraptor.U32]::GetForegroundWindow() -eq $h) }
   }
   captura = { param($a)
     if ($a.ventana) {

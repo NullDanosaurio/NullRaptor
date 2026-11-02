@@ -1,11 +1,25 @@
 # Registro de trabajo
 
+## 03/11/2026 — Puente con el PC probado en modo completo
+- Pruebas [O] contra MAQUINOTE con la imagen 05864ef: `ejecutar` (PowerShell 5.1, acentos, código de salida y
+  errores), `enviar`/`traer` de 20 MB idénticos (SHA-256; 1 s y 2 s), `ventanas`, `captura` de los dos monitores
+  (3840×1080) y de una ventana, `iniciar`, `teclado` con acentos y caracteres especiales, `raton` mover, Blender
+  4.4.3 con `-b`. ElegooSlicer está en `C:\Program Files\ElegooSlicer\elegoo-slicer.exe`, pero `--help` no imprime
+  en consola (es un programa con ventana; para laminar, redirigir la salida).
+- Incidente: el Bloc de notas de Windows 11 reabrió una pestaña de Daniel (`config.toml` de Codex) con todo
+  seleccionado, y el texto de prueba la sustituyó. Se deshizo con Ctrl+Z (sin guardar; el archivo del disco no se
+  tocó). Además, `enfocar` pulsaba Alt para traer la ventana al frente, y eso activaba los atajos del menú: el primer
+  Ctrl+Z fue al menú.
+- Arreglos: `enfocar` usa AttachThreadInput (sin teclas). Instrucciones de la IA: antes de escribir, comprobar con una
+  captura la ventana, el campo y que no haya nada seleccionado; para probar, un documento nuevo.
+- Carpeta `C:\Users\danoa\Nullraptor\Modelos3D` creada en el PC; falta que Daniel la comparta en Ajustes.
+
 ## 02/11/2026 — Archivos con el PC sin límite de 50 MB
 - [U] ¿Por qué 50 MB? Era por precaución: el archivo iba entero en una línea JSON en base64, con varias copias en la
   memoria de PowerShell y el puente bloqueado mientras tanto. [U] Daniel pide las dos alternativas:
 - `enviar`/`traer` por trozos (4 MB por petición; el puente acepta hasta 8 MB): poca memoria, el puente atiende otras
   órdenes entre trozo y trozo, `.parcial` que se renombra al final y comprobación SHA-256 en los dos lados.
-- Carpeta compartida `C:\\Users\\danoa\\Nullraptor` → `/pc/Nullraptor` para el trabajo diario (Modelos3D): montaje directo,
+- Carpeta compartida `C:\Users\danoa\Nullraptor` → `/pc/Nullraptor` para el trabajo diario (Modelos3D): montaje directo,
   sin límite. Se crea y se pide desde Ajustes cuando esté la imagen nueva (hace falta `ejecutar` en el PC).
 - Pruebas [O]: 116/116 (puente falso por trozos con la misma lógica que `puente.ps1`).
 

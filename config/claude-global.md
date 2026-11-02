@@ -48,6 +48,9 @@ a medias, dile a Daniel dónde se quedó y propón seguir.
   - Pantalla: `ventanas`, `enfocar ventana=…`, `captura [ventana=…]` (guarda un PNG: ábrelo con Read para verlo),
     `raton accion=clic x=… y=…` (coordenadas de pantalla: pásalas desde la captura con su `escala`), `teclado
     texto=…` o `teclas=^s`. Mira con una captura antes y después de cada acción.
+    Antes de escribir, comprueba en la captura qué ventana y qué campo reciben el texto y que no haya nada
+    seleccionado: muchos programas (el Bloc de notas, editores) reabren documentos de Daniel. Para probar, usa un
+    documento nuevo (Ctrl+N). Si escribes donde no debías, deshaz (Ctrl+Z) y no guardes.
   - Cuidado: no toques `%LOCALAPPDATA%\Nullraptor` (clave del cofre, token del puente), `~\.nullraptor` ni
     credenciales; no instales, desinstales ni borres nada en el PC sin decírselo antes a Daniel, y no cambies la
     configuración de Windows. Si el puente dice «modo solo consulta», Daniel lo ha cortado: no intentes saltártelo.
