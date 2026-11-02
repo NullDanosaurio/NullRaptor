@@ -1,8 +1,9 @@
 // Ajustes: versión y actualización, cómo se entra al panel (y las passkeys), carpetas y servidores MCP.
-// Cambiar el acceso y las carpetas desde aquí llega con la fase 5 (lanzador simple); de momento se ven.
-import { Download, FolderTree, GitBranch, KeyRound, LogOut, Plug, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+// El acceso y las carpetas de Windows se cambian aquí y los aplica el lanzador (componentes/AjustesEquipo.jsx).
+import { Download, FolderTree, GitBranch, KeyRound, LogOut, Plug, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { haceCuanto, post, useDatos } from '../api.js';
+import AjustesEquipo from '../componentes/AjustesEquipo.jsx';
 import { usePasskey } from '../componentes/Passkey.jsx';
 import { Qr } from '../componentes/Sesiones.jsx';
 import { Boton, Cabecera, Cargando, Fallo, Insignia, Tarjeta } from '../componentes/ui.jsx';
@@ -76,8 +77,7 @@ export default function Ajustes() {
   const [fallo, setFallo] = useState(null);
   const { intentar, aviso } = usePasskey(setFallo);
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
-  const a = datos?.acceso;
-  const mcp = datos?.mcp;
+    const mcp = datos?.mcp;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -89,17 +89,10 @@ export default function Ajustes() {
           <div className="space-y-6">
             <Actualizacion version={datos.version} />
 
-            <Tarjeta titulo="Acceso" icono={ShieldCheck}>
-              <dl className="divide-y divide-borde">
-                <Fila etiqueta="Este equipo">Siempre, sin código.</Fila>
-                <Fila etiqueta="Red de casa">{a.red ? 'Con código de acceso (sin terminal ni aprobaciones).' : 'Cerrado.'}</Fila>
-                <Fila etiqueta="Desde fuera">{a.dominio ? <>Por Tailscale con passkey: <span className="font-mono">https://{a.dominio}</span></> : 'Cerrado (sin Tailscale).'}</Fila>
-              </dl>
-              <p className="mt-2 text-[12px] text-apagado">Se cambia con el lanzador de Windows (<span className="font-mono">-Red</span>, Tailscale).</p>
-            </Tarjeta>
+            <AjustesEquipo />
             <Passkeys intentar={intentar} />
 
-            <Tarjeta titulo="Carpetas" icono={FolderTree}>
+            <Tarjeta titulo="Datos" icono={FolderTree}>
               <dl className="divide-y divide-borde">
                 <Fila etiqueta="Trabajo"><span className="font-mono text-[12px]">{datos.carpetas.trabajo}</span></Fila>
                 <Fila etiqueta="Bóveda">{datos.carpetas.boveda ? <span className="font-mono text-[12px]">{datos.carpetas.boveda}</span> : <span className="text-apagado">sin bóveda</span>}</Fila>

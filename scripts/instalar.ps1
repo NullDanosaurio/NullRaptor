@@ -1,7 +1,7 @@
 ﻿# Instala o actualiza Nullraptor en este equipo desde el USB (doble clic en "Instalar Nullraptor.cmd").
 # Nullraptor solo corre en Docker: aquí no se instala ni git ni Node. Pasos: Docker Desktop si falta (winget) y en
 # marcha, cofre del USB a ~/.nullraptor, sesión en el registro si la imagen lo pide, imagen, lanzador y acceso
-# directo en el escritorio, y arranque. Se puede repetir: lo que ya está, se deja o se actualiza.
+# directo en el escritorio (con el icono del raptor), y arranque. El acceso y las carpetas se cambian luego en Ajustes. Se puede repetir: lo que ya está, se deja o se actualiza.
 # Este archivo vive en el repo (scripts/instalar.ps1) y en la imagen; el USB guarda una copia que se refresca al terminar.
 $ErrorActionPreference = 'Stop'
 $imagen = if ($env:NULLRAPTOR_IMAGEN) { $env:NULLRAPTOR_IMAGEN } else { 'ghcr.io/nulldanosaurio/nullraptor:main' }
@@ -68,15 +68,18 @@ $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force $casa | Out-Null
 $tmp = docker create $imagen
 docker cp "${tmp}:/nullraptor/scripts/arrancar.ps1" $lanzador
+$icono = Join-Path $casa 'raptor.ico'
+try { docker cp "${tmp}:/nullraptor/panel/dist/raptor.ico" $icono } catch { }
 try { docker cp "${tmp}:/nullraptor/scripts/instalar.ps1" $PSCommandPath } catch { }
 docker rm $tmp | Out-Null
 $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Nullraptor.lnk'))
 $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$lanzador`""
-$lnk.WorkingDirectory = $casa; $lnk.Save()
+$lnk.WorkingDirectory = $casa
+if (Test-Path $icono) { $lnk.IconLocation = "$icono,0" }
+$lnk.Save()
 
 Write-Host "`nNullraptor listo (imagen $imagen). Acceso directo `"Nullraptor`" en el escritorio."
 Write-Host 'La primera vez, dentro de Claude, escribe /login para tener los conectores de claude.ai (21st, Notion...).'
-$red = (Read-Host '¿Abrir el panel a los navegadores de tu casa, con código de acceso? (s/N)') -match '^s'
-if ((Read-Host '¿Lo arranco ahora? (S/n)') -notmatch '^n') { if ($red) { & $lanzador -Red } else { & $lanzador -SoloEquipo } }
-elseif ($red) { New-Item -ItemType File -Force (Join-Path $casa 'red') | Out-Null } # se recuerda para el próximo arranque
+Write-Host 'El panel se abre en su propia ventana. La red de casa, Tailscale y las carpetas de Windows se activan en Ajustes.'
+if ((Read-Host '¿Lo arranco ahora? (S/n)') -notmatch '^n') { & $lanzador }

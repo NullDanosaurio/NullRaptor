@@ -1,5 +1,20 @@
 # Registro de trabajo
 
+## 02/11/2026 — Fase 5: lanzador simple y Nullraptor como aplicación
+- [U] Acceso (red de casa, Tailscale) y carpetas de Windows desde Ajustes, desde el PC o por Tailscale con passkey
+  confirmada (opción recomendada que eligió Daniel). [U] Daniel pide que la web se abra como una aplicación propia
+  (como Spotify o Discord): Edge/Chrome en modo app con perfil aparte + manifiesto para el móvil. Un ejecutable propio
+  (Electron) queda para más adelante si lo pide.
+- Panel: `panel/lib/equipo.mjs` y `rutas-equipo.mjs` (pedido → `$TRABAJO_DIR/equipo/pedido.json`; resultado del
+  lanzador en `resultado.json`), Ajustes editable (`componentes/AjustesEquipo.jsx`), manifiesto e iconos PNG/ICO.
+- Lanzador: doble clic sin opciones; aplica el pedido (todo o nada) al abrirlo y en la tarea de cada 5 minutos, abre
+  la ventana propia, pasa `NULLRAPTOR_LANZADOR` y `NULLRAPTOR_CARPETAS` al contenedor. Corregido: la raíz de una
+  unidad (`D:\`) no se montaba bien. Instalador: sin la pregunta de la red; acceso directo con icono.
+- Pruebas [O]: 98/98 (pedido, permisos, raíz de unidad, manifiesto). Expresión de rutas sin vuelta atrás exponencial
+  (la primera versión se colgaba con 5000 caracteres).
+- [?] El lanzador y el instalador **sin ejecutar**: no hay Windows ni PowerShell en el contenedor (descargar
+  PowerShell para comprobar la sintaxis no se permitió). Solo revisados a mano y con un contador de llaves y comillas.
+
 ## 02/11/2026 — Fase 4: una sola interfaz (F4-1 a F4-3)
 - [U] Decisiones de Daniel: la terminal de Claude va dentro de Proyectos (sin pestaña Remoto); la bóveda se reparte
   (nota en cada proyecto; buscador y cambios en Resumen; sin pestaña); en el Chat se elige Claude o Codex (sin «Las dos»).

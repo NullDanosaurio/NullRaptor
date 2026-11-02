@@ -1,0 +1,16 @@
+{
+  "name": "Nullraptor",
+  "short_name": "Nullraptor",
+  "description": "Tu agente: proyectos, chat con Claude y Codex, herramientas.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0c0b",
+  "theme_color": "#0a0c0b",
+  "icons": [
+    { "src": "/raptor.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/raptor-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/raptor-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

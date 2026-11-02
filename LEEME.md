@@ -23,18 +23,22 @@ Procedencia: [O] observado · [P] propuesta · [?] pendiente.
 
 Decisión [U] 29/10/2026: Nullraptor **nunca corre sobre el sistema**, solo en Docker, para que funcione igual en
 cualquier equipo con Docker. Flujo: lanzador → Docker (se instala y arranca si hace falta) → imagen de GitHub
-(`ghcr.io/nulldanosaurio/nullraptor:main`) → contenedor con el servidor y el panel → navegador en
-`http://localhost:4321`. El contenedor (`nullraptor`) sigue en marcha al cerrar la ventana; si ya lo está, el
-lanzador solo abre el navegador. Pararlo: `docker stop nullraptor`.
+(`ghcr.io/nulldanosaurio/nullraptor:main`) → contenedor con el servidor y el panel → el panel en **su propia ventana**,
+como una aplicación (`http://localhost:4321` en Edge o Chrome en modo app: sin pestañas ni barra de direcciones, con
+el icono del raptor y un perfil aparte en `%LOCALAPPDATA%\Nullraptor\ventana`; sin ninguno de los dos, el navegador
+de siempre). En el móvil, «Añadir a pantalla de inicio» lo abre igual, a pantalla completa (`manifest.webmanifest`).
+El contenedor (`nullraptor`) sigue en marcha al cerrar la ventana; si ya lo está, el lanzador solo la abre.
+Pararlo: `docker stop nullraptor`.
 
 **Equipo nuevo desde el USB:** doble clic en `Instalar Nullraptor.cmd` (raíz del USB), que ejecuta
 `Nullraptor\instalar.ps1`, copia de `scripts/instalar.ps1`. Instala Docker Desktop con winget si falta (pide
 administrador; si Windows pide reiniciar por WSL 2, reinicia y repite) y lo arranca, copia el cofre del USB a
 `~/.nullraptor/` (si ya hay uno distinto, pregunta), descarga la imagen (si el registro pide sesión, la pide una
 vez: usuario de GitHub y token clásico con `read:packages`), deja el lanzador en `%LOCALAPPDATA%\Nullraptor`
-(sacado de la imagen), crea el acceso directo y arranca. Al terminar refresca la copia del USB desde la imagen.
+(sacado de la imagen), crea el acceso directo (con el icono del raptor) y arranca. Al terminar refresca la copia del USB desde la imagen.
 
-**Lanzador** (`scripts/arrancar.ps1`; acceso directo «Nullraptor» o `Nullraptor.cmd` en el repo): actualiza la
+**Lanzador** (`scripts/arrancar.ps1`; acceso directo «Nullraptor» o `Nullraptor.cmd` en el repo): **doble clic, sin
+opciones** (fase 5, 02/11/2026). Actualiza la
 imagen (sin red, usa la que haya), prueba la clave con un contenedor de un solo uso y levanta el panel. La clave se
 pide **solo la primera vez** en cada equipo: se recuerda en `%LOCALAPPDATA%\Nullraptor\clave.dpapi`, cifrada con
 DPAPI (solo tu usuario de Windows en ese equipo puede leerla). Si deja de abrir el cofre, se olvida y se vuelve a
@@ -53,7 +57,17 @@ parado, no lo arranca. Se hablan por archivos del volumen (`$TRABAJO_DIR/actuali
 `%LOCALAPPDATA%\Nullraptor\actualizar.log`. `-SinActualizar` quita la tarea (se recuerda; `-ConActualizar` la vuelve a
 poner). La tarea se crea la primera vez que se abre el lanzador ya actualizado.
 
-**Red de casa** (lanzador con `-Red`, se recuerda; `-SoloEquipo` lo quita; el instalador lo pregunta): el panel
+**Acceso y carpetas desde Ajustes** (decisión [U] 02/11/2026): la red de casa, Tailscale y las carpetas de Windows
+que ve la IA (cada una, con lectura y escritura, en `/pc/<nombre>`) se cambian en el panel → Ajustes, desde este equipo o por Tailscale con la passkey confirmada (con solo
+el código de casa, no). El contenedor no toca Windows: el panel deja el pedido en `$TRABAJO_DIR/equipo/pedido.json`
+(`panel/lib/equipo.mjs`) y el lanzador lo aplica al abrirlo o en su tarea de cada 5 minutos, cuando no hay sesiones
+abiertas (o en seguida con «Aplicar ahora», que las cierra). Todo o nada: si una carpeta no existe, contiene el cofre o
+la clave, o Tailscale no está listo, no cambia nada y Ajustes enseña el motivo (`resultado.json`). Cada pedido queda en
+el registro de accesos y avisa por ntfy. La regla del firewall (red de casa) pide administrador: la tarea no puede, así
+que la crea el siguiente arranque a mano. **Rescate** si el panel no responde: lanzador con `-SoloEquipo`,
+`-SinTailscale` o `-SinCarpetas` (y siguen `-Red`, `-Tailscale` y `-Carpeta 'C:\ruta'`).
+
+**Red de casa** (Ajustes → «Red de casa»): el panel
 se publica en todas las interfaces y el lanzador muestra las direcciones (`http://<IP>:4321`) y el **código de
 acceso**. Cada navegador lo escribe una vez en `/entrar` y queda con una cookie de sesión (HttpOnly, SameSite=Strict,
 30 días); este equipo entra solo. Solo se aceptan Host de casa (IP privada o nombre del equipo) y, como mucho, 10
@@ -62,7 +76,7 @@ reiniciar cierra todas las sesiones. Abre una regla del firewall de Windows solo
 Wi-Fi está como pública en Windows, no llegará). Sin HTTPS: úsalo solo en tu red de confianza, no en Wi-Fi públicas;
 ojo con VPN tipo ZeroTier, cuyos miembros también son «red privada».
 
-**Desde cualquier parte: Tailscale + passkey** (lanzador con `-Tailscale`, se recuerda; `-SinTailscale` lo quita).
+**Desde cualquier parte: Tailscale + passkey** (Ajustes → «Desde cualquier parte»).
 Antes, una vez: instala Tailscale en el PC y en el móvil con la misma cuenta y activa MagicDNS y los certificados
 HTTPS en https://login.tailscale.com/admin/dns. El lanzador ejecuta `tailscale serve` (nunca Funnel): el panel sigue
 publicado solo en `127.0.0.1` y Tailscale lo sirve por HTTPS en `https://<pc>.<tailnet>.ts.net` únicamente a tus

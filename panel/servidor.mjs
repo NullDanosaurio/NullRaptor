@@ -19,7 +19,9 @@ import { crearEntrada, esRemota, hostDominio, quienEs } from './lib/entrada.mjs'
 import { Passkeys, Sesiones } from './lib/passkey.mjs';
 import { Registro } from './lib/registro.mjs';
 import { Remoto } from './lib/remoto.mjs';
+import { Equipo } from './lib/equipo.mjs';
 import { Proyectos } from './lib/proyectos.mjs';
+import { crearRutasEquipo } from './lib/rutas-equipo.mjs';
 import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
 import { crearRutasProyectos } from './lib/rutas-proyectos.mjs';
 import { crearRutasRemoto } from './lib/rutas-remoto.mjs';
@@ -31,7 +33,7 @@ const DIST = path.join(AQUI, 'dist');
 const MAX_CUERPO = 64 * 1024;
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.json': 'application/json',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
 };
 const SEGURIDAD = {
   'X-Content-Type-Options': 'nosniff',
@@ -126,6 +128,7 @@ export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
   dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
   env = process.env, prepararMcp = null, proyectos = new Proyectos({ trabajo, memoria, env }),
+  equipo = new Equipo({ trabajo, env }),
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -137,6 +140,7 @@ export function crearServidor({
   const alCambiar = () => { try { prepararMcp?.(); } catch (e) { console.warn(`[panel] MCP: ${e.message}`); } };
   const rutasHerramientas = crearRutasHerramientas({ trabajo, env, sesiones, registro, alCambiar, leerCuerpo, json });
   const rutasProyectos = crearRutasProyectos({ proyectos, sesiones, registro, leerCuerpo, json });
+  const rutasEquipo = crearRutasEquipo({ equipo, sesiones, registro, leerCuerpo, json });
   // Para la actualización automática: cuántas sesiones hay abiertas (la tarea de Windows no corta ninguna).
   let latido = null;
   if (actualizacion) {
@@ -219,6 +223,7 @@ export function crearServidor({
       if (await rutasRemoto(req, res, p, ctx)) return;
       if (await rutasHerramientas(req, res, p, ctx)) return;
       if (await rutasProyectos(req, res, p, ctx)) return;
+      if (await rutasEquipo(req, res, p, ctx)) return;
 
       // Chats abiertos: /api/chats/:id/(eventos|mensajes|cerrar)
       const m = p.match(/^\/api\/chats\/([0-9a-f-]{36})\/(eventos|mensajes|cerrar)$/);
