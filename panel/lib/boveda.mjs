@@ -71,6 +71,45 @@ export function leerNota(raiz, relativa) {
   return { ruta: relativa, nombre, datos, cuerpo, cambiada: st.mtimeMs, enlaces: enlaces(cuerpo), retroenlaces: retro };
 }
 
+/**
+ * Grafo de la bóveda, como el de Obsidian: cada nota es un nodo y cada [[enlace]] una conexión (sin dirección ni
+ * repetidas). Los enlaces se resuelven como en Obsidian: por ruta («Proyectos/X») o por nombre de nota; los que no
+ * llevan a ninguna nota quedan como nodos «fantasma» (la nota aún no existe).
+ */
+export function grafo(raiz) {
+  const notas = listarNotas(raiz);
+  const porNombre = new Map();
+  const porRuta = new Map();
+  for (const n of notas) {
+    const k = n.nombre.toLowerCase();
+    if (!porNombre.has(k)) porNombre.set(k, n.ruta);
+    porRuta.set(n.ruta.replace(/\.md$/i, '').toLowerCase(), n.ruta);
+  }
+  const nodos = notas.map((n) => ({ id: n.ruta, nombre: n.nombre, carpeta: n.ruta.includes('/') ? n.ruta.split('/')[0] : '' }));
+  const fantasmas = new Map();
+  const aristas = [];
+  const vistas = new Set();
+  for (const n of notas) {
+    if (n.bytes > MAX_NOTA) continue;
+    let texto;
+    try { texto = fs.readFileSync(path.join(raiz, n.ruta), 'utf8'); } catch { continue; }
+    for (const e of enlaces(texto)) {
+      const k = e.toLowerCase().replace(/\.md$/, '');
+      let destino = porRuta.get(k) ?? porNombre.get(k.split('/').pop());
+      if (!destino) {
+        destino = `fantasma:${k}`;
+        if (!fantasmas.has(destino)) fantasmas.set(destino, { id: destino, nombre: e, carpeta: '', fantasma: true });
+      }
+      if (destino === n.ruta) continue;
+      const clave = [n.ruta, destino].sort().join('\0');
+      if (vistas.has(clave)) continue;
+      vistas.add(clave);
+      aristas.push({ origen: n.ruta, destino });
+    }
+  }
+  return { nodos: [...nodos, ...fantasmas.values()], aristas };
+}
+
 /** Búsqueda simple sin mayúsculas ni acentos, en nombre y contenido; con fragmento. */
 export function buscar(raiz, consulta, limite = 30) {
   const normal = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();

@@ -13,7 +13,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Actualizacion } from './lib/actualizacion.mjs';
 import { crearAcceso, hostRed, leerOCrearCodigo, paginaEntrar } from './lib/acceso.mjs';
-import { buscar, cambiosRecientes, estadoGit, leerNota, listarNotas } from './lib/boveda.mjs';
+import { buscar, cambiosRecientes, estadoGit, grafo, leerNota, listarNotas } from './lib/boveda.mjs';
 import { Chats } from './lib/chats.mjs';
 import { crearEntrada, esRemota, hostDominio, quienEs } from './lib/entrada.mjs';
 import { Passkeys, Sesiones } from './lib/passkey.mjs';
@@ -176,6 +176,7 @@ export function crearServidor({
     'GET /api/boveda/notas': () => (memoria ? listarNotas(memoria) : [503, sinBoveda()]),
     'GET /api/boveda/nota': (q) => (memoria ? leerNota(memoria, q.get('ruta')) ?? [404, { error: 'Nota no encontrada.' }] : [503, sinBoveda()]),
     'GET /api/boveda/buscar': (q) => (memoria ? buscar(memoria, q.get('q')) : [503, sinBoveda()]),
+    'GET /api/boveda/grafo': () => (memoria ? grafo(memoria) : [503, sinBoveda()]),
     'GET /api/boveda/cambios': () => (memoria ? cambiosRecientes(memoria, 20) : [503, sinBoveda()]),
     'GET /api/chats': () => ({ abiertos: chats.lista(), guardados: chats.guardados() }),
     'GET /api/chats/guardado': (q) => chats.leerGuardado(q.get('archivo')) ?? [404, { error: 'Chat no encontrado.' }],
