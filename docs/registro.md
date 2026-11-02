@@ -1,5 +1,12 @@
 # Registro de trabajo
 
+## 02/11/2026 — Puente con el PC probado
+- [O] Desde el contenedor, contra MAQUINOTE (Windows 11 Pro): responden `estado`, `sistema`, `procesos`, `puertos`,
+  `programas`, `winget-buscar` y `notificar`. Se rechazan una orden fuera de la lista, un token incorrecto y una
+  URL `file://`. `abrir-url` con una dirección válida no se probó (abre el navegador).
+- Arreglos en `puente.ps1`: las listas de un solo elemento llegaban como objeto (`,@(...)`), y la salida de winget
+  llegaba con los acentos rotos (se lee como UTF-8).
+
 ## 02/11/2026 — El lanzador se reiniciaba sin pedirlo
 - [U] Nullraptor se reinició sin pedir la actualización; Windows mostraba «El término '#' no se reconoce» y lo mismo
   con `param` en `arrancar.ps1`.

@@ -44,22 +44,25 @@ $ordenes = [ordered]@{
     }
   }
   procesos = { param($a)
-    @(Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 40 | ForEach-Object { @{ nombre = $_.ProcessName; pid = $_.Id; memoriaMB = [math]::Round($_.WorkingSet64 / 1MB) } })
+    ,@(Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 40 | ForEach-Object { @{ nombre = $_.ProcessName; pid = $_.Id; memoriaMB = [math]::Round($_.WorkingSet64 / 1MB) } })
   }
   puertos = { param($a)
     $nombres = @{}; Get-Process | ForEach-Object { $nombres[$_.Id] = $_.ProcessName }
-    @(Get-NetTCPConnection -State Listen | Sort-Object LocalPort -Unique | ForEach-Object { @{ direccion = $_.LocalAddress; puerto = $_.LocalPort; proceso = $nombres[[int]$_.OwningProcess] } })
+    ,@(Get-NetTCPConnection -State Listen | Sort-Object LocalPort -Unique | ForEach-Object { @{ direccion = $_.LocalAddress; puerto = $_.LocalPort; proceso = $nombres[[int]$_.OwningProcess] } })
   }
   programas = { param($a)
     $filtro = if ($a.filtro) { Texto $a 'filtro' 80 } else { $null }
     $claves = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
-    @(Get-ItemProperty $claves -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and (-not $filtro -or $_.DisplayName -like "*$([Management.Automation.WildcardPattern]::Escape($filtro))*") } |
+    ,@(Get-ItemProperty $claves -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and (-not $filtro -or $_.DisplayName -like "*$([Management.Automation.WildcardPattern]::Escape($filtro))*") } |
       Sort-Object DisplayName -Unique | ForEach-Object { @{ nombre = $_.DisplayName; version = $_.DisplayVersion } })
   }
   'winget-buscar' = { param($a)
     $q = Texto $a 'texto' 60 '[\w .+-]{2,60}'
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'winget no está en este PC.' }
-    (& winget search --query $q --accept-source-agreements --disable-interactivity 2>&1 | Out-String).Trim()
+    # winget escribe UTF-8; sin esto se lee con la página de la consola y los acentos salen rotos.
+    $antes = [Console]::OutputEncoding
+    try { [Console]::OutputEncoding = [Text.Encoding]::UTF8; (& winget search --query $q --accept-source-agreements --disable-interactivity 2>&1 | Out-String).Trim() }
+    finally { [Console]::OutputEncoding = $antes }
   }
   'abrir-url' = { param($a)
     $url = Texto $a 'url' 2000 'https?://[^\s"''<>]+'
@@ -79,6 +82,7 @@ $ordenes = [ordered]@{
   }
 }
 
+# Las órdenes que dan listas las devuelven con «,@(...)»: si no, PowerShell desenvuelve la de un solo elemento.
 function Contestar($flujo, $datos) {
   $bytes = [Text.Encoding]::UTF8.GetBytes(($datos | ConvertTo-Json -Depth 6 -Compress) + "`n")
   $flujo.Write($bytes, 0, $bytes.Length)
