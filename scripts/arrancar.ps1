@@ -1,4 +1,4 @@
-﻿﻿# Lanzador de Nullraptor en Windows: doble clic y listo. Siempre dentro de Docker, nunca sobre el sistema.
+﻿# Lanzador de Nullraptor en Windows: doble clic y listo. Siempre dentro de Docker, nunca sobre el sistema.
 # Arranca Docker Desktop si hace falta, actualiza la imagen, levanta el contenedor con el servidor y el panel, y abre
 # el panel en una ventana propia, como una aplicación (Edge o Chrome en modo app: sin pestañas ni barra de direcciones).
 # La clave del cofre se pide solo la primera vez y se recuerda cifrada con DPAPI (solo tu usuario de Windows en

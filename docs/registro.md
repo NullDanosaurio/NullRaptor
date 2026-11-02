@@ -1,5 +1,16 @@
 # Registro de trabajo
 
+## 02/11/2026 — El lanzador se reiniciaba sin pedirlo
+- [U] Nullraptor se reinició sin pedir la actualización; Windows mostraba «El término '#' no se reconoce» y lo mismo
+  con `param` en `arrancar.ps1`.
+- Causa [O]: desde ffd983a, `arrancar.ps1` empezaba con dos BOM. PowerShell quita uno y el otro queda delante de la
+  primera línea: `param(...)` deja de ser lo primero, falla, y los modificadores se pierden. La tarea de cada 5 minutos
+  (`-Actualizar`) hacía un arranque normal, sin mirar si había sesiones abiertas.
+- Arreglo: un solo BOM, y `tests/scripts-windows.test.mjs` comprueba que todos los .ps1 llevan exactamente uno.
+- [?] La CI no pasa `REVISION` a la imagen (Ajustes no muestra la versión). Falta añadir en `imagen.yml`
+  `build-args: REVISION=${{ github.sha }}`; el token del agente no puede cambiar workflows: lo hace Daniel.
+- Pruebas [O]: 109/109. La copia instalada del lanzador se refresca desde la imagen en el siguiente arranque completo.
+
 ## 02/11/2026 — Instalar, puente con el PC, reinicios sin perder trabajo, Ruflo y tareas
 - [U] Daniel: la IA no puede instalar casi nada, no puede hablar con el PC, las actualizaciones cortan a los agentes
   y lo dejan a medias sin acordarse, y en los proyectos no se usa Ruflo ni se listan las tareas al pedir un desarrollo.
