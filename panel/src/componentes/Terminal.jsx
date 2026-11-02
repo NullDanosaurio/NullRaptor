@@ -2,7 +2,8 @@
 // salen por POST, en orden. Por Tailscale, si el servidor pide confirmar la passkey, se pide con un botón (Safari
 // solo deja usar la passkey tras un toque). Copiar: Ctrl+C (o Cmd+C) con texto seleccionado copia en vez de interrumpir;
 // Ctrl+V pega lo copiado en tu equipo (las imágenes y archivos se suben y llegan por su ruta);
-// Claude Code captura el ratón, así que se selecciona con Mayús+arrastrar. En el móvil, «Texto» muestra la pantalla
+// Claude Code va a pantalla completa y captura el ratón: al arrastrar selecciona él y copia mandando un OSC 52, que
+// aquí pasa al portapapeles del navegador (Mayús+arrastrar selecciona con xterm). En el móvil, «Texto» muestra la pantalla
 // como texto normal para seleccionarlo con el dedo. Debajo, el redactor (Redactor.jsx) para pegar, dictar y adjuntar
 // archivos (imágenes, PDF, Office, texto y código). Los enlaces se abren en otra pestaña (los normales y los OSC 8
 // que pinta Claude Code).
@@ -13,6 +14,7 @@ import '@xterm/xterm/css/xterm.css';
 import { Copy, FileText, KeyRound, RotateCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { confirmarPasskey, post, subir } from '../api.js';
+import { textoOsc52 } from '../osc52.js';
 import Redactor from './Redactor.jsx';
 import { Boton, cx } from './ui.jsx';
 
@@ -58,6 +60,8 @@ export default function Terminal({ id, className }) {
   const [estado, setEstado] = useState('comprobando'); // comprobando | confirmar | viva | perdida | fin
   const [aviso, setAviso] = useState(null);
   const [intento, setIntento] = useState(0);
+  const pendienteCopia = useRef(null); // lo que Claude Code quiso copiar si el navegador no lo dejó (lo copia «Copiar»)
+  const avisarCopiado = useCallback(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500); }, []);
 
   const confirmar = useCallback(async () => {
     setAviso(null);
@@ -86,6 +90,14 @@ export default function Terminal({ id, className }) {
       e.preventDefault();
       if (e.type === 'keydown' && term.hasSelection()) alPortapapeles(term.getSelection()).then(() => term.clearSelection()).catch(() => {});
       return false;
+    });
+    // Lo que copia Claude Code (OSC 52) va al portapapeles del navegador.
+    term.parser.registerOscHandler(52, (datos) => {
+      const t = textoOsc52(datos);
+      if (!t) return true;
+      alPortapapeles(t).then(() => { pendienteCopia.current = null; avisarCopiado(); }).catch(() => { pendienteCopia.current = t; });
+      if (!navigator.clipboard?.writeText) term.focus(); // el textarea temporal se lleva el foco
+      return true;
     });
     try { fit.fit(); } catch { /* sin tamaño aún */ }
     let fuente = null;
@@ -154,13 +166,13 @@ export default function Terminal({ id, className }) {
     }
   }, [id]);
 
-  // Copia la selección; sin selección, toda la pantalla.
+  // Copia la selección; sin ella, lo que Claude Code no pudo copiar o, si no hay, toda la pantalla.
   const copiar = useCallback(async (valor) => {
     const term = xterm.current;
-    const t = valor ?? (term ? textoDe(term, term.hasSelection()) : '');
+    const t = valor ?? (term?.hasSelection() ? term.getSelection() : (pendienteCopia.current ?? (term ? textoDe(term, false) : '')));
     if (!t) return;
-    try { await alPortapapeles(t); setCopiado(true); setTimeout(() => setCopiado(false), 1500); } catch { setAviso('No se pudo copiar.'); }
-  }, []);
+    try { await alPortapapeles(t); pendienteCopia.current = null; avisarCopiado(); } catch { setAviso('No se pudo copiar.'); }
+  }, [avisarCopiado]);
 
   return (
     <div className={cx('flex min-h-0 flex-col gap-2', className)}>

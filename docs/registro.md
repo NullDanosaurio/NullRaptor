@@ -1,5 +1,13 @@
 # Registro de trabajo
 
+## 02/11/2026 — Copiar desde la terminal
+- [U] Ya se pega, pero no se copia nada de la terminal del panel.
+- Causa: Claude Code 2.1 va a pantalla completa y captura el ratón (`?1049h`, `?1000h`–`?1006h`): al arrastrar
+  selecciona él y copia mandando un OSC 52 (`ESC ]52;c;<base64>`), porque el contenedor no tiene portapapeles.
+  xterm.js no entiende OSC 52 y lo tiraba. `Terminal.jsx` lo recoge (`panel/src/osc52.js`) y lo copia al
+  portapapeles del navegador; si el navegador no deja copiar sin un clic, el botón «Copiar» lo copia.
+- Pruebas [O]: 103/103. Web construida. Sin probar todavía en el navegador de Daniel (aquí no arranca Chromium).
+
 ## 02/11/2026 — Pegar con Ctrl+V en la terminal
 - [U] Daniel no podía pegar en la terminal del panel lo copiado de otra sesión.
 - Causa: xterm convierte Ctrl+V en ^V y anula el pegado del navegador; Claude Code lo toma como «pegar imagen» del
