@@ -1,0 +1,4 @@
+# Entorno de voz de Nullraptor (scripts/voz-instalar.sh). Versiones exactas, probadas el 03/11/2026.
+faster-whisper==1.2.1
+kokoro-onnx==0.6.1
+soundfile==0.14.0
