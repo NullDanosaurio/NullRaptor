@@ -92,6 +92,10 @@ body {
 .prosa code { font-family: var(--font-mono); font-size: 0.86em; background: var(--color-elevado); border: 1px solid var(--color-borde); border-radius: 5px; padding: 0.08rem 0.32rem; }
 .prosa pre { background: #0c0f0d; border: 1px solid var(--color-borde); border-radius: 10px; padding: 0.85rem 1rem; overflow-x: auto; }
 .prosa pre code { background: none; border: 0; padding: 0; font-size: 0.82rem; }
+/* Bloque de código con cabecera (Markdown.jsx): el marco va en el contenedor; el <pre> de dentro, sin borde. */
+.prosa .bloque-codigo { margin: 0.7rem 0; background: #0c0f0d; border: 1px solid var(--color-borde); border-radius: 10px; overflow: hidden; }
+.prosa .bloque-codigo-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.2rem 0.35rem 0.2rem 0.85rem; border-bottom: 1px solid var(--color-borde); color: var(--color-apagado); font-size: 11px; }
+.prosa .bloque-codigo pre { margin: 0; border: 0; border-radius: 0; }
 .prosa blockquote { border-left: 3px solid var(--color-raptor-oscuro); padding: 0.1rem 0 0.1rem 0.9rem; color: var(--color-tenue); }
 .prosa hr { border: 0; border-top: 1px solid var(--color-borde); margin: 1.5rem 0; }
 .prosa .tabla { overflow-x: auto; border: 1px solid var(--color-borde); border-radius: 10px; margin: 0.8rem 0; }

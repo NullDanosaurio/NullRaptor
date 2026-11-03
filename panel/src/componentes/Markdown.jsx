@@ -2,6 +2,8 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { enlace } from '../api.js';
+import { lenguajeDe, textoDeCodigo } from '../codigo.js';
+import Copiar from './Copiar.jsx';
 
 const ROTO = '#nota-inexistente';
 
@@ -32,6 +34,20 @@ const componentes = {
     if (href === ROTO) return <a className="roto" title="Esta nota aún no existe">{children}</a>;
     const externo = /^https?:/i.test(href);
     return <a href={href} {...(externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>{children}</a>;
+  },
+  // Bloques de código con cabecera: el lenguaje y «Copiar» (siempre visible, también en el móvil), que copia el
+  // código exacto, sin las ``` ni la etiqueta del lenguaje.
+  pre: ({ node, children }) => {
+    const lenguaje = lenguajeDe(node);
+    return (
+      <div className="bloque-codigo">
+        <div className="bloque-codigo-cabecera">
+          <span className="truncate font-mono">{lenguaje ?? ''}</span>
+          <Copiar texto={() => textoDeCodigo(node)} titulo="Copiar el código" />
+        </div>
+        <pre>{children}</pre>
+      </div>
+    );
   },
   table: ({ children }) => <div className="tabla"><table>{children}</table></div>,
   img: ({ alt }) => <span className="text-apagado">[imagen: {alt}]</span>, // sin cargas externas
