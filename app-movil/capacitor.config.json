@@ -4,10 +4,13 @@
   "webDir": "www",
   "server": {
     "androidScheme": "https",
-    "allowNavigation": ["*.ts.net"]
+    "allowNavigation": [
+      "*.ts.net"
+    ]
   },
   "android": {
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": false
-  }
+  },
+  "appendUserAgent": "NullraptorApp/0.1"
 }

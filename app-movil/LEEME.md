@@ -6,10 +6,13 @@ móvil, pensado para el modo voz (Jarvis). La interfaz es la del panel: la app n
 ## Cómo funciona
 
 - La primera vez pide la dirección del panel (`https://<equipo>.<red>.ts.net`, solo `*.ts.net`) y la recuerda.
-- Se entra con la passkey del panel, igual que en el navegador. Para eso, la app activa WebAuthn en su WebView
-  (modo «app», `MainActivity.java`) y el panel publica `/.well-known/assetlinks.json` con el paquete y la huella del
-  certificado de firma que hay en `firma.json` (y acepta el origen `android:apk-key-hash:…` de esa huella).
-  Autorizar otra firma = añadir su huella a `firma.json` con un commit.
+- Se entra con la passkey del panel **en una pestaña de Chrome**: dentro de la app (WebView) la passkey no funciona,
+  porque Android exige que Google pueda leer el `assetlinks.json` del dominio y el panel solo existe en Tailscale.
+  La app genera un verificador secreto, abre `/vincular-app?reto=sha256(verificador)` en Chrome, entras con la
+  passkey y vuelves con «Volver a la app» (`es.nullraptor.movil://sesion?codigo=…`); la app canjea el código con su
+  verificador en `/entrar/app` (como PKCE: un código interceptado no sirve sin el verificador). Lo mismo para
+  reconfirmar la passkey cada hora (terminal). Detalle en `panel/lib/entrada-app.mjs` y `MainActivity.java`.
+- La app se identifica añadiendo `NullraptorApp/0.1` a su user agent (`capacitor.config.json`).
 - Necesita Tailscale activo en el móvil.
 
 ## Compilar (en el contenedor de Nullraptor)

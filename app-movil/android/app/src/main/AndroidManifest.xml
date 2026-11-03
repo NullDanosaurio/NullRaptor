@@ -22,6 +22,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Entrada por Chrome (MainActivity): es.nullraptor.movil://entrar y es.nullraptor.movil://sesion?codigo=… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="es.nullraptor.movil" />
+            </intent-filter>
+
         </activity>
 
         <provider
@@ -34,6 +42,13 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
     </application>
+
+    <!-- Para encontrar Chrome (pestañas personalizadas) en Android 11 y posteriores. -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
 
     <!-- Permissions -->
 
