@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Base64;
 import android.webkit.WebView;
+import androidx.activity.OnBackPressedCallback;
 import androidx.browser.customtabs.CustomTabsIntent;
 import com.getcapacitor.BridgeActivity;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,19 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         atender(getIntent());
+        // Atrás vuelve a la pantalla anterior del panel (cada vista es una entrada del historial); sin nada detrás, sale.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                WebView web = getBridge().getWebView();
+                if (web.canGoBack()) {
+                    web.goBack();
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        });
     }
 
     @Override

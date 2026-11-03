@@ -153,7 +153,8 @@ export default function App() {
   const Vista = actual.componente;
 
   return (
-    <div className="flex h-full flex-col md:flex-row">
+    // pt: en la app (pantalla de borde a borde), que nada quede debajo de la barra de estado.
+    <div className="flex h-full flex-col pt-[env(safe-area-inset-top)] md:flex-row">
       <nav aria-label="Secciones" className="hidden shrink-0 flex-col gap-1.5 border-r border-borde bg-panel/95 px-3 py-4 md:flex md:h-full md:w-[72px] lg:w-60">
         <div className="pb-5"><Logo /></div>
         {VISTAS.map((v) => <EnlaceLateral key={v.id} v={v} activa={v.id === actual.id} />)}

@@ -12,5 +12,11 @@
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": false
   },
-  "appendUserAgent": "NullraptorApp/0.1"
+  "appendUserAgent": "NullraptorApp/0.1",
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
 }
