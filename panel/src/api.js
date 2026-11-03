@@ -12,8 +12,13 @@ async function respuesta(r) {
 const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const deB64 = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 
+/** Dentro de la app Android (añade «NullraptorApp» a su user agent): la passkey no funciona en su WebView. */
+export const enApp = () => typeof navigator !== 'undefined' && /\bNullraptorApp\//.test(navigator.userAgent);
+
 /** Confirma la passkey (por Tailscale, para la terminal y la seguridad: vale una hora). */
 export async function confirmarPasskey() {
+  // En la app se confirma en Chrome (panel/lib/entrada-app.mjs): vuelve con una sesión nueva, recién confirmada.
+  if (enApp()) { window.location.href = 'es.nullraptor.movil://entrar'; return new Promise(() => {}); }
   const o = await post('/api/seguridad/reautenticar/opciones');
   const c = await navigator.credentials.get({ publicKey: { ...o, challenge: deB64(o.challenge) } });
   const r = c.response;

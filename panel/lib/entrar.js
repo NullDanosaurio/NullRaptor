@@ -18,7 +18,8 @@
     const c = await navigator.credentials.get({ publicKey: { ...o, challenge: deB64(o.challenge) } });
     const r = c.response;
     await pedir('/entrar/passkey', { id: c.id, clientDataJSON: b64(r.clientDataJSON), authenticatorData: b64(r.authenticatorData), signature: b64(r.signature) });
-    location.replace('/');
+    // Entrando para la app (/vincular-app): se recarga la misma dirección, que ya da el código para volver a la app.
+    location.replace(location.pathname === '/vincular-app' ? location.href : '/');
   }
 
   async function alta() {
