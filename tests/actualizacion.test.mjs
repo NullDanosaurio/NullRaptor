@@ -69,8 +69,8 @@ test('reanudar: al pararse apunta los proyectos con sesión; al arrancar los da 
   const { trabajo, a } = nueva();
   a.guardarReanudar([]);
   assert.ok(!fs.existsSync(path.join(trabajo, 'actualizacion', 'reanudar.json'))); // sin sesiones, nada
-  a.guardarReanudar(['A', 'B', 'A', 7]);
-  assert.deepEqual(a.tomarReanudar(), ['A', 'B']);
+  a.guardarReanudar(['A', 'B', 'A', 7], { B: 'director', C: 'director' });
+  assert.deepEqual(a.tomarReanudar(), [{ proyecto: 'A', perfil: null }, { proyecto: 'B', perfil: 'director' }]);
   assert.deepEqual(a.tomarReanudar(), []); // ya tomado: se borra
   escribir(trabajo, 'reanudar.json', { proyectos: ['A'], fecha: '2026-10-31T10:00:00Z' }); // hace 2 h
   assert.deepEqual(a.tomarReanudar(), []);

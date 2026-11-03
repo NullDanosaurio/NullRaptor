@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { clasificar } from './adjuntos.mjs';
 import { cortarPty, lanzarPty, redimensionar, tamanoValido, ttyDe } from './pty.mjs';
 import { rutaProyecto } from './trabajo.mjs';
-import { ARCHIVO_MCP } from '../../scripts/ia.mjs';
+import { ARCHIVO_MCP, leerPerfil } from '../../scripts/ia.mjs';
 
 const AGENTE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLAUDE = path.join(AGENTE, 'node_modules', '.bin', 'claude');
@@ -88,11 +88,13 @@ export class Remoto {
   activas() { return [...this.sesiones.values()].filter((s) => s.estado !== 'terminada'); }
 
   lista() {
-    return [...this.sesiones.values()].map(({ id, proyecto, url, entorno, inicio, estado, motivo, quien }) => ({ id, proyecto, url, entorno, inicio, estado, motivo, quien }));
+    return [...this.sesiones.values()].map(({ id, proyecto, perfil, url, entorno, inicio, estado, motivo, quien }) => ({ id, proyecto, perfil, url, entorno, inicio, estado, motivo, quien }));
   }
 
-  /** Abre Claude en $TRABAJO_DIR/proyectos/<nombre>. Lanza con `codigo` 404, 409 o 429. */
-  abrir(nombre, { quien = 'este equipo', cols = 120, filas = 36, continuar = false, aviso = null } = {}) {
+  /** Abre Claude en $TRABAJO_DIR/proyectos/<nombre>. `perfil` (p. ej. 'director', de PERFILES) añade su texto con
+   * --append-system-prompt. Lanza con `codigo` 400, 404, 409 o 429. */
+  abrir(nombre, { quien = 'este equipo', cols = 120, filas = 36, continuar = false, aviso = null, perfil = null } = {}) {
+    const textoPerfil = perfil === null || perfil === undefined || perfil === '' ? null : leerPerfil(AGENTE, perfil);
     const ruta = rutaProyecto(this.trabajo, nombre); // sin memoria: la bóveda no vale, solo proyectos
     if (!ruta) throw fallo('Proyecto no encontrado en este equipo.', 404);
     if (this.activas().some((s) => s.proyecto === nombre)) throw fallo(`Ya hay una sesión remota abierta en ${nombre}.`, 409);
@@ -112,13 +114,14 @@ export class Remoto {
     const mcp = path.join(this.trabajo, ARCHIVO_MCP);
     if (fs.existsSync(mcp)) args.push('--mcp-config', mcp);
     // Seguir la última conversación de este proyecto (Claude la guarda en el volumen) y, si lo hay, un primer mensaje.
+    if (textoPerfil) args.push('--append-system-prompt', textoPerfil);
     if (continuar) args.push('--continue');
     if (typeof aviso === 'string' && aviso.trim()) args.push('--', aviso.trim());
     const hijo = this.lanzar(args, { cwd: ruta, env, cols, filas });
     const id = randomUUID();
-    const s = { id, proyecto: nombre, url: null, entorno: null, inicio: new Date().toISOString(), estado: 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };
+    const s = { id, proyecto: nombre, perfil: textoPerfil ? perfil : null, url: null, entorno: null, inicio: new Date().toISOString(), estado: 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };
     s.apunte = this.registro?.sesion(id, nombre) ?? (() => {});
-    s.apunte('apertura', { proyecto: nombre, quien, args: args.slice(0, 4) });
+    s.apunte('apertura', { proyecto: nombre, quien, perfil: s.perfil, args: args.slice(0, 4) }); // nunca el texto del perfil
     let acabar;
     s.fin = new Promise((r) => { acabar = r; });
     this.sesiones.set(id, s);

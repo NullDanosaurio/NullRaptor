@@ -295,12 +295,12 @@ if (esPrincipal) {
   process.on('exit', () => remoto.cerrarTodas());
   for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     process.once(senal, () => {
-      try { actualizacion.guardarReanudar(remoto.activas().map((s) => s.proyecto)); } catch (e) { console.warn(`[panel] reanudar: ${e.message}`); }
+      try { actualizacion.guardarReanudar(remoto.activas().map((s) => s.proyecto), Object.fromEntries(remoto.activas().map((s) => [s.proyecto, s.perfil]))); } catch (e) { console.warn(`[panel] reanudar: ${e.message}`); }
       remoto.cerrarTodas().then(() => process.exit(0));
     });
   }
-  for (const proyecto of actualizacion.tomarReanudar()) {
-    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', continuar: true, aviso: AVISO_REANUDAR }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
+  for (const { proyecto, perfil } of actualizacion.tomarReanudar()) {
+    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', continuar: true, aviso: AVISO_REANUDAR, perfil }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
     catch (e) { console.warn(`[panel] No se pudo reanudar la sesión de ${proyecto}: ${e.message}`); }
   }
   const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;

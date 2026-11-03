@@ -38,20 +38,23 @@ export class Actualizacion {
     return { disponible, solicitada: s?.fecha ?? null };
   }
 
-  /** Al pararse: qué proyectos tenían sesión, para reabrirlas al volver. */
-  guardarReanudar(proyectos) {
+  /** Al pararse: qué proyectos tenían sesión (y con qué perfil), para reabrirlas al volver. `perfiles`: { proyecto:
+   * perfil }, solo el nombre del perfil. */
+  guardarReanudar(proyectos, perfiles = {}) {
     const lista = [...new Set(proyectos)].filter((p) => typeof p === 'string' && p);
-    if (lista.length) this.#escribir('reanudar.json', { proyectos: lista, fecha: this.ahora().toISOString() });
+    const conPerfil = Object.fromEntries(lista.filter((p) => typeof perfiles[p] === 'string' && perfiles[p]).map((p) => [p, perfiles[p]]));
+    if (lista.length) this.#escribir('reanudar.json', { proyectos: lista, perfiles: conPerfil, fecha: this.ahora().toISOString() });
   }
 
-  /** Al arrancar: los proyectos que reabrir (solo si se paró hace poco: tras una parada larga no se sigue solo). */
+  /** Al arrancar: [{ proyecto, perfil }] que reabrir (solo si se paró hace poco: tras una parada larga no se sigue solo). */
   tomarReanudar(maxMs = 30 * 60_000) {
     const archivo = path.join(this.dir, 'reanudar.json');
     const r = leer(archivo);
     fs.rmSync(archivo, { force: true });
     const edad = this.ahora() - new Date(r?.fecha);
     if (!Array.isArray(r?.proyectos) || !(edad >= 0 && edad <= maxMs)) return [];
-    return r.proyectos.filter((p) => typeof p === 'string' && p);
+    const perfiles = r.perfiles && typeof r.perfiles === 'object' ? r.perfiles : {};
+    return r.proyectos.filter((p) => typeof p === 'string' && p).map((p) => ({ proyecto: p, perfil: typeof perfiles[p] === 'string' ? perfiles[p] : null }));
   }
 
   /** «Actualizar ahora»: la tarea lo verá en su siguiente pasada (5 min como mucho). */

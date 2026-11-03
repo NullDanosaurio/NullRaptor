@@ -44,9 +44,9 @@ export function crearRutasRemoto({ maxAdjunto = MAX_ADJUNTO, remoto, passkeys, s
       if (!metodo('POST')) return true;
       const no = permisoTerminal();
       if (no) return responder(no);
-      const { proyecto, cols, filas, continuar } = await leerCuerpo(req);
-      const s = remoto.abrir(proyecto, { quien, cols, filas, continuar: continuar === true });
-      registro?.acceso({ evento: 'terminal', proyecto, quien });
+      const { proyecto, cols, filas, continuar, perfil } = await leerCuerpo(req);
+      const s = remoto.abrir(proyecto, { quien, cols, filas, continuar: continuar === true, perfil: perfil ?? null });
+      registro?.acceso({ evento: 'terminal', proyecto, perfil: s.perfil, quien });
       if (remota) registro?.aviso(`Terminal abierta en ${proyecto}: ${quien}`);
       json(res, 201, s);
       return true;

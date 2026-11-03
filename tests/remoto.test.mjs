@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { comillas, tamanoValido } from '../panel/lib/pty.mjs';
 import { entorno, nuevo } from './apoyo/remoto.mjs';
 import { Registro } from '../panel/lib/registro.mjs';
@@ -246,4 +247,25 @@ test('abrir con continuar: retoma la última conversación y, si hay aviso, lo m
   const { args } = lanzados[1];
   assert.ok(args.includes('--continue'));
   assert.deepEqual(args.slice(-2), ['--', 'Sigue donde lo dejaste.']);
+});
+
+test('abrir con perfil: --append-system-prompt con el texto del perfil antes del «--»; inválido, 400; sin perfil, igual que antes', async () => {
+  const { leerPerfil } = await import('../scripts/ia.mjs');
+  const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const e = entorno();
+  const { remoto, lanzados } = nuevo(e);
+  remoto.abrir('A', { continuar: true, aviso: 'Hola' });
+  const base = lanzados[0].args;
+  assert.ok(!base.includes('--append-system-prompt'));
+  remoto.cerrar(remoto.lista()[0].id);
+  remoto.abrir('A', { continuar: true, aviso: 'Hola', perfil: 'director' });
+  const { args } = lanzados[1];
+  const i = args.indexOf('--append-system-prompt');
+  assert.ok(i > 0 && i < args.indexOf('--'));
+  assert.equal(args[i + 1], leerPerfil(agente, 'director'));
+  assert.deepEqual([...args.slice(0, i), ...args.slice(i + 2)], base); // sin el perfil, idénticos
+  assert.equal(remoto.lista().find((s) => s.estado !== 'terminada').perfil, 'director');
+  remoto.cerrar(remoto.lista().find((s) => s.estado !== 'terminada').id);
+  for (const malo of ['../config/perfiles/director', 'otro', 7]) assert.throws(() => remoto.abrir('A', { perfil: malo }), (err) => err.codigo === 400);
+  assert.equal(lanzados.length, 2); // un perfil inválido no lanza nada
 });
