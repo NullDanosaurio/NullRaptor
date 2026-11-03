@@ -1,5 +1,17 @@
 # Registro de trabajo
 
+## 03/11/2026 — Botones de copiar en el chat
+- [U] Mejora prioritaria: copiar bloques de código y respuestas de la IA en el chat; sin push.
+- `panel/src/portapapeles.js`: `alPortapapeles` (antes en Terminal.jsx) devuelve si copió y nunca lanza; sin
+  `navigator.clipboard`, textarea de solo lectura fuera de la vista (16 px, `select()` + `setSelectionRange` para iOS)
+  que devuelve el foco. La terminal lo usa igual que antes (borra la selección o avisa «Copiado» solo si funcionó).
+- `componentes/Copiar.jsx` (Copiado / No se pudo copiar, 1,5 s); Markdown: bloques de código con cabecera (lenguaje y
+  Copiar, siempre visible; `panel/src/codigo.js` saca el texto exacto del árbol hast); Chat: Copiar junto a la hora en
+  los mensajes de la IA.
+- Pruebas [O]: 126/126 y build. En el Edge del PC (copia del panel en 4777): bloque y mensaje copiados idénticos con
+  `navigator.clipboard` y con la reserva (API ocultada por DevTools en un Edge aparte), «Copiado» visible, y «No se pudo
+  copiar» con un clic sin gesto. [?] Sin probar: Safari/iOS, Firefox, la terminal interactiva y http real por la red.
+
 ## 03/11/2026 — Voz: Jarvis con Whisper y Kokoro
 - [U] Daniel: «whisper + kokoro para añadir una voz al agente, me gustaría que se pareciera a Jarvis». Decisiones [U]:
   en el contenedor (CPU), en el panel con pulsar y hablar, voz española `em_alex`. Jev (router de TypeSafe AI):
