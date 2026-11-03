@@ -1,5 +1,22 @@
 # Registro de trabajo
 
+## 03/11/2026 — El panel, pensado para el móvil (y la app)
+- [U] Daniel: «las apps que realizas son navegadores sin más, apenas es responsive, no es cómodo navegar», y no
+  encuentra el modo voz en la app. Lección de Roleplay (bóveda): revisar con capturas a 320–412 px, no suponerlo.
+- Revisión [O] a 360 y 412 px: nada se salía de la pantalla, pero Bóveda no estaba en la barra, Jarvis escondido
+  dentro de un chat, tarjeta de Resumen cortada (hijo de grid sin min-width:0), tarjeta de sesión con el texto en
+  una columna estrecha, títulos de tareas cortados y filas de la bóveda de menos de 32 px.
+- [U] Barra del móvil: Inicio · Proyectos · Jarvis (centro, grande) · Bóveda · Más (Chat, Herramientas, Ajustes en
+  una hoja); botones de 56 px. Escritorio: barra lateral con todo. Vista Jarvis (`vistas/Jarvis.jsx`): voz a
+  pantalla completa sobre un proyecto, con subtítulos, teclado y Callar.
+- Arreglos: `.grid > * { min-width: 0 }`, títulos en dos líneas, botones de la sesión a lo ancho, filas de la bóveda
+  de 44 px en el móvil, margen superior seguro (la app es de borde a borde).
+- App: permiso de micrófono (Capacitor lo concede al WebView), Atrás retrocede en el historial del panel, barra de
+  estado oscura. Antes, allowNavigation *.ts.net no casaba con maquinote.taile75fb6.ts.net (Capacitor exige el
+  mismo número de partes) y el panel se abría fuera, en Chrome: ahora *.*.ts.net.
+- `scripts/revisar-movil.mjs`: revisor con capturas a 360/412/1280 (playwright-core fuera del repo). Pruebas 134/134.
+  [?] Sin probar en el móvil real: micrófono, Atrás y la entrada por Chrome.
+
 ## 03/11/2026 — Botones de copiar en el chat
 - [U] Mejora prioritaria: copiar bloques de código y respuestas de la IA en el chat; sin push.
 - `panel/src/portapapeles.js`: `alPortapapeles` (antes en Terminal.jsx) devuelve si copió y nunca lanza; sin

@@ -33,7 +33,7 @@ function Nodo({ nombre, nodo, ruta, actual, abiertas, alternar, nivel }) {
   const total = (n) => n.notas.length + [...n.carpetas.values()].reduce((s, c) => s + total(c), 0);
   return (
     <li>
-      <button type="button" onClick={() => alternar(ruta)} aria-expanded={abierta} className="flex w-full items-center gap-1.5 rounded-lg py-1.5 pr-2 text-left text-[13px] text-tenue hover:bg-elevado/60 hover:text-texto" style={{ paddingLeft: 8 + nivel * 14 }}>
+      <button type="button" onClick={() => alternar(ruta)} aria-expanded={abierta} className="flex w-full items-center gap-1.5 rounded-lg py-2.5 pr-2 text-left text-[14px] md:py-1.5 md:text-[13px] text-tenue hover:bg-elevado/60 hover:text-texto" style={{ paddingLeft: 8 + nivel * 14 }}>
         <ChevronRight className={cx('size-3.5 shrink-0 text-apagado transition-transform duration-150', abierta && 'rotate-90')} />
         {abierta ? <FolderOpen className="size-4 shrink-0 text-raptor-oscuro" strokeWidth={1.7} /> : <Folder className="size-4 shrink-0 text-apagado" strokeWidth={1.7} />}
         <span className="flex-1 truncate">{nombre}</span>
@@ -53,7 +53,7 @@ function Rama({ nodo, ruta, actual, abiertas, alternar, nivel }) {
       ))}
       {nodo.notas.map((n) => (
         <li key={n.ruta}>
-          <a href={enlace('boveda', n.ruta)} aria-current={actual === n.ruta ? 'page' : undefined} className={cx('flex items-center gap-1.5 rounded-lg py-1.5 pr-2 text-[13px]', actual === n.ruta ? 'bg-elevado text-white' : 'text-tenue hover:bg-elevado/60 hover:text-texto')} style={{ paddingLeft: 8 + nivel * 14 + 20 }}>
+          <a href={enlace('boveda', n.ruta)} aria-current={actual === n.ruta ? 'page' : undefined} className={cx('flex items-center gap-1.5 rounded-lg py-2.5 pr-2 text-[14px] md:py-1.5 md:text-[13px]', actual === n.ruta ? 'bg-elevado text-white' : 'text-tenue hover:bg-elevado/60 hover:text-texto')} style={{ paddingLeft: 8 + nivel * 14 + 20 }}>
             <FileText className={cx('size-3.5 shrink-0', actual === n.ruta ? 'text-raptor' : 'text-apagado')} strokeWidth={1.7} />
             <span className="truncate">{n.nombre}</span>
           </a>
