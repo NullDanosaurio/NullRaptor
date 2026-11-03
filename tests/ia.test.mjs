@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ARCHIVO_MCP, prepararIA } from '../scripts/ia.mjs';
+import { ARCHIVO_MCP, instalarEquipo, leerPerfil, PERFILES, prepararIA } from '../scripts/ia.mjs';
+import { construirEncargo, extraerDiff, leerArchivos, rutaDentro } from '../scripts/codex-parche.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,4 +37,74 @@ test('prepararIA: CLAUDE.md global propio, MCP de Ruflo con raíz en el agente y
 test('el repositorio no lleva andamiaje de Ruflo: solo su runtime en .claude-flow', () => {
   for (const p of ['.claude/settings.json', '.claude/helpers', '.agents', '.mcp.json']) assert.ok(!fs.existsSync(path.join(agente, p)), p);
   assert.ok(fs.existsSync(path.join(agente, 'config', 'mcp.json')));
+});
+
+test('prepararIA instala el equipo del Director: copia equipo-*, retira los obsoletos y no toca agentes ajenos', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-equipo-'));
+  const configDir = path.join(base, '.claude');
+  const agents = path.join(configDir, 'agents');
+  fs.mkdirSync(agents, { recursive: true });
+  fs.writeFileSync(path.join(agents, 'equipo-viejo.md'), 'obsoleto');
+  fs.writeFileSync(path.join(agents, 'mio.md'), 'ajeno');
+  fs.writeFileSync(path.join(agents, 'equipo-notas.txt'), 'ajeno, no es .md');
+  prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
+  const roles = ['arquitectura', 'calidad', 'desarrollo', 'diseno', 'producto', 'seguridad'].map((r) => `equipo-${r}.md`);
+  for (const r of roles) assert.equal(fs.readFileSync(path.join(agents, r), 'utf8'), fs.readFileSync(path.join(agente, 'config', 'agentes', r), 'utf8'));
+  assert.ok(!fs.existsSync(path.join(agents, 'equipo-viejo.md')));
+  assert.equal(fs.readFileSync(path.join(agents, 'mio.md'), 'utf8'), 'ajeno');
+  assert.ok(fs.existsSync(path.join(agents, 'equipo-notas.txt')));
+  // Sin config/agentes no se borra nada.
+  const sinEquipo = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-sin-'));
+  assert.deepEqual(instalarEquipo(sinEquipo, configDir), []);
+  assert.ok(fs.existsSync(path.join(agents, 'equipo-calidad.md')));
+});
+
+test('subagentes: frontmatter válido, herramientas por rol, veto y modelo por rol', () => {
+  const dir = path.join(agente, 'config', 'agentes');
+  const esperadas = {
+    producto: ['Read, Grep, Glob', 'sonnet'], arquitectura: ['Read, Grep, Glob', 'inherit'],
+    desarrollo: ['Read, Grep, Glob, Bash, Edit, Write', 'sonnet'], calidad: ['Read, Grep, Glob, Bash', 'sonnet'],
+    seguridad: ['Read, Grep, Glob, Bash', 'inherit'], diseno: ['Read, Grep, Glob, Bash', 'sonnet'],
+  };
+  for (const [rol, [tools, model]] of Object.entries(esperadas)) {
+    const texto = fs.readFileSync(path.join(dir, `equipo-${rol}.md`), 'utf8');
+    const cabecera = Object.fromEntries(texto.match(/^---\n([\s\S]*?)\n---\n/)[1].split('\n').map((l) => [l.slice(0, l.indexOf(':')), l.slice(l.indexOf(':') + 1).trim()]));
+    assert.equal(cabecera.name, `equipo-${rol}`);
+    assert.ok(cabecera.description.length > 20);
+    assert.equal(cabecera.tools, tools, rol);
+    assert.equal(cabecera.model, model, rol);
+    assert.match(texto, /PREGUNTAS PARA EL DIRECTOR/, rol);
+    if (rol === 'calidad' || rol === 'seguridad') {
+      assert.match(texto, /VEREDICTO: APROBADO/);
+      assert.match(texto, /VEREDICTO: BLOQUEADO/);
+      assert.match(texto, /no modificas archivos ni haces commits/i);
+    }
+  }
+});
+
+test('perfiles: lista cerrada; el Director menciona a su equipo y el veto', () => {
+  assert.deepEqual(PERFILES, ['director']);
+  const texto = leerPerfil(agente, 'director');
+  assert.match(texto, /^# Perfil: Director IA de NullRaptor/);
+  for (const rol of ['producto', 'arquitectura', 'desarrollo', 'calidad', 'seguridad', 'diseno']) assert.ok(texto.includes(`equipo-${rol}`), rol);
+  assert.match(texto, /VEREDICTO: APROBADO/);
+  for (const malo of ['../../etc/passwd', 'Director', '', undefined]) assert.throws(() => leerPerfil(agente, malo), (e) => e.codigo === 400);
+});
+
+test('codex-parche: solo archivos del proyecto y sin secretos; encargo y diff', () => {
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'parche-'));
+  fs.writeFileSync(path.join(raiz, 'a.mjs'), 'export const a = 1;\n');
+  assert.equal(rutaDentro(raiz, './src/../a.mjs'), 'a.mjs');
+  for (const malo of ['../fuera.txt', '/etc/passwd', '.env', 'conf/.env.local', 'claves/id_ed25519', '.git/config', 'x/servidor.pem']) assert.throws(() => rutaDentro(raiz, malo), malo);
+  const archivos = leerArchivos(raiz, ['a.mjs', 'nuevo.mjs']);
+  assert.deepEqual(archivos, [{ ruta: 'a.mjs', texto: 'export const a = 1;\n' }, { ruta: 'nuevo.mjs', texto: null }]);
+  const encargo = construirEncargo({ encargo: 'Cambia a por 2', archivos });
+  assert.match(encargo, /=== a\.mjs\nexport const a = 1;/);
+  assert.match(encargo, /=== nuevo\.mjs \(no existe/);
+  assert.match(encargo, /No ejecutes órdenes/);
+  const diff = 'diff --git a/a.mjs b/a.mjs\n--- a/a.mjs\n+++ b/a.mjs\n@@ -1 +1 @@\n-export const a = 1;\n+export const a = 2;';
+  assert.equal(extraerDiff(`Aquí va:\n\`\`\`diff\n${diff}\n\`\`\`\n`), `${diff}\n`);
+  assert.equal(extraerDiff(diff), `${diff}\n`);
+  assert.equal(extraerDiff('NO PUEDO: falta el archivo b'), null);
+  assert.match(construirEncargo({ revisar: true, diff, archivos: [], encargo: '' }), /Sin objeciones/);
 });
