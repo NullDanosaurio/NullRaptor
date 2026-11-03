@@ -67,8 +67,15 @@ function correr(cmd, args, { cwd, input, timeout }) {
   });
 }
 
-async function preguntarClaude(proyecto, entrada, sesion) {
+/** Modo voz del panel: la respuesta se lee en voz alta (Kokoro), con la personalidad de Jarvis. */
+export const PERSONA_JARVIS = 'Modo voz: eres Jarvis, el asistente personal de Daniel. Tu respuesta se leerá en voz alta, así que '
+  + 'contesta en español, en una a cuatro frases cortas, sin Markdown, listas, tablas, código, rutas ni direcciones web. '
+  + 'Tono formal y cercano: tratas a Daniel de «señor», con un punto de humor seco y discreto, nunca servil. '
+  + 'Si algo necesita detalle (código, rutas, listas largas), dilo en una frase y ofrece dejarlo por escrito.';
+
+async function preguntarClaude(proyecto, entrada, sesion, { voz = false } = {}) {
   const args = ['-p', '--output-format', 'json', '--tools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk', '--strict-mcp-config'];
+  if (voz) args.push('--append-system-prompt', PERSONA_JARVIS);
   if (sesion) args.push('--resume', sesion);
   const r = await correr(BIN.claude, args, { cwd: proyecto, input: entrada, timeout: 10 * 60_000 });
   try {
@@ -158,7 +165,7 @@ export class Chat extends EventEmitter {
   }
 
   /** Envía una línea de Dano y espera las respuestas. Devuelve false si no había nada que enviar. */
-  async enviar(linea) {
+  async enviar(linea, { voz = false } = {}) {
     if (this.ocupado) throw new Error('Espera a que terminen de contestar.');
     const limpia = String(linea ?? '').trim();
     const { destino, texto } = this.ia ? { destino: [this.ia], texto: limpia } : destinatarios(limpia, this.turno);
@@ -175,8 +182,8 @@ export class Chat extends EventEmitter {
         try {
           const entrada = pendientes(this.historial, e.vistos, ia, this.proyecto.nombre);
           const r = ia === 'claude'
-            ? await preguntarClaude(this.proyecto.ruta, entrada, e.sesion)
-            : await preguntarCodex(this.proyecto.ruta, entrada, e.sesion, path.join(this.carpeta, `.codex-${path.basename(this.registro, '.md')}.txt`));
+            ? await preguntarClaude(this.proyecto.ruta, entrada, e.sesion, { voz })
+            : await preguntarCodex(this.proyecto.ruta, voz ? `${PERSONA_JARVIS}\n\n${entrada}` : entrada, e.sesion, path.join(this.carpeta, `.codex-${path.basename(this.registro, '.md')}.txt`));
           e.sesion = r.sesion;
           this.anotar(ia, r.texto || '(sin respuesta)');
           e.vistos = this.historial.length;

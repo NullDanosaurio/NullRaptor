@@ -1,10 +1,13 @@
 // Chat sobre un proyecto con la IA que elijas, Claude o Codex (misma lógica que scripts/chat.mjs), y chats guardados.
 // Rutas: #/chat · #/chat/nuevo[/<proyecto>] · #/chat/<id> · #/chat/guardado/<archivo>.
-import { ArrowLeft, ArrowUp, BookCheck, ChevronDown, History, MessagesSquare, Plus, Square } from 'lucide-react';
+// Modo voz (botón «Voz»): se habla manteniendo pulsado el micro (Whisper) y las respuestas se leen en voz alta
+// (Kokoro), con la personalidad de Jarvis (scripts/chat.mjs, PERSONA_JARVIS).
+import { ArrowLeft, ArrowUp, AudioLines, BookCheck, ChevronDown, History, Loader2, MessagesSquare, Mic, Plus, Square, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { enlace, get, haceCuanto, ir, post, useDatos } from '../api.js';
 import Markdown from '../componentes/Markdown.jsx';
 import { Avatar, Boton, Cargando, cx, Fallo, Insignia, PERSONAS, Punto, Vacio } from '../componentes/ui.jsx';
+import { useVoz } from '../voz.js';
 
 const IAS = [
   { id: 'claude', ayuda: 'Claude Code, con tu suscripción de Claude.' },
@@ -69,12 +72,26 @@ function ChatAbierto({ id }) {
   const [texto, setTexto] = useState('');
   const [ia, setIa] = useState(null);
   const scroll = useAlFinal(`${historial.length}-${escribiendo}`);
+  const voz = useVoz();
+  const [modoVoz, setModoVoz] = useState(() => { try { return localStorage.getItem('chat.voz') === '1'; } catch { return false; } });
+  const enVoz = useRef(modoVoz); // para el oyente de SSE, que no se vuelve a crear
+  enVoz.current = modoVoz;
+  const alternarVoz = () => {
+    const v = !modoVoz;
+    setModoVoz(v);
+    if (!v) voz.callar();
+    try { localStorage.setItem('chat.voz', v ? '1' : '0'); } catch { /* sin almacenamiento */ }
+  };
 
   useEffect(() => {
     const fuente = new EventSource(`/api/chats/${id}/eventos`);
     const datos = (e) => JSON.parse(e.data);
     fuente.addEventListener('estado', (e) => { const d = datos(e); setHistorial(d.historial); setEscribiendo(d.escribiendo); setProyecto(d.proyecto); setIa(d.ia); setConectado(true); });
-    fuente.addEventListener('mensaje', (e) => setHistorial((h) => [...h, datos(e)]));
+    fuente.addEventListener('mensaje', (e) => {
+      const m = datos(e);
+      setHistorial((h) => [...h, m]);
+      if (enVoz.current && m.quien !== 'dano') voz.decir(m.texto); // Jarvis lo dice en voz alta
+    });
     fuente.addEventListener('escribiendo', (e) => setEscribiendo(datos(e)));
     fuente.addEventListener('fallo', (e) => { const d = datos(e); setHistorial((h) => [...h, { quien: 'sistema', texto: `${PERSONAS[d.quien]?.nombre ?? ''}: ${d.texto}` }]); });
     fuente.addEventListener('cerrado', (e) => { setCierre(datos(e)); fuente.close(); });
@@ -84,18 +101,23 @@ function ChatAbierto({ id }) {
       get('/api/chats').then((d) => { if (!d.abiertos.some((c) => c.id === id)) { fuente.close(); setPerdido(true); } }).catch(() => {});
     };
     return () => fuente.close();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ocupado = Boolean(escribiendo);
+  const mandar = async (limpio) => {
+    setError(null);
+    await post(`/api/chats/${id}/mensajes`, { texto: limpio, voz: modoVoz });
+  };
   const enviar = async (e) => {
     e?.preventDefault();
     const limpio = texto.trim();
     if (!limpio || ocupado) return;
-    setError(null);
-    try {
-      await post(`/api/chats/${id}/mensajes`, { texto: limpio });
-      setTexto('');
-    } catch (err) { setError(err); }
+    try { await mandar(limpio); setTexto(''); } catch (err) { setError(err); }
+  };
+  // Pulsar y hablar: al soltar, lo transcrito se envía solo.
+  const soltar = async () => {
+    const dicho = (await voz.terminar()).trim();
+    if (dicho && !ocupado) { try { await mandar(dicho); } catch (err) { setError(err); } }
   };
   const cerrar = async () => {
     setCerrando(true);
@@ -140,7 +162,11 @@ function ChatAbierto({ id }) {
           <p className="truncate font-medium text-white">{proyecto || 'Chat'}</p>
           <p className="flex items-center gap-1.5 text-[12px] text-apagado"><Punto tono={conectado ? 'ok' : 'fallo'} />{conectado ? `${PERSONAS[ia]?.nombre ?? 'La IA'} lee el proyecto (sin modificarlo)` : 'Reconectando…'}</p>
         </div>
-        <Boton className="ml-auto" tam="sm" onClick={cerrar} disabled={ocupado || cerrando} title="Cierra el chat y guarda un resumen en el Diario de la bóveda">
+        <Boton className="ml-auto" tam="sm" variante={modoVoz ? 'primario' : 'suave'} onClick={alternarVoz} aria-pressed={modoVoz}
+          disabled={!voz.estado?.instalada} title={voz.estado?.instalada ? 'Hablar con Jarvis: pulsa y habla, y te contesta en voz alta' : 'La voz no está instalada: sh /nullraptor/scripts/voz-instalar.sh'}>
+          <AudioLines className="size-3.5" /> Voz
+        </Boton>
+        <Boton tam="sm" onClick={cerrar} disabled={ocupado || cerrando} title="Cierra el chat y guarda un resumen en el Diario de la bóveda">
           {cerrando ? 'Resumiendo…' : <><Square className="size-3" /> Terminar y resumir</>}
         </Boton>
       </header>
@@ -160,6 +186,26 @@ function ChatAbierto({ id }) {
 
       <form onSubmit={enviar} className="mx-auto w-full max-w-3xl px-4 pt-2 pb-4 md:px-6">
         <Fallo error={error} className="mb-2" />
+        {modoVoz && (
+          <div className="mb-3 flex flex-col items-center gap-2">
+            <button type="button" aria-label="Mantén pulsado para hablar" disabled={!voz.micPosible || ocupado || voz.fase === 'transcribiendo'}
+              onPointerDown={(e) => { e.preventDefault(); voz.callar(); voz.empezar(); }} onPointerUp={soltar} onPointerLeave={() => { if (voz.fase === 'escuchando') soltar(); }} onPointerCancel={soltar}
+              onContextMenu={(e) => e.preventDefault()}
+              className={cx('flex size-16 touch-none select-none items-center justify-center rounded-full border-2 transition-[scale,background-color] duration-150 disabled:opacity-30',
+                voz.fase === 'escuchando' ? 'scale-110 border-raptor bg-raptor text-fondo shadow-[0_0_30px_rgb(181_242_61/0.45)]' : 'border-raptor/50 bg-raptor/10 text-raptor active:scale-95')}>
+              {voz.fase === 'transcribiendo' ? <Loader2 className="size-6 animate-spin" /> : <Mic className="size-6" />}
+            </button>
+            <p className="flex items-center gap-2 text-[12px] text-apagado">
+              {!voz.micPosible ? 'El micrófono necesita este equipo o Tailscale (https); por la red de casa no se puede.'
+                : voz.fase === 'escuchando' ? 'Escuchando… suelta para enviar'
+                  : voz.fase === 'transcribiendo' ? 'Transcribiendo…'
+                    : voz.hablando ? 'Jarvis está hablando'
+                      : ocupado ? 'Jarvis está pensando…' : 'Mantén pulsado para hablar'}
+              {voz.hablando && <button type="button" onClick={voz.callar} className="flex items-center gap-1 rounded-md border border-borde px-2 py-0.5 text-tenue hover:text-texto"><VolumeX className="size-3" /> Callar</button>}
+            </p>
+            {voz.aviso && <p className="text-[12px] text-aviso">{voz.aviso}</p>}
+          </div>
+        )}
         <div className="rounded-[22px] border border-borde-fuerte bg-panel shadow-[0_8px_30px_rgb(0_0_0/0.35)] transition-colors focus-within:border-raptor/40">
           <textarea
             value={texto}

@@ -236,9 +236,9 @@ export function crearServidor({
         const [, id, accion] = m;
         if (accion === 'eventos' && req.method === 'GET') { if (!chats.suscribir(id, res)) json(res, 404, { error: 'Ese chat ya no está abierto.' }); return; }
         if (accion === 'mensajes' && req.method === 'POST') {
-          const { texto } = await leerCuerpo(req);
+          const { texto, voz } = await leerCuerpo(req);
           if (typeof texto !== 'string' || !texto.trim()) { json(res, 400, { error: 'Mensaje vacío.' }); return; }
-          chats.enviar(id, texto);
+          chats.enviar(id, texto, { voz: voz === true });
           json(res, 202, { ok: true });
           return;
         }

@@ -56,11 +56,11 @@ export class Chats {
   }
 
   /** Envía en segundo plano: las respuestas llegan por SSE. Lanza si el chat no existe o está ocupado. */
-  enviar(id, texto) {
+  enviar(id, texto, { voz = false } = {}) {
     const e = this.abiertos.get(id);
     if (!e) throw Object.assign(new Error('Ese chat ya no está abierto.'), { codigo: 404 });
     if (e.chat.ocupado) throw Object.assign(new Error('Espera a que terminen de contestar.'), { codigo: 409 });
-    e.chat.enviar(texto).catch((err) => { for (const res of e.clientes) enviarEvento(res, 'fallo', { quien: 'dano', texto: err.message }); });
+    e.chat.enviar(texto, { voz }).catch((err) => { for (const res of e.clientes) enviarEvento(res, 'fallo', { quien: 'dano', texto: err.message }); });
   }
 
   async cerrar(id) {
