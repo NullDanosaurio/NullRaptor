@@ -1,5 +1,18 @@
 # Registro de trabajo
 
+## 03/11/2026 — Voz: Jarvis con Whisper y Kokoro
+- [U] Daniel: «whisper + kokoro para añadir una voz al agente, me gustaría que se pareciera a Jarvis». Decisiones [U]:
+  en el contenedor (CPU), en el panel con pulsar y hablar, voz española `em_alex`. Jev (router de TypeSafe AI):
+  no por ahora (otro proveedor con clave de OpenRouter; ahorros sin pruebas independientes).
+- `scripts/voz/servidor.py` (HTTP en 127.0.0.1:4330: /estado, /transcribir, /hablar; modelos cargados una vez),
+  `scripts/voz-instalar.sh` (entorno y modelos en `/estado/sistema/voz`), `panel/lib/voz.mjs` (arranca el servicio
+  cuando hace falta, limpia el Markdown antes de hablar) y `panel/lib/rutas-voz.mjs`.
+- Chat: botón Voz (`panel/src/voz.js` graba con MediaRecorder y reproduce en cola); `voz: true` en el mensaje añade
+  `PERSONA_JARVIS` (Claude con `--append-system-prompt`; Codex, delante del texto).
+- Pruebas [O]: 121/121. Kokoro → Whisper de ida y vuelta, idéntico. En el PC de Daniel (copia del panel en 4777):
+  modo voz activado, respuesta de Jarvis sobre Modelos3D y servicio de voz arrancado por el navegador para leerla.
+  [?] Falta que Daniel confirme que la oye y pruebe el micro.
+
 ## 03/11/2026 — Grafo de la bóveda (como Obsidian)
 - [U] Daniel quiere ver la bóveda como el grafo de Obsidian, «el cerebro con conexiones», en la vista Bóveda.
 - `GET /api/boveda/grafo` (`panel/lib/boveda.mjs`): notas como nodos, `[[enlaces]]` resueltos por ruta o nombre como

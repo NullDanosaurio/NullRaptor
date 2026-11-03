@@ -229,6 +229,20 @@ registro de chats → la conversación completa queda solo en el equipo (`$TRABA
 al cerrar Claude escribe en `Diario/AAAA-MM-DD.md` de la memoria un resumen de 2-5 viñetas; si ve una lección
 reutilizable la propone, pero no la guarda sola. Cada mensaje a las dos gasta cuota de ambas suscripciones.
 
+## Voz: Jarvis (decisión [U] 03/11/2026)
+
+Todo en local y con el procesador, dentro del contenedor: **Whisper** «small» (faster-whisper, int8) para oír y
+**Kokoro** (kokoro-onnx, voz española `em_alex`) para hablar. Se instala una vez en el volumen (dura entre
+actualizaciones): `sh /nullraptor/scripts/voz-instalar.sh` (entorno en `/estado/sistema/voz`, versiones fijas en
+`scripts/voz/requisitos.txt`, modelos ~850 MB). El panel arranca solo el servicio (`scripts/voz/servidor.py`,
+`127.0.0.1:4330`, no se ve desde fuera) la primera vez que hace falta (`panel/lib/voz.mjs`, rutas `/api/voz/*`).
+
+En el **Chat**, el botón **Voz**: mantén pulsado el micro, habla y suelta; se transcribe y se envía. La respuesta se
+lee en voz alta («Callar» la corta) y, en este modo, la IA contesta como **Jarvis** (`PERSONA_JARVIS` en
+`scripts/chat.mjs`: breve, sin formato, formal, te llama «señor»). No imita ninguna voz real. El micrófono solo
+funciona desde este equipo (localhost) o por Tailscale (https); por la red de casa (http) el navegador no lo deja.
+Tiempos en el i9: Kokoro ~2 s por cada 7 s de audio; Whisper ~2 s por frase.
+
 ## Panel web: una sola interfaz
 
 `panel/` (añadido el 29/10/2026; reorganizado en la fase 4, 02/11/2026). Servidor Node sin dependencias
