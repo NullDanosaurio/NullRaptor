@@ -43,6 +43,7 @@ export function TarjetaSesion({ s, alCerrar, conProyecto = false }) {
         <div className="flex flex-wrap items-center gap-2">
           <Punto tono={e.punto} vivo={s.estado === 'conectando'} />
           <p className="min-w-0 flex-1 truncate font-medium text-white">{conProyecto ? s.proyecto : 'Sesión de Claude Code'}</p>
+          {s.perfil === 'director' && <Insignia tono="raptor">Director IA</Insignia>}
           <Insignia tono={e.tono}>{e.texto}</Insignia>
         </div>
         <p className="text-[12px] text-apagado">

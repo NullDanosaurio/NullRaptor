@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { enlace, get, haceCuanto, ir, post, useDatos } from '../api.js';
 import Copiar from '../componentes/Copiar.jsx';
 import Markdown from '../componentes/Markdown.jsx';
+import { guardarPerfil, perfilGuardado, SelectorPerfil } from '../componentes/Perfil.jsx';
 import { Avatar, Boton, Cargando, cx, Fallo, Insignia, PERSONAS, Punto, Vacio } from '../componentes/ui.jsx';
 import { useVoz } from '../voz.js';
 
@@ -255,13 +256,19 @@ function ChatGuardado({ archivo }) {
 function NuevoChat({ proyectoInicial }) {
   const { datos } = useDatos('/api/proyectos');
   const [ia, setIa] = useState('claude');
+  const [perfil, setPerfil] = useState(() => (proyectoInicial ? perfilGuardado(proyectoInicial) : null));
   const [error, setError] = useState(null);
   const [creando, setCreando] = useState(null);
   const locales = (datos ?? []).filter((p) => p.local);
   const crear = async (nombre) => {
     setCreando(nombre);
     setError(null);
-    try { const { id } = await post('/api/chats', { proyecto: nombre, ia }); ir(`chat/${id}`); } catch (e) { setError(e); setCreando(null); }
+    const conPerfil = ia === 'claude' ? perfil : null; // Codex no tiene subagentes: sin perfil
+    try {
+      const { id } = await post('/api/chats', { proyecto: nombre, ia, perfil: conPerfil });
+      if (ia === 'claude') guardarPerfil(nombre, perfil);
+      ir(`chat/${id}`);
+    } catch (e) { setError(e); setCreando(null); }
   };
   return (
     <div className="flex h-full items-center justify-center overflow-y-auto p-6">
@@ -278,6 +285,9 @@ function NuevoChat({ proyectoInicial }) {
             </button>
           ))}
         </div>
+        <p className="mt-4 mb-2 text-[12px] text-apagado">Perfil</p>
+        <SelectorPerfil valor={perfil} alCambiar={setPerfil} deshabilitado={ia !== 'claude'}
+          nota={ia !== 'claude' ? 'Codex no tiene subagentes: responde sin perfil.' : perfil === 'director' ? 'Modo consultor: analiza y opina; el equipo trabaja en las sesiones.' : null} />
         <Fallo error={error} className="mt-4" />
         <p className="mt-5 mb-2 text-[12px] text-apagado">Proyecto</p>
         <div className="grid gap-2">

@@ -7,6 +7,7 @@ import { duracion, enlace, haceCuanto, ir, post, useDatos } from '../api.js';
 import { BarraFases, LineaFases, NOMBRE_FASE } from '../componentes/Fases.jsx';
 import Markdown, { indiceNotas } from '../componentes/Markdown.jsx';
 import { usePasskey } from '../componentes/Passkey.jsx';
+import { SelectorPerfil, usePerfil } from '../componentes/Perfil.jsx';
 import { enlaceTerminal, TarjetaSesion, VistaTerminal } from '../componentes/Sesiones.jsx';
 import TraerProyecto from '../componentes/TraerProyecto.jsx';
 import { Boton, Cargando, cx, Fallo, Insignia, Punto, Tarjeta, Vacio } from '../componentes/ui.jsx';
@@ -145,6 +146,7 @@ function SesionProyecto({ nombre }) {
   const { datos, recargar } = useDatos('/api/remoto', { cada: 2000 });
   const [fallo, setFallo] = useState(null);
   const [abriendo, setAbriendo] = useState(false);
+  const [perfil, setPerfil] = usePerfil(nombre);
   const { intentar, aviso } = usePasskey(setFallo);
   const sesiones = (datos?.sesiones ?? []).filter((s) => s.proyecto === nombre);
   const viva = sesiones.find((s) => s.estado !== 'terminada');
@@ -152,7 +154,7 @@ function SesionProyecto({ nombre }) {
   // continuar: retoma la última conversación de Claude en este proyecto (p. ej. tras una actualización).
   const abrir = (continuar = false) => intentar(async () => {
     setAbriendo(true);
-    try { const s = await post('/api/remoto/abrir', { proyecto: nombre, cols: 120, filas: 36, continuar }); window.location.hash = enlaceTerminal(s); } finally { setAbriendo(false); recargar(); }
+    try { const s = await post('/api/remoto/abrir', { proyecto: nombre, cols: 120, filas: 36, continuar, perfil }); window.location.hash = enlaceTerminal(s); } finally { setAbriendo(false); recargar(); }
   });
   const cerrar = (id) => intentar(async () => { await post(`/api/remoto/${id}/cerrar`); recargar(); });
   if (!datos) return null;
@@ -171,6 +173,8 @@ function SesionProyecto({ nombre }) {
               : activas >= datos.maxTotal ? `Ya hay ${activas} sesiones abiertas (el máximo): cierra alguna.`
                 : 'Claude Code en este proyecto: en la terminal del panel y a la vez en claude.ai o la app. Pregunta antes de cada acción.'}
           </p>
+          <SelectorPerfil valor={perfil} alCambiar={setPerfil} className="w-full sm:max-w-sm"
+            nota={perfil === 'director' ? 'Coordina al equipo (Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño).' : null} />
           {/* En el móvil, los botones debajo del texto y a lo ancho (fáciles de pulsar). */}
           <div className="flex w-full gap-2 sm:w-auto">
             <Boton className="flex-1 justify-center sm:flex-none" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true)} title="Retoma la última conversación de Claude en este proyecto">
