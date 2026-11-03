@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+  <title>Nullraptor</title>
+  <link rel="stylesheet" href="inicio.css">
+</head>
+<body>
+  <main>
+    <h1>Nullraptor</h1>
+    <p class="tenue">Tu panel, por Tailscale. La primera vez, escribe su dirección; después la app entra sola.</p>
+    <form id="formulario">
+      <label for="direccion">Dirección del panel</label>
+      <input id="direccion" type="url" inputmode="url" autocomplete="url" placeholder="https://tu-equipo.tu-red.ts.net" required>
+      <p id="aviso" class="aviso" role="alert" hidden></p>
+      <button type="submit">Entrar</button>
+    </form>
+    <p class="tenue pie">Necesitas Tailscale activo en el móvil y una passkey dada de alta en el panel.</p>
+  </main>
+  <script src="inicio.js"></script>
+</body>
+</html>

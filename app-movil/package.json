@@ -1,0 +1,17 @@
+{
+  "name": "nullraptor-movil",
+  "private": true,
+  "version": "0.1.0",
+  "description": "App Android de Nullraptor: el panel por Tailscale con extras nativos para el modo voz (Capacitor).",
+  "scripts": {
+    "sincronizar": "cap sync android",
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

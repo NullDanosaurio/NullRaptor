@@ -1,0 +1,13 @@
+{
+  "appId": "es.nullraptor.movil",
+  "appName": "Nullraptor",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["*.ts.net"]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}
