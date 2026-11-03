@@ -85,7 +85,8 @@ export function grafo(raiz) {
     if (!porNombre.has(k)) porNombre.set(k, n.ruta);
     porRuta.set(n.ruta.replace(/\.md$/i, '').toLowerCase(), n.ruta);
   }
-  const nodos = notas.map((n) => ({ id: n.ruta, nombre: n.nombre, carpeta: n.ruta.includes('/') ? n.ruta.split('/')[0] : '' }));
+  // Grupo (color) = carpeta de hasta dos niveles: «Proyectos/TuRinconDeLectura» no se pierde dentro de «Proyectos».
+  const nodos = notas.map((n) => ({ id: n.ruta, nombre: n.nombre, carpeta: n.ruta.split('/').slice(0, -1).slice(0, 2).join('/') }));
   const fantasmas = new Map();
   const aristas = [];
   const vistas = new Set();

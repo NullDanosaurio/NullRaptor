@@ -27,6 +27,7 @@ test('grafo: enlaces por nombre o por ruta, sin dirección ni repetidos; fantasm
   const ids = g.nodos.map((n) => n.id).sort();
   assert.deepEqual(ids, ['00-Inicio.md', 'Proyectos/Modelos3D.md', 'Proyectos/Nullraptor.md', 'Sola.md', 'fantasma:pendiente']);
   assert.equal(g.nodos.find((n) => n.id === 'Proyectos/Nullraptor.md').carpeta, 'Proyectos');
+  assert.equal(grafo(boveda({ 'Proyectos/X/a/b.md': '' })).nodos[0].carpeta, 'Proyectos/X');
   assert.equal(g.nodos.find((n) => n.id === 'fantasma:pendiente').fantasma, true);
   const pares = g.aristas.map((a) => [a.origen, a.destino].sort().join(' — ')).sort();
   assert.deepEqual(pares, [

@@ -1,7 +1,9 @@
-// Bóveda: árbol de notas, búsqueda, lectura con [[enlaces]] y retroenlaces, y cambios recientes. Solo lectura.
-import { ArrowLeft, BookOpen, ChevronRight, FileText, Folder, FolderOpen, GitCommitHorizontal, Link2, Search, X } from 'lucide-react';
+// Bóveda: árbol de notas, búsqueda, grafo de conexiones (como Obsidian), lectura con [[enlaces]] y retroenlaces, y
+// cambios recientes. Solo lectura.
+import { ArrowLeft, BookOpen, ChevronRight, FileText, Folder, FolderOpen, GitCommitHorizontal, Link2, Network, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
+import Grafo from '../componentes/Grafo.jsx';
 import Markdown, { indiceNotas } from '../componentes/Markdown.jsx';
 import { Cargando, cx, Fallo, Insignia, Tarjeta, Vacio } from '../componentes/ui.jsx';
 
@@ -136,7 +138,6 @@ function Cambios() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-8">
-        <h2 className="mb-1 text-[22px] font-semibold tracking-tight text-white">Bóveda</h2>
         <p className="mb-6 text-[13px] text-apagado">Memoria compartida entre proyectos y sesiones. Elige una nota o busca a la izquierda.</p>
         <Tarjeta titulo="Cambios recientes" icono={GitCommitHorizontal} cuerpo="p-2">
           {!datos && <Cargando className="p-3" />}
@@ -155,6 +156,37 @@ function Cambios() {
   );
 }
 
+/** Portada de la bóveda: el grafo de conexiones (por defecto) o los cambios recientes. */
+function Portada({ alCerrar }) {
+  const [vista, setVista] = useState(() => { try { return localStorage.getItem('boveda.vista') ?? 'grafo'; } catch { return 'grafo'; } });
+  const { datos, error } = useDatos(vista === 'grafo' ? '/api/boveda/grafo' : null, { cada: 30_000 });
+  const elegir = (v) => { setVista(v); try { localStorage.setItem('boveda.vista', v); } catch { /* sin almacenamiento */ } };
+  const pestana = (v, Icono, texto) => (
+    <button type="button" role="tab" aria-selected={vista === v} onClick={() => elegir(v)}
+      className={cx('flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px]', vista === v ? 'bg-elevado text-white' : 'text-tenue hover:text-texto')}>
+      <Icono className="size-3.5" /> {texto}
+    </button>
+  );
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-borde px-4 py-2.5 md:px-6">
+        {alCerrar && <button type="button" onClick={alCerrar} className="text-apagado hover:text-texto md:hidden" aria-label="Volver"><ArrowLeft className="size-5" /></button>}
+        <h2 className="mr-2 text-[17px] font-semibold tracking-tight text-white">Bóveda</h2>
+        <div role="tablist" aria-label="Vista de la bóveda" className="flex gap-1">
+          {pestana('grafo', Network, 'Grafo')}
+          {pestana('cambios', GitCommitHorizontal, 'Cambios recientes')}
+        </div>
+        {vista === 'grafo' && datos && <span className="ml-auto hidden text-[12px] text-apagado sm:inline">{datos.nodos.filter((n) => !n.fantasma).length} notas · {datos.aristas.length} conexiones</span>}
+      </div>
+      <div className="min-h-0 flex-1">
+        {vista === 'cambios' ? <Cambios /> : datos
+          ? <Grafo datos={datos} alAbrir={(ruta) => { window.location.hash = enlace('boveda', ruta); }} />
+          : error ? <div className="p-8"><Fallo error={error} /></div> : <div className="p-8"><Cargando /></div>}
+      </div>
+    </div>
+  );
+}
+
 export default function Boveda({ resto }) {
   const { datos: notas, error } = useDatos('/api/boveda/notas', { cada: 30_000 });
   const [consulta, setConsulta] = useState('');
@@ -162,6 +194,8 @@ export default function Boveda({ resto }) {
   const arbol = useMemo(() => construirArbol(notas ?? []), [notas]);
   const indice = useMemo(() => indiceNotas(notas ?? []), [notas]);
   const ruta = resto || null;
+  const [grafoMovil, setGrafoMovil] = useState(false); // en el móvil, el grafo ocupa la pantalla en vez del árbol
+  useEffect(() => { if (ruta) setGrafoMovil(false); }, [ruta]);
 
   // Al abrir una nota, desplegar sus carpetas.
   useEffect(() => {
@@ -174,11 +208,14 @@ export default function Boveda({ resto }) {
 
   return (
     <div className="flex h-full">
-      <aside className={cx('w-full shrink-0 flex-col border-r border-borde bg-panel/50 md:flex md:w-72', ruta ? 'hidden' : 'flex')}>
+      <aside className={cx('w-full shrink-0 flex-col border-r border-borde bg-panel/50 md:flex md:w-72', ruta || grafoMovil ? 'hidden' : 'flex')}>
         <div className="px-3 pt-4 pb-2">
           <div className="flex items-center justify-between px-1 pb-3">
             <h1 className="text-[15px] font-semibold text-white">Bóveda</h1>
-            <span className="text-[11px] text-apagado">{notas ? `${notas.length} notas` : ''}</span>
+            <span className="flex items-center gap-2 text-[11px] text-apagado">
+              {notas ? `${notas.length} notas` : ''}
+              <button type="button" onClick={() => setGrafoMovil(true)} className="flex items-center gap-1 rounded-md border border-borde px-2 py-1 text-tenue hover:text-texto md:hidden"><Network className="size-3.5" /> Grafo</button>
+            </span>
           </div>
           <label className="flex h-9 items-center gap-2 rounded-xl border border-borde bg-elevado/60 px-3 focus-within:border-raptor/40">
             <Search className="size-4 text-apagado" />
@@ -200,8 +237,8 @@ export default function Boveda({ resto }) {
           )}
         </div>
       </aside>
-      <section className={cx('min-w-0 flex-1', !ruta && 'hidden md:block')}>
-        {ruta ? <Nota key={ruta} ruta={ruta} indice={indice} /> : <Cambios />}
+      <section className={cx('min-w-0 flex-1', !ruta && !grafoMovil && 'hidden md:block')}>
+        {ruta ? <Nota key={ruta} ruta={ruta} indice={indice} /> : <Portada alCerrar={grafoMovil ? () => setGrafoMovil(false) : null} />}
       </section>
     </div>
   );

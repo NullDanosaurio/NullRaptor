@@ -1,5 +1,16 @@
 # Registro de trabajo
 
+## 03/11/2026 — Grafo de la bóveda (como Obsidian)
+- [U] Daniel quiere ver la bóveda como el grafo de Obsidian, «el cerebro con conexiones», en la vista Bóveda.
+- `GET /api/boveda/grafo` (`panel/lib/boveda.mjs`): notas como nodos, `[[enlaces]]` resueltos por ruta o nombre como
+  conexiones sin dirección, nodos fantasma para lo que aún no existe; grupo = carpeta de hasta dos niveles.
+- `panel/src/grafo.js` (física sin dependencias: repulsión, muelles, gravedad, se para sola) y
+  `componentes/Grafo.jsx` (canvas: colores por carpeta, tamaño por conexiones, desplazar, zoom con rueda o dos
+  dedos, arrastrar nodos, resaltar vecinas al pasar por encima, clic abre la nota, botones Fantasmas y Centrar,
+  leyenda). La portada de la Bóveda tiene pestañas Grafo / Cambios recientes; en el móvil, botón «Grafo».
+- Pruebas [O]: 119/119. Probado en el PC de Daniel con una copia del panel en 4777 (abierta en Edge desde el puente):
+  61 notas y 101 conexiones; ajustados los colores (dos niveles), los nombres visibles y las notas sueltas.
+
 ## 03/11/2026 — Puente con el PC probado en modo completo
 - Pruebas [O] contra MAQUINOTE con la imagen 05864ef: `ejecutar` (PowerShell 5.1, acentos, código de salida y
   errores), `enviar`/`traer` de 20 MB idénticos (SHA-256; 1 s y 2 s), `ventanas`, `captura` de los dos monitores
