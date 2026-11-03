@@ -33,7 +33,7 @@ function Tarea({ t, vivo }) {
     <li className={cx('rounded-xl border p-3.5 transition-colors', activa ? 'border-raptor/30 bg-raptor/[0.04]' : 'border-borde bg-elevado/30')}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-[12px] text-apagado">{t.id}</span>
-        <span className="min-w-0 flex-1 truncate font-medium text-texto">{t.titulo}</span>
+        <span className="line-clamp-2 min-w-0 flex-1 font-medium text-texto [overflow-wrap:anywhere]" title={t.titulo}>{t.titulo}</span>
         <Insignia tono={e.tono}>{e.texto}</Insignia>
       </div>
       {t.dependencias.length > 0 && t.estado === 'pendiente' && <p className="mt-1.5 text-[12px] text-apagado">Depende de {t.dependencias.join(', ')}</p>}
@@ -166,17 +166,20 @@ function SesionProyecto({ nombre }) {
       {!viva && (
         <div className={cx('flex flex-wrap items-center gap-3 rounded-2xl border border-borde bg-panel/80 p-4', sesiones.length > 0 && 'mt-3')}>
           <SquareTerminal className="size-5 text-raptor" />
-          <p className="min-w-0 flex-1 text-[13px] text-tenue">
+          <p className="min-w-0 flex-1 basis-[calc(100%-2.75rem)] text-[13px] text-tenue sm:basis-0">
             {datos.terminal === false ? 'Desde la red de casa con solo el código no se abre la terminal.'
               : activas >= datos.maxTotal ? `Ya hay ${activas} sesiones abiertas (el máximo): cierra alguna.`
                 : 'Claude Code en este proyecto: en la terminal del panel y a la vez en claude.ai o la app. Pregunta antes de cada acción.'}
           </p>
-          <Boton disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true)} title="Retoma la última conversación de Claude en este proyecto">
-            Continuar la anterior
-          </Boton>
-          <Boton variante="primario" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(false)}>
-            {abriendo ? <><Loader2 className="size-4 animate-spin" /> Abriendo…</> : 'Abrir sesión'}
-          </Boton>
+          {/* En el móvil, los botones debajo del texto y a lo ancho (fáciles de pulsar). */}
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Boton className="flex-1 justify-center sm:flex-none" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true)} title="Retoma la última conversación de Claude en este proyecto">
+              <span className="sm:hidden">Continuar</span><span className="hidden sm:inline">Continuar la anterior</span>
+            </Boton>
+            <Boton className="flex-1 justify-center sm:flex-none" variante="primario" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(false)}>
+              {abriendo ? <><Loader2 className="size-4 animate-spin" /> Abriendo…</> : 'Abrir sesión'}
+            </Boton>
+          </div>
         </div>
       )}
     </div>

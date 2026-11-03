@@ -104,3 +104,7 @@ body {
 .prosa th, .prosa td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--color-borde); vertical-align: top; }
 .prosa tr:last-child td { border-bottom: 0; }
 .prosa input[type="checkbox"] { accent-color: var(--color-raptor); margin-right: 0.4rem; }
+
+/* En un grid, un hijo crece por defecto hasta su contenido más largo (un commit, una ruta) y se sale por la derecha en
+   el móvil: que puedan encogerse. */
+.grid > * { min-width: 0; }
