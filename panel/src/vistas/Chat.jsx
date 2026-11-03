@@ -5,6 +5,7 @@
 import { ArrowLeft, ArrowUp, AudioLines, BookCheck, ChevronDown, History, Loader2, MessagesSquare, Mic, Plus, Square, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { enlace, get, haceCuanto, ir, post, useDatos } from '../api.js';
+import Copiar from '../componentes/Copiar.jsx';
 import Markdown from '../componentes/Markdown.jsx';
 import { Avatar, Boton, Cargando, cx, Fallo, Insignia, PERSONAS, Punto, Vacio } from '../componentes/ui.jsx';
 import { useVoz } from '../voz.js';
@@ -23,8 +24,10 @@ function Mensaje({ m }) {
     <div className={cx('flex gap-3 animate-entrar', mio && 'flex-row-reverse')}>
       <Avatar quien={m.quien} className="mt-0.5" />
       <div className={cx('flex min-w-0 max-w-[min(42rem,85%)] flex-col gap-1', mio && 'items-end')}>
-        <span className={cx('text-[12px] font-medium', PERSONAS[m.quien]?.texto)}>
+        <span className={cx('flex items-center text-[12px] font-medium', PERSONAS[m.quien]?.texto)}>
           {PERSONAS[m.quien]?.nombre}{m.hora && <span className="ml-2 font-normal text-apagado">{new Date(m.hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>}
+          {/* En las respuestas de la IA: copia el mensaje tal cual (con su Markdown). */}
+          {!mio && <Copiar texto={m.texto} className="ml-1 font-normal" titulo="Copiar el mensaje" />}
         </span>
         <div className={cx('rounded-[18px] px-4 py-2.5 text-[14.5px]', mio ? 'rounded-tr-md bg-elevado text-texto' : 'rounded-tl-md border border-borde bg-panel')}>
           {mio ? <p className="whitespace-pre-wrap leading-relaxed">{m.texto}</p> : <Markdown texto={m.texto} />}
