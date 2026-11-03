@@ -243,6 +243,39 @@ lee en voz alta («Callar» la corta) y, en este modo, la IA contesta como **Jar
 funciona desde este equipo (localhost) o por Tailscale (https); por la red de casa (http) el navegador no lo deja.
 Tiempos en el i9: Kokoro ~2 s por cada 7 s de audio; Whisper ~2 s por frase.
 
+## Director IA: un equipo de subagentes (03/11/2026)
+
+Perfil opcional (desactivado por defecto) que convierte la sesión de Claude Code en el **Director** de un estudio:
+coordina seis subagentes y responde de la calidad. Se elige al abrir la sesión en **Proyectos** (selector «Perfil:
+Normal / Director IA»; se recuerda por proyecto en el navegador) o al crear un chat.
+
+| Rol | Subagente | Modelo | Herramientas | Gasta de |
+|---|---|---|---|---|
+| Producto (Lucía) | `equipo-producto` | Sonnet | Read, Grep, Glob | Claude |
+| Arquitectura (Marcos) | `equipo-arquitectura` | el de la sesión | Read, Grep, Glob | Claude |
+| Desarrollo (Iker) | `equipo-desarrollo` | Sonnet | + Bash, Edit, Write | Claude (revisión) y **Codex** (código) |
+| Calidad (Sara), veto | `equipo-calidad` | Sonnet | Read, Grep, Glob, Bash | Claude (+ Codex opcional) |
+| Seguridad (Óscar), veto | `equipo-seguridad` | el de la sesión | Read, Grep, Glob, Bash | Claude |
+| Diseño/UX (Nora) | `equipo-diseno` | Sonnet | Read, Grep, Glob, Bash | Claude |
+
+- **Dónde está:** `config/perfiles/director.md` (el perfil) y `config/agentes/equipo-*.md` (el equipo). Al arrancar,
+  `prepararIA` copia el equipo a `CLAUDE_CONFIG_DIR/agents/` y retira los `equipo-*` que ya no existan; nada llega
+  a los proyectos. El perfil se pasa con `--append-system-prompt` al abrir la sesión (lista cerrada `PERFILES`).
+- **Nada está hecho** sin `VEREDICTO: APROBADO` de Calidad (y de Seguridad si toca entradas, permisos, secretos,
+  red o dependencias). Los subagentes no hablan con Daniel: devuelven sus preguntas al Director.
+- **Codex programa** desde Desarrollo con `scripts/codex-parche.mjs`: los archivos van por la entrada (sin pasar por
+  el contexto de Claude), Codex devuelve un diff y se aplica con `git apply`. Así se hace porque en el contenedor el
+  sandbox de Codex (bwrap) no puede crear namespaces y Codex no puede ejecutar nada. El script solo admite archivos
+  del proyecto y rechaza secretos (`.env`, claves, credenciales).
+- **En el chat** (solo lectura) el Director va en modo consultor: analiza y opina; el equipo trabaja en las sesiones.
+  Codex no tiene subagentes: con Codex no hay perfil.
+- **Añadir un rol:** crea `config/agentes/equipo-<rol>.md` con el frontmatter (`name`, `description`, `tools`,
+  `model`) y las reglas comunes del equipo, nómbralo en `config/perfiles/director.md` y amplía la prueba de
+  subagentes en `tests/ia.test.mjs`. **Añadir un perfil:** `config/perfiles/<id>.md` + `PERFILES` en `scripts/ia.mjs`
+  + la lista del selector en `panel/src/componentes/Perfil.jsx`.
+- Ojo: `tools` no admite patrones como `Bash(npm test:*)` (probado con Claude Code 2.1.308: el subagente ejecutó
+  otras órdenes). Que Calidad, Seguridad y Diseño no modifiquen nada es una norma escrita en su archivo.
+
 ## Panel web: una sola interfaz
 
 `panel/` (añadido el 29/10/2026; reorganizado en la fase 4, 02/11/2026). Servidor Node sin dependencias

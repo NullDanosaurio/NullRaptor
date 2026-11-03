@@ -1,5 +1,23 @@
 # Registro de trabajo
 
+## 03/11/2026 — Director IA: equipo de subagentes, perfil y Codex como programador
+- [U] Daniel: perfil «Director IA» que coordina Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño/UX;
+  encargo detallado (subagentes, perfil, instalación, activación opcional, pruebas, documentación). Nombre: NullRaptor.
+- [U] Por el gasto de tokens: un modelo por rol ya (Arquitectura y Seguridad heredan el de la sesión; el resto,
+  Sonnet) y **Codex** en el equipo, que gasta de la cuenta de ChatGPT. Jev queda para después; si el propio equipo
+  basta para ahorrar, lo sustituye.
+- Comprobado [O]: `tools: Bash(echo:*)` en un subagente no restringe (ejecutó `ls /`) → norma escrita en Calidad,
+  Seguridad y Diseño. El sandbox de Codex no funciona en el contenedor («bwrap: No permissions to create a new
+  namespace»): ni `workspace-write` ni `read-only` pueden ejecutar órdenes (el flujo con Codex tampoco podrá aquí).
+  Alternativa probada: archivos por la entrada → diff → `git apply` (`scripts/codex-parche.mjs`, también
+  `--revisar` para una segunda opinión de Calidad).
+- Decisiones [P→U]: Director en modo consultor en el chat (sin ampliar sus herramientas); perfil recordado en
+  localStorage por proyecto; el registro y `reanudar.json` guardan solo el nombre del perfil (una sesión del
+  Director vuelve como Director tras actualizar); perfil desconocido → 400; con Codex, sin perfil.
+- Pruebas [O]: 140/140. Selector revisado a 360 px. API: perfil inválido y Codex+Director → 400. codex-parche real:
+  aplica un diff, rechaza `.env` y revisa («Sin objeciones»). [?] Sin probar: una sesión real del Director con el
+  equipo (queda para la primera tarea del equipo, revisar su propio funcionamiento).
+
 ## 03/11/2026 — El panel, pensado para el móvil (y la app)
 - [U] Daniel: «las apps que realizas son navegadores sin más, apenas es responsive, no es cómodo navegar», y no
   encuentra el modo voz en la app. Lección de Roleplay (bóveda): revisar con capturas a 320–412 px, no suponerlo.
