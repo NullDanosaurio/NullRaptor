@@ -17,6 +17,16 @@
 - Pruebas [O]: 140/140. Selector revisado a 360 px. API: perfil inválido y Codex+Director → 400. codex-parche real:
   aplica un diff, rechaza `.env` y revisa («Sin objeciones»). [?] Sin probar: una sesión real del Director con el
   equipo (queda para la primera tarea del equipo, revisar su propio funcionamiento).
+- Primera tarea del equipo [O]: el Director (`claude -p`, solo lectura, sin MCP) revisó su propio funcionamiento
+  con Marcos e Iker. 0,53 USD en 91 s: Opus (el Director) 0,47 y Sonnet (subagentes) 0,06. Hallazgos: el gasto
+  está en los lanzamientos (4–8 k tokens fijos cada uno) y en leer el diff y las pruebas varias veces, no en el
+  texto de los prompts. Veredicto sobre Jev: no hace falta (modelo por rol + Codex ya cubren; Jev saldría de la
+  suscripción a pago por API y mandaría el código a TypeSafe).
+- Aplicado [P→U] (bajo riesgo, sin tocar reglas de Daniel): `codex-parche --probar` (aplica, prueba y devuelve
+  «pasan» o el final), salidas recortadas a 15 líneas con el resto en un archivo, encargos cortos y máximo dos
+  llamadas a Codex por tarea, diff leído una sola vez, informes de 10 líneas si se aprueba, el Director no lee el
+  código que revisa otro y nada de enjambres de Ruflo. Pendiente de Daniel: Calidad opcional en cambios pequeños,
+  Producto y Arquitectura solo cuando hagan falta, Seguridad en Sonnet.
 
 ## 03/11/2026 — El panel, pensado para el móvil (y la app)
 - [U] Daniel: «las apps que realizas son navegadores sin más, apenas es responsive, no es cómodo navegar», y no

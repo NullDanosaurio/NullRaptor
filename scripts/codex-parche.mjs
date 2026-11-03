@@ -2,7 +2,8 @@
 // (bwrap) no puede crear namespaces, así que Codex no puede leer ni escribir por sí mismo. Este script le manda el
 // encargo y los archivos por la entrada, recibe un diff unificado y lo aplica con `git apply`. Los archivos van de
 // disco a Codex sin pasar por el contexto de Claude: así el código lo escribe la cuenta de ChatGPT.
-//   node scripts/codex-parche.mjs [--aplicar] archivo… < encargo     diff (con --aplicar, también lo aplica)
+//   node scripts/codex-parche.mjs [--aplicar] [--probar "orden"] archivo… < encargo
+//       diff; con --aplicar lo aplica y con --probar pasa las pruebas después («pasan» o el final de la salida)
 //   git diff | node scripts/codex-parche.mjs --revisar [archivo…]     revisión en texto (segunda opinión)
 // Se ejecuta en la carpeta del proyecto; solo admite archivos dentro de él y nunca secretos (.env, claves…).
 import { spawnSync } from 'node:child_process';
@@ -13,6 +14,7 @@ import { pathToFileURL } from 'node:url';
 import { BIN } from '../flujo/lib/comun.mjs';
 
 export const MAX_ARCHIVOS = 300 * 1024;
+export const MAX_LINEAS = 15; // lo que vuelve al contexto de Claude cuando algo falla; el texto entero, a un archivo
 const SECRETO = /(^|\/)(\.env(\..*)?|.*\.(pem|key|p12|pfx)|id_(rsa|ed25519|ecdsa)(\.pub)?|credenciales.*|\.credentials\.json|passkeys\.json)$/i;
 const fallo = (mensaje) => Object.assign(new Error(mensaje), { usuario: true });
 
@@ -74,11 +76,36 @@ function preguntarCodex(raiz, mensaje) {
   return respuesta;
 }
 
+/** Las últimas `max` líneas de un texto largo; el texto completo se guarda en un archivo temporal (se dice cuál). */
+export function recortar(texto, max = MAX_LINEAS, guardar = guardarTemporal) {
+  const lineas = String(texto ?? '').trim().split('\n');
+  if (lineas.length <= max) return lineas.join('\n');
+  return `… (${lineas.length - max} líneas antes; completo en ${guardar(lineas.join('\n'))})\n${lineas.slice(-max).join('\n')}`;
+}
+
+function guardarTemporal(texto) {
+  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'codex-parche-')), 'salida.txt');
+  fs.writeFileSync(archivo, texto);
+  return archivo;
+}
+
+/** Separa «--probar orden» del resto de argumentos. */
+export function leerArgumentos(argv) {
+  const opciones = new Set();
+  const rutas = [];
+  let probar = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--probar') { probar = argv[i + 1] ?? ''; i += 1; } else if (argv[i].startsWith('--')) opciones.add(argv[i]); else rutas.push(argv[i]);
+  }
+  if (probar !== null && !probar.trim()) throw fallo('--probar necesita la orden de las pruebas (p. ej. --probar "npm test").');
+  if (probar !== null) opciones.add('--aplicar'); // probar sin aplicar no tiene sentido
+  return { opciones, rutas, probar };
+}
+
 const git = (raiz, args, input) => spawnSync('git', args, { cwd: raiz, input, encoding: 'utf8' });
 
 async function principal(argv) {
-  const opciones = new Set(argv.filter((a) => a.startsWith('--')));
-  const rutas = argv.filter((a) => !a.startsWith('--'));
+  const { opciones, rutas, probar } = leerArgumentos(argv);
   const raiz = git(process.cwd(), ['rev-parse', '--show-toplevel']).stdout?.trim() || process.cwd();
   const entrada = fs.readFileSync(0, 'utf8').trim();
   if (!entrada) throw fallo('Falta el encargo (o el diff con --revisar) por la entrada estándar.');
@@ -91,17 +118,21 @@ async function principal(argv) {
   if (!rutas.length) throw fallo('Indica los archivos que Codex debe ver o crear.');
   const respuesta = preguntarCodex(raiz, construirEncargo({ encargo: entrada, archivos }));
   const diff = extraerDiff(respuesta);
-  if (!diff) { process.stdout.write(`Codex no devolvió un diff:\n${respuesta.trim().slice(0, 2000)}\n`); return 3; }
+  if (!diff) { process.stdout.write(`Codex no devolvió un diff:\n${recortar(respuesta)}\n`); return 3; }
   const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'codex-parche-')), 'cambio.diff');
   fs.writeFileSync(archivo, diff);
   const prueba = git(raiz, ['apply', '--check', '--recount', archivo]);
-  if (prueba.status !== 0) { process.stdout.write(`El diff no aplica (${archivo}):\n${prueba.stderr.trim()}\n`); return 4; }
+  if (prueba.status !== 0) { process.stdout.write(`El diff no aplica (${archivo}):\n${recortar(prueba.stderr)}\n`); return 4; }
   const resumen = git(raiz, ['apply', '--stat', '--recount', archivo]).stdout.trim();
   if (!opciones.has('--aplicar')) { process.stdout.write(`Diff en ${archivo} (aplica limpio, sin aplicar):\n${resumen}\n`); return 0; }
   const r = git(raiz, ['apply', '--recount', archivo]);
-  if (r.status !== 0) { process.stdout.write(`No se pudo aplicar:\n${r.stderr.trim()}\n`); return 4; }
-  process.stdout.write(`Aplicado (diff en ${archivo}):\n${resumen}\nRevisa con git diff y pasa las pruebas.\n`);
-  return 0;
+  if (r.status !== 0) { process.stdout.write(`No se pudo aplicar:\n${recortar(r.stderr)}\n`); return 4; }
+  process.stdout.write(`Aplicado (diff en ${archivo}):\n${resumen}\n`);
+  if (!probar) { process.stdout.write('Revisa con git diff --stat y pasa las pruebas.\n'); return 0; }
+  const t = spawnSync('sh', ['-c', probar], { cwd: raiz, encoding: 'utf8', timeout: 20 * 60_000, maxBuffer: 64 * 1024 * 1024 });
+  if (t.status === 0) { process.stdout.write(`Pruebas (${probar}): pasan.\n`); return 0; }
+  process.stdout.write(`Pruebas (${probar}): FALLAN (código ${t.status ?? t.error?.message}).\n${recortar(`${t.stdout ?? ''}\n${t.stderr ?? ''}`, 30)}\n`);
+  return 5;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

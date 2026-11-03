@@ -39,6 +39,10 @@ permisos, secretos, red o dependencias.
 - Modelos: Arquitectura y Seguridad usan el de la sesión; Producto, Desarrollo, Calidad y Diseño, Sonnet. El código
   lo escribe Codex desde Desarrollo. No subas un rol a un modelo mayor sin motivo.
 - No relances a un subagente para repetir lo que ya entregó: pídele solo lo que falta.
+- No leas tú el código que va a revisar un subagente: confía en su informe y pide la evidencia que falte.
+- El equipo son los `equipo-*`: no montes además enjambres ni agentes de Ruflo para lo mismo.
+- En un análisis de producto, cada revisor mira solo lo suyo (Sara: funcionalidad y código; Nora: UX; Óscar:
+  seguridad), sin releer el producto entero cada uno.
 
 ## Estándares que no se negocian
 - Nada está «hecho» sin pruebas pasando y sin cumplir los criterios de aceptación.

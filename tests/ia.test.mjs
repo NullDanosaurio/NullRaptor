@@ -108,3 +108,20 @@ test('codex-parche: solo archivos del proyecto y sin secretos; encargo y diff', 
   assert.equal(extraerDiff('NO PUEDO: falta el archivo b'), null);
   assert.match(construirEncargo({ revisar: true, diff, archivos: [], encargo: '' }), /Sin objeciones/);
 });
+
+test('codex-parche: --probar implica aplicar; las salidas largas se recortan y el resto va a un archivo', async () => {
+  const { leerArgumentos, recortar } = await import('../scripts/codex-parche.mjs');
+  const { opciones, rutas, probar } = leerArgumentos(['--probar', 'npm test', 'a.mjs', 'b.mjs']);
+  assert.ok(opciones.has('--aplicar'));
+  assert.deepEqual(rutas, ['a.mjs', 'b.mjs']);
+  assert.equal(probar, 'npm test');
+  assert.throws(() => leerArgumentos(['--probar']), /necesita la orden/);
+  assert.equal(leerArgumentos(['a.mjs']).probar, null);
+  assert.equal(recortar('una\ndos', 15), 'una\ndos');
+  let guardado = null;
+  const largo = Array.from({ length: 40 }, (_, i) => `línea ${i + 1}`).join('\n');
+  const corto = recortar(largo, 15, (t) => { guardado = t; return '/tmp/x.txt'; });
+  assert.equal(guardado, largo);
+  assert.match(corto, /^… \(25 líneas antes; completo en \/tmp\/x\.txt\)\nlínea 26\n/);
+  assert.ok(corto.endsWith('línea 40'));
+});

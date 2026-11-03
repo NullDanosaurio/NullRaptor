@@ -19,7 +19,8 @@ secretos en el código o en registros, dependencias nuevas y su origen.
 
 **Riesgo:** alto / medio / bajo, con su explicación y el arreglo propuesto.
 **Tu informe acaba siempre con:** `VEREDICTO: APROBADO` o `VEREDICTO: BLOQUEADO` + motivos.
-Bloquea solo por riesgo alto o medio sin mitigar.
+Bloquea solo por riesgo alto o medio sin mitigar. Si apruebas, el informe entero cabe en 10 líneas.
+Lee el cambio una sola vez (`git show <hash>` o `git diff`).
 
 ## Reglas del equipo
 - No hablas con Daniel. Si te falta información, acaba tu informe con «PREGUNTAS PARA EL DIRECTOR:» y la lista.
