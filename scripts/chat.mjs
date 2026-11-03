@@ -8,8 +8,9 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BIN, entornoSeguro } from '../flujo/lib/comun.mjs';
+import { leerPerfil } from './ia.mjs';
 
 export const IAS = ['claude', 'codex'];
 export const NOMBRE = { dano: 'Dano', claude: 'Claude', codex: 'Codex' };
@@ -73,10 +74,22 @@ export const PERSONA_JARVIS = 'Modo voz: eres Jarvis, el asistente personal de D
   + 'Tono formal y cercano: tratas a Daniel de «señor», con un punto de humor seco y discreto, nunca servil. '
   + 'Si algo necesita detalle (código, rutas, listas largas), dilo en una frase y ofrece dejarlo por escrito.';
 
-async function preguntarClaude(proyecto, entrada, sesion, { voz = false } = {}) {
+const AGENTE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/** El chat solo lee: el Director no puede lanzar a su equipo aquí, así que va en modo consultor. */
+export const NOTA_CONSULTOR = 'Modo consultor: en este chat solo analizas y opinas (puedes leer el proyecto, no modificarlo ni lanzar '
+  + 'subagentes). El equipo trabaja en las sesiones remotas; si hace falta construir algo, propón el encargo para una sesión.';
+
+/** Argumentos de Claude para un turno del chat: solo lectura, sin MCP; voz y perfil en un único --append-system-prompt. */
+export function argsClaude({ voz = false, perfil = null, sesion = null } = {}) {
   const args = ['-p', '--output-format', 'json', '--tools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk', '--strict-mcp-config'];
-  if (voz) args.push('--append-system-prompt', PERSONA_JARVIS);
+  const extra = [perfil ? `${leerPerfil(AGENTE, perfil)}\n\n${NOTA_CONSULTOR}` : null, voz ? PERSONA_JARVIS : null].filter(Boolean);
+  if (extra.length) args.push('--append-system-prompt', extra.join('\n\n'));
   if (sesion) args.push('--resume', sesion);
+  return args;
+}
+
+async function preguntarClaude(proyecto, entrada, sesion, { voz = false, perfil = null } = {}) {
+  const args = argsClaude({ voz, perfil, sesion });
   const r = await correr(BIN.claude, args, { cwd: proyecto, input: entrada, timeout: 10 * 60_000 });
   try {
     const j = JSON.parse(r.stdout);
@@ -141,11 +154,17 @@ export function limpiarChats(carpeta) {
  * Solo un mensaje a la vez (las IA contestan por turnos).
  */
 export class Chat extends EventEmitter {
-  /** `ia`: con 'claude' o 'codex' contesta solo esa (el panel); sin ella, las dos por turnos (la terminal). */
-  constructor({ ruta, carpeta, ia = null }) {
+  /** `ia`: con 'claude' o 'codex' contesta solo esa (el panel); sin ella, las dos por turnos (la terminal).
+   * `perfil` (de PERFILES, solo con Claude): el Director en modo consultor. Codex no tiene subagentes: sin perfil. */
+  constructor({ ruta, carpeta, ia = null, perfil = null }) {
     super();
     if (ia !== null && !IAS.includes(ia)) throw new Error(`IA desconocida: ${ia}`);
+    if (perfil) {
+      if (ia !== 'claude') throw Object.assign(new Error('Codex no tiene subagentes: responde sin perfil.'), { codigo: 400 });
+      leerPerfil(AGENTE, perfil); // valida (400 si no está en la lista)
+    }
     this.ia = ia;
+    this.perfil = perfil || null;
     this.proyecto = { ruta, nombre: path.basename(ruta) };
     this.carpeta = carpeta;
     limpiarChats(carpeta);
@@ -182,7 +201,7 @@ export class Chat extends EventEmitter {
         try {
           const entrada = pendientes(this.historial, e.vistos, ia, this.proyecto.nombre);
           const r = ia === 'claude'
-            ? await preguntarClaude(this.proyecto.ruta, entrada, e.sesion, { voz })
+            ? await preguntarClaude(this.proyecto.ruta, entrada, e.sesion, { voz, perfil: this.perfil })
             : await preguntarCodex(this.proyecto.ruta, voz ? `${PERSONA_JARVIS}\n\n${entrada}` : entrada, e.sesion, path.join(this.carpeta, `.codex-${path.basename(this.registro, '.md')}.txt`));
           e.sesion = r.sesion;
           this.anotar(ia, r.texto || '(sin respuesta)');

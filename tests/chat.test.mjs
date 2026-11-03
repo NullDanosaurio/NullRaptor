@@ -44,3 +44,32 @@ test('con una IA elegida (panel) solo contesta esa, aunque el mensaje lleve @ de
     assert.throws(() => new Chat({ ruta: base, carpeta: path.join(base, 'chats'), ia: 'gemini' }), /desconocida/);
   } finally { Object.assign(BIN, antes); }
 });
+
+test('chat con perfil: el Director va en modo consultor; voz + perfil, un único --append-system-prompt', async () => {
+  const { argsClaude, Chat, NOTA_CONSULTOR, PERSONA_JARVIS } = await import('../scripts/chat.mjs');
+  const { leerPerfil } = await import('../scripts/ia.mjs');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const cuenta = (a) => a.filter((x) => x === '--append-system-prompt').length;
+  const valor = (a) => a[a.indexOf('--append-system-prompt') + 1];
+
+  const normal = argsClaude();
+  assert.equal(cuenta(normal), 0);
+  assert.ok(normal.includes('Read,Grep,Glob') && normal.includes('--strict-mcp-config')); // sigue siendo de solo lectura
+  assert.equal(valor(argsClaude({ voz: true })), PERSONA_JARVIS);
+  const ambos = argsClaude({ voz: true, perfil: 'director', sesion: 's1' });
+  assert.equal(cuenta(ambos), 1);
+  assert.equal(valor(ambos), `${leerPerfil(agente, 'director')}\n\n${NOTA_CONSULTOR}\n\n${PERSONA_JARVIS}`);
+  assert.deepEqual(ambos.slice(-2), ['--resume', 's1']);
+  assert.deepEqual(argsClaude({ perfil: 'director' }).filter((x, i, a) => a[i - 1] !== '--append-system-prompt' && x !== '--append-system-prompt'), normal);
+  assert.throws(() => argsClaude({ perfil: 'otro' }), (e) => e.codigo === 400);
+
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'chat-perfil-'));
+  const carpeta = path.join(base, 'chats');
+  assert.equal(new Chat({ ruta: base, carpeta, ia: 'claude', perfil: 'director' }).perfil, 'director');
+  assert.throws(() => new Chat({ ruta: base, carpeta, ia: 'codex', perfil: 'director' }), /Codex no tiene subagentes/);
+  assert.throws(() => new Chat({ ruta: base, carpeta, ia: 'claude', perfil: '../x' }), (e) => e.codigo === 400);
+});

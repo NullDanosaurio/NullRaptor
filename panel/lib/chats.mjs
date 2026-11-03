@@ -14,12 +14,13 @@ export class Chats {
     this.abiertos = new Map(); // id → { chat, clientes: Set<res>, creado }
   }
 
-  /** Abre un chat sobre el proyecto con una sola IA ('claude' o 'codex'), elegida por Daniel. */
-  crear(ruta, ia) {
+  /** Abre un chat sobre el proyecto con una sola IA ('claude' o 'codex'), elegida por Daniel, y opcionalmente un
+   * perfil (solo Claude; el Director va en modo consultor). */
+  crear(ruta, ia, perfil = null) {
     if (!IAS.includes(ia)) throw Object.assign(new Error('Elige con quién hablar: Claude o Codex.'), { codigo: 400 });
     if (this.abiertos.size >= MAX_ABIERTOS) throw new Error(`Máximo ${MAX_ABIERTOS} chats abiertos: cierra alguno.`);
     const id = randomUUID();
-    const chat = new Chat({ ruta, carpeta: this.carpeta, ia });
+    const chat = new Chat({ ruta, carpeta: this.carpeta, ia, perfil });
     const entrada = { chat, clientes: new Set(), creado: new Date().toISOString() };
     const emitir = (tipo) => (datos) => { for (const res of entrada.clientes) enviarEvento(res, tipo, datos); };
     chat.on('mensaje', emitir('mensaje'));
@@ -33,13 +34,13 @@ export class Chats {
     const e = this.abiertos.get(id);
     if (!e) return null;
     const { chat } = e;
-    return { id, proyecto: chat.proyecto.nombre, ia: chat.ia, creado: e.creado, historial: chat.historial, escribiendo: chat.escribiendo, ocupado: chat.ocupado };
+    return { id, proyecto: chat.proyecto.nombre, ia: chat.ia, perfil: chat.perfil, creado: e.creado, historial: chat.historial, escribiendo: chat.escribiendo, ocupado: chat.ocupado };
   }
 
   lista() {
     return [...this.abiertos.keys()].map((id) => {
       const r = this.resumen(id);
-      return { id, proyecto: r.proyecto, ia: r.ia, creado: r.creado, mensajes: r.historial.length, ocupado: r.ocupado };
+      return { id, proyecto: r.proyecto, ia: r.ia, perfil: r.perfil, creado: r.creado, mensajes: r.historial.length, ocupado: r.ocupado };
     });
   }
 

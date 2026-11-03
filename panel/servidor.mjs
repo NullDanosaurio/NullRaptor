@@ -187,7 +187,7 @@ export function crearServidor({
     'POST /api/chats': async (_q, cuerpo) => {
       const ruta = rutaProyecto(trabajo, cuerpo.proyecto, memoria);
       if (!ruta) return [404, { error: 'Proyecto no encontrado en este equipo.' }];
-      return [201, { id: chats.crear(ruta, cuerpo.ia) }];
+      return [201, { id: chats.crear(ruta, cuerpo.ia, cuerpo.perfil || null) }];
     },
   };
 
