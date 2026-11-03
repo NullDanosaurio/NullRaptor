@@ -212,10 +212,12 @@ export default function Boveda({ resto }) {
         <div className="px-3 pt-4 pb-2">
           <div className="flex items-center justify-between px-1 pb-3">
             <h1 className="text-[15px] font-semibold text-white">Bóveda</h1>
-            <span className="flex items-center gap-2 text-[11px] text-apagado">
-              {notas ? `${notas.length} notas` : ''}
-              <button type="button" onClick={() => setGrafoMovil(true)} className="flex items-center gap-1 rounded-md border border-borde px-2 py-1 text-tenue hover:text-texto md:hidden"><Network className="size-3.5" /> Grafo</button>
-            </span>
+            <span className="text-[11px] text-apagado">{notas ? `${notas.length} notas` : ''}</span>
+          </div>
+          {/* En el móvil, notas y grafo son dos pestañas grandes (antes el grafo era un botón pequeño que no se veía). */}
+          <div role="tablist" aria-label="Vista de la bóveda" className="mb-3 grid grid-cols-2 gap-1 rounded-xl border border-borde bg-elevado/40 p-1 md:hidden">
+            <button type="button" role="tab" aria-selected="true" className="flex h-11 items-center justify-center gap-2 rounded-lg bg-elevado text-[14px] text-white"><FileText className="size-4" /> Notas</button>
+            <button type="button" role="tab" aria-selected="false" onClick={() => setGrafoMovil(true)} className="flex h-11 items-center justify-center gap-2 rounded-lg text-[14px] text-tenue active:bg-elevado"><Network className="size-4" /> Grafo</button>
           </div>
           <label className="flex h-9 items-center gap-2 rounded-xl border border-borde bg-elevado/60 px-3 focus-within:border-raptor/40">
             <Search className="size-4 text-apagado" />
