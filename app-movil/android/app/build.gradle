@@ -16,7 +16,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Firma de depuración estable (en el volumen de Nullraptor): su huella va en app-movil/firma.json, y con ella el
+    // panel deja a la app usar las passkeys. Sin NULLRAPTOR_ANDROID_FIRMA, la clave de depuración normal de Android.
+    signingConfigs {
+        if (System.getenv('NULLRAPTOR_ANDROID_FIRMA')) {
+            nullraptor {
+                storeFile file(System.getenv('NULLRAPTOR_ANDROID_FIRMA'))
+                storePassword 'android'
+                keyAlias 'nullraptor'
+                keyPassword 'android'
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (System.getenv('NULLRAPTOR_ANDROID_FIRMA')) signingConfig signingConfigs.nullraptor
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
@@ -36,6 +51,7 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion" // passkeys (WebAuthn) dentro de la app
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

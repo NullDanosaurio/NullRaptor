@@ -23,6 +23,7 @@ import { Equipo } from './lib/equipo.mjs';
 import { Proyectos } from './lib/proyectos.mjs';
 import { crearRutasEquipo } from './lib/rutas-equipo.mjs';
 import { crearRutasVoz } from './lib/rutas-voz.mjs';
+import { assetlinks, leerFirma, origenesApp } from './lib/app-android.mjs';
 import { Voz } from './lib/voz.mjs';
 import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
 import { crearRutasProyectos } from './lib/rutas-proyectos.mjs';
@@ -195,6 +196,8 @@ export function crearServidor({
       if (!permitido(req.headers.host)) { res.writeHead(421); res.end(); return; }
       const url = new URL(req.url, 'http://localhost');
       const { pathname: p, searchParams: q } = url;
+      // Público también por Tailscale (sin passkey): Android lo lee para dejar a la app usar las passkeys del dominio.
+      if (p === '/.well-known/assetlinks.json' && req.method === 'GET') { json(res, 200, assetlinks(leerFirma())); return; }
       // Por Tailscale: Origin exacto en toda escritura, /entrar con passkey y sesión obligatoria para lo demás.
       const remota = esRemota(req, dominio);
       let sesion = null;
@@ -281,7 +284,7 @@ if (esPrincipal) {
   if (dominio && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(dominio)) { console.error(`PANEL_DOMINIO no válido: ${dominio}`); process.exit(1); }
   const codigo = red || dominio ? leerOCrearCodigo(archivoCodigo) : null;
   const acceso = red ? crearAcceso(codigo) : null;
-  const passkeys = dominio ? new Passkeys({ archivo: path.join(os.homedir(), '.nullraptor', 'passkeys.json'), dominio }) : null;
+  const passkeys = dominio ? new Passkeys({ archivo: path.join(os.homedir(), '.nullraptor', 'passkeys.json'), dominio, origenesApp: origenesApp(leerFirma()) }) : null;
   const registro = new Registro({ carpeta: path.join(trabajo, 'registros'), avisoUrl: process.env.AVISO_NTFY || null });
   // MCP de las sesiones (con las herramientas aprobadas), rehecho al abrir cada una y al aprobar o desactivar.
   const prepararMcp = () => escribirMcp({ agente: path.resolve(AQUI, '..'), env: process.env, memoria, trabajo });

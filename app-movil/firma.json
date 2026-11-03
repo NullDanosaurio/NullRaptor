@@ -1,0 +1,7 @@
+{
+  "nota": "Apps Android que pueden entrar al panel con tus passkeys. El panel lo publica en /.well-known/assetlinks.json y acepta su origen (android:apk-key-hash). Solo datos públicos: el paquete y la huella SHA-256 del certificado con que se firma. Añadir o quitar una huella es una decisión de seguridad: va en un commit.",
+  "paquete": "es.nullraptor.movil",
+  "huellas": [
+    { "uso": "depuración (clave en /estado/sistema/android/nullraptor-depuracion.keystore)", "sha256": "D1:12:58:E7:04:BF:C0:4F:1D:78:8A:6B:B5:57:A6:A7:B6:A8:FC:EC:1E:E2:9A:13:43:C5:6D:31:48:AD:80:00" }
+  ]
+}

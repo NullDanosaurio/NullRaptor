@@ -29,9 +29,11 @@ export function deB64u(s, max = 16_384) {
 const limpiarNombre = (n) => String(n ?? '').replace(/[^\p{L}\p{N} ._()-]/gu, '').trim().slice(0, 40) || 'Passkey';
 
 export class Passkeys {
-  constructor({ archivo, dominio, ahora = Date.now }) {
+  /** origenesApp: orígenes de la app Android autorizada (app-android.mjs), además de https://<dominio>. */
+  constructor({ archivo, dominio, ahora = Date.now, origenesApp = [] }) {
     this.archivo = archivo;
     this.dominio = dominio;
+    this.origenesApp = origenesApp;
     this.ahora = ahora;
     this.retos = new Map(); // reto → { tipo, expira, usuario? }
     this.altas = new Map(); // código de alta → expira
@@ -77,7 +79,7 @@ export class Passkeys {
     if (!r || r.expira < this.ahora() || r.tipo !== reto) throw fallo('El reto ha caducado o no es válido: vuelve a intentarlo.', 401);
     this.retos.delete(cd.challenge);
     if (cd.type !== tipo) throw fallo('Respuesta de la passkey no válida.', 401);
-    if (cd.origin !== this.origen || cd.crossOrigin === true) throw fallo('Origen no permitido.', 403);
+    if ((cd.origin !== this.origen && !this.origenesApp.includes(cd.origin)) || cd.crossOrigin === true) throw fallo('Origen no permitido.', 403);
     return r;
   }
 
