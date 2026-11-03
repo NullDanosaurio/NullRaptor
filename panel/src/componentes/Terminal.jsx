@@ -15,6 +15,7 @@ import { Copy, FileText, KeyRound, RotateCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { confirmarPasskey, post, subir } from '../api.js';
 import { textoOsc52 } from '../osc52.js';
+import { alPortapapeles } from '../portapapeles.js';
 import Redactor from './Redactor.jsx';
 import { Boton, cx } from './ui.jsx';
 
@@ -39,16 +40,6 @@ function textoDe(term, soloSeleccion) {
   for (let i = 0; i < b.length; i++) lineas.push(b.getLine(i)?.translateToString(true) ?? '');
   while (lineas.length && !lineas.at(-1)) lineas.pop();
   return lineas.join('\n');
-}
-
-async function alPortapapeles(texto) {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(texto);
-  // Sin contexto seguro (http fuera de localhost) no hay API: se copia con un textarea temporal.
-  const t = Object.assign(document.createElement('textarea'), { value: texto });
-  document.body.append(t);
-  t.select();
-  document.execCommand('copy');
-  t.remove();
 }
 
 export default function Terminal({ id, className }) {
@@ -88,14 +79,14 @@ export default function Terminal({ id, className }) {
       const teclaC = e.key.toLowerCase() === 'c' && (e.ctrlKey || e.metaKey);
       if (!teclaC || !(term.hasSelection() || e.shiftKey)) return true;
       e.preventDefault();
-      if (e.type === 'keydown' && term.hasSelection()) alPortapapeles(term.getSelection()).then(() => term.clearSelection()).catch(() => {});
+      if (e.type === 'keydown' && term.hasSelection()) alPortapapeles(term.getSelection()).then((ok) => { if (ok) term.clearSelection(); });
       return false;
     });
     // Lo que copia Claude Code (OSC 52) va al portapapeles del navegador.
     term.parser.registerOscHandler(52, (datos) => {
       const t = textoOsc52(datos);
       if (!t) return true;
-      alPortapapeles(t).then(() => { pendienteCopia.current = null; avisarCopiado(); }).catch(() => { pendienteCopia.current = t; });
+      alPortapapeles(t).then((ok) => { if (ok) { pendienteCopia.current = null; avisarCopiado(); } else pendienteCopia.current = t; });
       if (!navigator.clipboard?.writeText) term.focus(); // el textarea temporal se lleva el foco
       return true;
     });
@@ -171,7 +162,7 @@ export default function Terminal({ id, className }) {
     const term = xterm.current;
     const t = valor ?? (term?.hasSelection() ? term.getSelection() : (pendienteCopia.current ?? (term ? textoDe(term, false) : '')));
     if (!t) return;
-    try { await alPortapapeles(t); pendienteCopia.current = null; avisarCopiado(); } catch { setAviso('No se pudo copiar.'); }
+    if (await alPortapapeles(t)) { pendienteCopia.current = null; avisarCopiado(); } else setAviso('No se pudo copiar.');
   }, [avisarCopiado]);
 
   return (
