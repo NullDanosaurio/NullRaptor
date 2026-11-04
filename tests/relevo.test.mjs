@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { anotarSenal, armarBriefing, esLimite, leerEnCurso, proyectoDe } from '../scripts/relevo.mjs';
+import { anotarSenal, argsCodex, armarBriefing, ejecutar, esLimite, estadoRelevo, lanzar, leerEnCurso, proyectoDe } from '../scripts/relevo.mjs';
 
 const trabajo = () => fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-'));
 
@@ -59,4 +59,55 @@ test('armarBriefing: tareas abiertas del proyecto, estado de Ruflo, git y reglas
   const vacio = armarBriefing({ proyecto: 'Demo', cwd: '/w', tareas: [], enCurso: null, rama: '', estadoGit: '', commits: '' });
   assert.match(vacio, /\(ninguna registrada en Ruflo\)/);
   assert.match(vacio, /\(no disponible\)/);
+});
+
+const senalDe = (t, proyecto = 'Demo') => {
+  const cwd = path.join(t, 'proyectos', proyecto);
+  fs.mkdirSync(cwd, { recursive: true });
+  return anotarSenal({ error: 'rate_limit', cwd }, t) && JSON.parse(fs.readFileSync(path.join(t, '.relevo', `${proyecto}.senal.json`), 'utf8'));
+};
+
+test('argsCodex: sandbox workspace-write con la carpeta .relevo; sin sandbox solo si se pide', () => {
+  const a = argsCodex({ cwd: '/p', dirRelevo: '/t/.relevo', salida: '/t/.relevo/D.final.md' });
+  assert.deepEqual(a.slice(0, 7), ['exec', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', '/t/.relevo']);
+  assert.equal(a.at(-1), '-');
+  assert.ok(!a.includes('--dangerously-bypass-approvals-and-sandbox'));
+  assert.ok(argsCodex({ cwd: '/p', dirRelevo: '/d', salida: '/s', sinSandbox: true }).includes('--dangerously-bypass-approvals-and-sandbox'));
+});
+
+test('lanzar: arranca el relevo aparte una sola vez mientras siga en curso', () => {
+  const t = trabajo();
+  const senal = senalDe(t);
+  const llamadas = [];
+  const arrancar = (cmd, args, op) => { llamadas.push({ args, op }); return { pid: process.pid, unref() {} }; };
+  assert.deepEqual(lanzar(senal, { trabajo: t, arrancar }), { lanzado: true, pid: process.pid });
+  assert.deepEqual(llamadas[0].args.slice(1), ['ejecutar', 'Demo']);
+  assert.equal(llamadas[0].op.detached, true);
+  assert.equal(estadoRelevo(t, 'Demo').estado, 'en curso');
+  assert.deepEqual(lanzar(senal, { trabajo: t, arrancar }), { lanzado: false, motivo: 'ya hay un relevo en curso' });
+  assert.equal(llamadas.length, 1);
+  // Un relevo cuyo proceso murió (reinicio) cuenta como interrumpido y se puede relanzar.
+  fs.writeFileSync(path.join(t, '.relevo', 'Demo.estado.json'), JSON.stringify({ estado: 'en curso', pid: 2 ** 22 + 12345 }));
+  assert.equal(estadoRelevo(t, 'Demo').estado, 'error');
+  assert.equal(lanzar(senal, { trabajo: t, arrancar }).lanzado, true);
+});
+
+test('ejecutar corre Codex con el briefing por la entrada y deja el estado final', async () => {
+  const t = trabajo();
+  senalDe(t);
+  const falso = path.join(t, 'codex-falso.sh');
+  fs.writeFileSync(falso, `#!/bin/sh\necho "$@" > "${t}/args.txt"\ncat > "${t}/entrada.txt"\nexit \${CODIGO:-0}\n`, { mode: 0o755 });
+  const env = { ...process.env, RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin-tareas.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
+  assert.equal(await ejecutar('Demo', { trabajo: t, env, agente: t }), 0);
+  assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), /relevas a Claude en el desarrollo de «Demo»/);
+  assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo.codex.md').replace(/\./g, '\\.')} un resumen`));
+  assert.match(fs.readFileSync(path.join(t, 'args.txt'), 'utf8'), /^exec --sandbox workspace-write /);
+  const fin = estadoRelevo(t, 'Demo');
+  assert.equal(fin.estado, 'terminado');
+  assert.equal(fin.codigo, 0);
+  // Código de salida distinto de 0 → error; con RELEVO_SIN_SANDBOX=1 → sin sandbox.
+  assert.equal(await ejecutar('Demo', { trabajo: t, env: { ...env, CODIGO: '3', RELEVO_SIN_SANDBOX: '1' }, agente: t }), 3);
+  assert.equal(estadoRelevo(t, 'Demo').estado, 'error');
+  assert.match(fs.readFileSync(path.join(t, 'args.txt'), 'utf8'), /--dangerously-bypass-approvals-and-sandbox/);
+  await assert.rejects(ejecutar('Otro', { trabajo: t, env, agente: t }), /No hay señal/);
 });
