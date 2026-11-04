@@ -6,7 +6,8 @@
 //    una sesión con --append-system-prompt (config/perfiles/<perfil>.md; lista cerrada PERFILES).
 //  - las skills propias (config/skills/nullraptor-* → CLAUDE_CONFIG_DIR/skills/): se cargan solo cuando hacen falta,
 //    así las instrucciones largas (usar el PC, crear herramientas) no van en cada mensaje;
-//  - los ajustes de ahorro de tokens (AHORRO) en CLAUDE_CONFIG_DIR/settings.json, sin tocar el resto del archivo;
+//  - los ajustes de ahorro de tokens (AHORRO) y el hook del relevo a Codex (conRelevo) en CLAUDE_CONFIG_DIR/settings.json,
+//    sin tocar el resto del archivo;
 // También retira las copias de Ruflo que versiones anteriores dejaban en la configuración global.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,12 +57,26 @@ export function conAhorro(ajustes) {
   return { ...base, model: AHORRO.model, env: { ...env, ...AHORRO.env } };
 }
 
-function aplicarAhorro(configDir) {
+/** Relevo a Codex: cuando Claude se queda sin tokens, el evento StopFailure (error rate_limit o billing_error) llama a
+ * scripts/relevo.mjs, que lanza Codex en segundo plano con el estado del desarrollo. */
+const MARCA_RELEVO = 'relevo.mjs';
+
+/** settings.json con el hook StopFailure del relevo (una sola vez; los demás hooks se conservan). */
+export function conRelevo(ajustes, agente) {
+  const base = ajustes && typeof ajustes === 'object' && !Array.isArray(ajustes) ? ajustes : {};
+  const hooks = base.hooks && typeof base.hooks === 'object' && !Array.isArray(base.hooks) ? base.hooks : {};
+  const previos = Array.isArray(hooks.StopFailure) ? hooks.StopFailure : [];
+  const ajenos = previos.filter((g) => !g?.hooks?.some((h) => String(h?.command).includes(MARCA_RELEVO)));
+  const propio = { hooks: [{ type: 'command', command: `node "${path.join(agente, 'scripts', MARCA_RELEVO)}" senal`, timeout: 30 }] };
+  return { ...base, hooks: { ...hooks, StopFailure: [...ajenos, propio] } };
+}
+
+function aplicarAjustes(configDir, agente) {
   const archivo = path.join(configDir, 'settings.json');
   let actuales = {};
   try { actuales = JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { /* no hay o no es JSON: se empieza de cero */ }
   const temporal = `${archivo}.${process.pid}.tmp`;
-  fs.writeFileSync(temporal, `${JSON.stringify(conAhorro(actuales), null, 2)}\n`);
+  fs.writeFileSync(temporal, `${JSON.stringify(conRelevo(conAhorro(actuales), agente), null, 2)}\n`);
   fs.renameSync(temporal, archivo);
 }
 
@@ -137,7 +152,7 @@ export function prepararIA({ agente, env, memoria, trabajo }) {
     retirarAntiguos(configDir);
     instalarEquipo(agente, configDir);
     instalarSkills(agente, configDir);
-    aplicarAhorro(configDir);
+    aplicarAjustes(configDir, agente);
   }
   return escribirMcp({ agente, env, memoria, trabajo });
 }

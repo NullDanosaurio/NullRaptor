@@ -144,6 +144,20 @@ test('prepararIA aplica el ahorro de tokens en settings.json sin perder lo demá
   assert.equal(JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8')).model, 'opusplan');
 });
 
+test('prepararIA añade el hook StopFailure del relevo una sola vez y conserva los demás hooks', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-relevo-'));
+  const configDir = path.join(base, '.claude');
+  fs.mkdirSync(configDir, { recursive: true });
+  const ajeno = { hooks: [{ type: 'command', command: 'echo ajeno' }] };
+  fs.writeFileSync(path.join(configDir, 'settings.json'), JSON.stringify({ hooks: { Stop: [ajeno], StopFailure: [ajeno] } }));
+  for (let i = 0; i < 2; i++) prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
+  const h = JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8')).hooks;
+  assert.deepEqual(h.Stop, [ajeno]);
+  assert.equal(h.StopFailure.length, 2);
+  assert.deepEqual(h.StopFailure[0], ajeno);
+  assert.equal(h.StopFailure[1].hooks[0].command, `node "${path.join(agente, 'scripts', 'relevo.mjs')}" senal`);
+});
+
 test('skills propias: se instalan nullraptor-*, se retiran las obsoletas y el CLAUDE.md global solo las nombra', () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-skills-'));
   const configDir = path.join(base, '.claude');
