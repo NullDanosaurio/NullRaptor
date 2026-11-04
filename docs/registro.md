@@ -1,5 +1,12 @@
 # Registro de trabajo
 
+## 04/11/2026 (noche) — Sandbox de Codex en el contenedor (AHO-5)
+- [U] Daniel autoriza el perfil seccomp y el cambio del lanzador y de compose.
+- Hecho: `arrancar.ps1` saca `config/seccomp.json` de la imagen (`docker create` + `docker cp`) y arranca con
+  `--security-opt seccomp=<ruta>`; `compose.yaml` lo referencia en `security_opt`. Sintaxis del script comprobada en el PC.
+- Sin probar [O]: el contenedor actual sigue con el seccomp por defecto; se verá al recrearlo con la imagen nueva
+  (`codex exec --sandbox workspace-write` debe poder crear un archivo). `RELEVO_SIN_SANDBOX` queda apagado.
+
 ## 04/11/2026 — Relevo a Codex cuando Claude se queda sin tokens
 - [U] Daniel: «cuando claude se quede sin tokens se pueda usar codex para que coja el lugar de claude y siga
   trabajando en los desarrollos». Elegido [U]: automático en segundo plano, y Claude retoma y revisa al volver

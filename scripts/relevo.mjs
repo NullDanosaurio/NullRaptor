@@ -3,8 +3,8 @@
 //                                     deja a Codex trabajando en segundo plano (ejecutar)
 //   node scripts/relevo.mjs revision  hook SessionStart: al volver Claude, le dice qué hizo Codex (una sola vez)
 //   node scripts/relevo.mjs ejecutar <Proyecto>   corre Codex con el briefing hasta que acaba (lo lanza «senal»)
-// Codex usa el sandbox workspace-write; en el contenedor hace falta el perfil seccomp de AHO-5 (bwrap necesita
-// namespaces). Solo con RELEVO_SIN_SANDBOX=1 (decisión de Daniel) se ejecuta sin sandbox: el contenedor es el límite.
+// Codex usa el sandbox workspace-write; en el contenedor lo permite el perfil seccomp de config/seccomp.json (bwrap necesita
+// namespaces; lo aplican arrancar.ps1 y compose.yaml). Solo con RELEVO_SIN_SANDBOX=1 se ejecuta sin sandbox.
 // Las señales y los registros van en $TRABAJO_DIR/.relevo/<Proyecto>.*, nunca dentro del proyecto.
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';

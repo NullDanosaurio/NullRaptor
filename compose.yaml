@@ -8,6 +8,8 @@ services:
       - nullraptor:/estado
     ports:
       - "127.0.0.1:4321:4321"   # panel web: docker compose run --rm --service-ports nullraptor node panel/servidor.mjs
+    security_opt:
+      - seccomp=config/seccomp.json   # namespaces sin privilegios: el sandbox de Codex (bwrap) los necesita
     stdin_open: true
     tty: true
 

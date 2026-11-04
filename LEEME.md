@@ -292,8 +292,9 @@ y el **65 %** fue releer contexto, con una mediana de 177 k tokens por llamada (
 - **Medidor**: `panel/lib/gasto.mjs` lee los registros locales de Claude Code (solo lectura) y estima el coste con
   precios de API; da la proporción, no lo que se paga con la suscripción.
 - **Tareas de la IA en Resumen**: las de Ruflo (`/estado/ruflo/tasks/store.json`), por proyecto.
-- Pendiente (necesita a Daniel): el filtro `config/seccomp.json` para que el sandbox de Codex funcione en el
-  contenedor, y las skills oficiales de Anthropic y Context7 (código externo).
+- Sandbox de Codex en el contenedor: perfil `config/seccomp.json` aplicado por el lanzador y por compose (autorizado
+  por Daniel el 04/11; ver «Relevo a Codex»).
+- Pendiente (necesita a Daniel): las skills oficiales de Anthropic y Context7 (código externo).
 
 ## Relevo a Codex cuando Claude se queda sin tokens (04/11/2026)
 
@@ -312,10 +313,12 @@ Si Claude agota el límite de uso (o el saldo) en mitad de un desarrollo, Codex 
 5. **Vuelta de Claude**: el hook `SessionStart` (`relevo.mjs revision`) le dice, una sola vez, que lea el resumen y el
    registro de Codex, revise sus commits, pase las pruebas y retome la lista. Codex no termina el desarrollo solo.
 
-**Sandbox**: el de Codex (`bwrap`) no puede crear namespaces dentro del contenedor, y sin él Codex no escribe archivos.
-Hace falta el perfil `config/seccomp.json` (AHO-5, pendiente de tu autorización). Mientras tanto,
-`RELEVO_SIN_SANDBOX=1` lanza Codex con `--dangerously-bypass-approvals-and-sandbox` (el contenedor es el límite).
-Está apagado por defecto. Los hooks y el panel llegan con la imagen nueva (como todo cambio en `/nullraptor`).
+**Sandbox**: el de Codex (`bwrap`) necesita crear namespaces, y el seccomp por defecto de Docker lo impide. El perfil
+`config/seccomp.json` (el de Docker más `clone`, `mount`, `pivot_root`, `setns`, `umount2` y `unshare` sin privilegios)
+se aplica con `--security-opt`: `arrancar.ps1` lo saca de la imagen en cada arranque (`%LOCALAPPDATA%\Nullraptor\seccomp.json`)
+y `compose.yaml` lo referencia. Ese cambio solo llega al recrear el contenedor con la imagen nueva. Si algún día hiciera
+falta saltarse el sandbox, `RELEVO_SIN_SANDBOX=1` lanza Codex con `--dangerously-bypass-approvals-and-sandbox` (apagado
+por defecto). Los hooks y el panel llegan con la imagen nueva (como todo cambio en `/nullraptor`).
 
 ## Panel web: una sola interfaz
 

@@ -370,10 +370,20 @@ if (Test-Path $tokenPuente) {
   $env:NULLRAPTOR_PUENTE_TOKEN = (Get-Content $tokenPuente -Raw).Trim()
   $conPuente = '-e', "NULLRAPTOR_PUENTE=host.docker.internal:$puertoPuente", '-e', 'NULLRAPTOR_PUENTE_TOKEN'
 }
+# Perfil seccomp de la imagen (el de Docker más los namespaces sin privilegios): sin él, el sandbox de Codex (bwrap) no
+# puede arrancar dentro del contenedor y Codex no escribe archivos. Se saca de la imagen en cada arranque; si falla se
+# usa la copia anterior, y sin ninguna se arranca con el perfil por defecto de Docker.
+$perfilSeccomp = Join-Path $env:LOCALAPPDATA 'Nullraptor\seccomp.json'
+$copia = docker create $imagen 2>$null
+if ($LASTEXITCODE -eq 0 -and $copia) {
+  docker cp "${copia}:/nullraptor/config/seccomp.json" $perfilSeccomp *> $null
+  docker rm $copia *> $null
+}
+$conSeccomp = if (Test-Path $perfilSeccomp) { @('--security-opt', "seccomp=$perfilSeccomp") } else { Write-Host 'Aviso: sin el perfil seccomp, Codex no podrá usar su sandbox.'; @() }
 $publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
 $publicaApps = @(foreach ($p in $puertosApps) { '-p'; "127.0.0.1:${p}:${p}" })
 docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" --label "nullraptor.carpetas=$etiquetaCarpetas" `
-  -e AGENTE_CLAVE @conPuente -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -e NULLRAPTOR_LANZADOR=windows -e "NULLRAPTOR_CARPETAS=$etiquetaCarpetas" `
+  @conSeccomp -e AGENTE_CLAVE @conPuente -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -e NULLRAPTOR_LANZADOR=windows -e "NULLRAPTOR_CARPETAS=$etiquetaCarpetas" `
   -v nullraptor:/estado -v $montaCofre @montaCarpetas -p $publica @publicaApps $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE
 Remove-Item Env:AGENTE_CLAVE, Env:NULLRAPTOR_PUENTE_TOKEN -ErrorAction SilentlyContinue
