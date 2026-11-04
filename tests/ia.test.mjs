@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ARCHIVO_MCP, instalarEquipo, leerPerfil, PERFILES, prepararIA } from '../scripts/ia.mjs';
+import { AHORRO, ARCHIVO_MCP, conAhorro, instalarEquipo, leerPerfil, PERFILES, prepararIA } from '../scripts/ia.mjs';
 import { construirEncargo, extraerDiff, leerArchivos, rutaDentro } from '../scripts/codex-parche.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -124,4 +124,22 @@ test('codex-parche: --probar implica aplicar; las salidas largas se recortan y e
   assert.equal(guardado, largo);
   assert.match(corto, /^… \(25 líneas antes; completo en \/tmp\/x\.txt\)\nlínea 26\n/);
   assert.ok(corto.endsWith('línea 40'));
+});
+
+test('prepararIA aplica el ahorro de tokens en settings.json sin perder lo demás', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-ahorro-'));
+  const configDir = path.join(base, '.claude');
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(path.join(configDir, 'settings.json'), JSON.stringify({ theme: 'dark', model: 'opus', env: { MIO: '1', BASH_MAX_OUTPUT_LENGTH: '99999' } }));
+  prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
+  const s = JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8'));
+  assert.equal(s.theme, 'dark');
+  assert.equal(s.model, 'opusplan');
+  assert.equal(s.env.MIO, '1');
+  assert.deepEqual({ ...s.env, MIO: undefined }, { ...AHORRO.env, MIO: undefined });
+  assert.deepEqual(conAhorro('no es un objeto'), { model: 'opusplan', env: AHORRO.env });
+  // Sin settings.json (o roto), se crea.
+  fs.writeFileSync(path.join(configDir, 'settings.json'), '{roto');
+  prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8')).model, 'opusplan');
 });

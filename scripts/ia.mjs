@@ -4,6 +4,7 @@
 //    para pasarlo con --mcp-config.
 //  - el equipo del Director IA (config/agentes/equipo-*.md → CLAUDE_CONFIG_DIR/agents/) y los perfiles que se añaden a
 //    una sesión con --append-system-prompt (config/perfiles/<perfil>.md; lista cerrada PERFILES).
+//  - los ajustes de ahorro de tokens (AHORRO) en CLAUDE_CONFIG_DIR/settings.json, sin tocar el resto del archivo;
 // También retira las copias de Ruflo que versiones anteriores dejaban en la configuración global.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +15,35 @@ export const ARCHIVO_MCP = '.mcp-agente.json';
 /** Perfiles que se pueden pedir al abrir una sesión o un chat. Lista cerrada: nunca una ruta que venga del cliente. */
 export const PERFILES = ['director'];
 const PREFIJO_EQUIPO = 'equipo-';
+
+/** Ahorro de tokens (decisión [U] 04/11/2026, medido: 99,6 % del gasto en Opus y 65 % en releer contexto):
+ * Opus solo para planificar (opusplan: Sonnet ejecuta), compactar antes la conversación, acotar la salida de Bash y
+ * de los MCP, y no cargar en cada sesión los conectores de claude.ai (Gmail, Drive, Notion…), que aquí no se usan. */
+export const AHORRO = {
+  model: 'opusplan',
+  env: {
+    CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '50',
+    BASH_MAX_OUTPUT_LENGTH: '15000',
+    MAX_MCP_OUTPUT_TOKENS: '10000',
+    ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+  },
+};
+
+/** settings.json con los ajustes de AHORRO encima de lo que hubiera (el resto de claves se conserva). */
+export function conAhorro(ajustes) {
+  const base = ajustes && typeof ajustes === 'object' && !Array.isArray(ajustes) ? ajustes : {};
+  const env = base.env && typeof base.env === 'object' ? base.env : {};
+  return { ...base, model: AHORRO.model, env: { ...env, ...AHORRO.env } };
+}
+
+function aplicarAhorro(configDir) {
+  const archivo = path.join(configDir, 'settings.json');
+  let actuales = {};
+  try { actuales = JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { /* no hay o no es JSON: se empieza de cero */ }
+  const temporal = `${archivo}.${process.pid}.tmp`;
+  fs.writeFileSync(temporal, `${JSON.stringify(conAhorro(actuales), null, 2)}\n`);
+  fs.renameSync(temporal, archivo);
+}
 
 // Lo que antes se copiaba de .claude/ del agente a la configuración global (hasta el 30/10/2026).
 const ANTIGUOS = {
@@ -86,6 +116,7 @@ export function prepararIA({ agente, env, memoria, trabajo }) {
     fs.copyFileSync(path.join(agente, 'config', 'claude-global.md'), path.join(configDir, 'CLAUDE.md'));
     retirarAntiguos(configDir);
     instalarEquipo(agente, configDir);
+    aplicarAhorro(configDir);
   }
   return escribirMcp({ agente, env, memoria, trabajo });
 }
