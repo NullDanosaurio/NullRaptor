@@ -1,5 +1,22 @@
 # Registro de trabajo
 
+## 04/11/2026 — Ahorro de tokens: medir primero
+- [U] Daniel: «realmente quiero ahorrar tokens… siento que apenas estamos raspando lo que podemos hacer contigo»;
+  acepta todas las mejoras y `opusplan`. Y: «no veo tus tareas en la pestaña resumen».
+- Medido [O] (registros de Claude Code, 7 días): 99,6 % Opus; 65 % del gasto en releer contexto, mediana 177 k
+  tokens por llamada y p90 518 k; instrucciones fijas, poco. Conclusión: el ahorro está en el modelo y en la
+  longitud de las sesiones, no en instalar más cosas (cada MCP añade herramientas a todas las sesiones).
+- Hecho: reanudar sin `--continue`; `AHORRO` en settings.json (`opusplan`, compactado al 50 %, salidas acotadas,
+  sin conectores de claude.ai); medidor (`panel/lib/gasto.mjs`, `/api/gasto`, tarjeta y `scripts/gasto.mjs`);
+  tarjeta «Tareas de la IA» con las de Ruflo; CLAUDE.md global de 7,1 a 4,9 KB con skills `nullraptor-pc` y
+  `nullraptor-herramienta`; `gh` instalado con `paquetes`.
+- Bloqueado por el modo automático [O]: `npx ccusage` (código externo: se hizo un medidor propio) y el cambio del
+  lanzador y de compose.yaml para usar `config/seccomp.json` (perfil de Docker + `clone`, `mount`, `pivot_root`,
+  `setns`, `umount2`, `unshare` sin privilegios, lo que pide bwrap). Comprobado: el núcleo admite namespaces
+  (max_user_namespaces 63809) y lo que los bloquea es el seccomp por defecto de Docker («unshare: Operation not
+  permitted»). Queda para que Daniel lo autorice.
+- Pruebas [O]: 146/146; tarjetas revisadas a 360 px.
+
 ## 03/11/2026 — Director IA: equipo de subagentes, perfil y Codex como programador
 - [U] Daniel: perfil «Director IA» que coordina Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño/UX;
   encargo detallado (subagentes, perfil, instalación, activación opcional, pruebas, documentación). Nombre: NullRaptor.

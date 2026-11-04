@@ -276,6 +276,25 @@ Normal / Director IA»; se recuerda por proyecto en el navegador) o al crear un 
 - Ojo: `tools` no admite patrones como `Bash(npm test:*)` (probado con Claude Code 2.1.308: el subagente ejecutó
   otras órdenes). Que Calidad, Seguridad y Diseño no modifiquen nada es una norma escrita en su archivo.
 
+## Ahorro de tokens (04/11/2026)
+
+Medido con `node scripts/gasto.mjs` (y en Resumen → «Gasto de Claude»): en 7 días, el **99,6 %** del gasto fue Opus
+y el **65 %** fue releer contexto, con una mediana de 177 k tokens por llamada (p90: 518 k). Lo que se hizo:
+
+- **Sesiones limpias al reiniciar**: ya no se reabren con `--continue`; recuperan el estado de Ruflo
+  (`task_list` y `proyecto-<X>/en-curso`) y `git log`. El botón «Continuar la anterior» sigue para cuando haga falta.
+- **`opusplan`** en `settings.json` (lo pone `prepararIA`, `AHORRO` en `scripts/ia.mjs`): Opus en modo plan, Sonnet
+  para ejecutar. Además, compactado al 50 % del contexto, salida de Bash a 15 000 caracteres, MCP a 10 000 tokens y
+  sin los conectores de claude.ai (`ENABLE_CLAUDEAI_MCP_SERVERS=false`; para recuperarlos, quítalo de `AHORRO`).
+- **CLAUDE.md global más corto** (de 7,1 a 4,9 KB, va en cada mensaje y en cada subagente): usar el PC y crear
+  herramientas pasan a skills propias (`config/skills/nullraptor-*`, que `prepararIA` instala), que solo se cargan
+  cuando hacen falta. Nueva sección «Gastar pocos tokens».
+- **Medidor**: `panel/lib/gasto.mjs` lee los registros locales de Claude Code (solo lectura) y estima el coste con
+  precios de API; da la proporción, no lo que se paga con la suscripción.
+- **Tareas de la IA en Resumen**: las de Ruflo (`/estado/ruflo/tasks/store.json`), por proyecto.
+- Pendiente (necesita a Daniel): el filtro `config/seccomp.json` para que el sandbox de Codex funcione en el
+  contenedor, y las skills oficiales de Anthropic y Context7 (código externo).
+
 ## Panel web: una sola interfaz
 
 `panel/` (añadido el 29/10/2026; reorganizado en la fase 4, 02/11/2026). Servidor Node sin dependencias
