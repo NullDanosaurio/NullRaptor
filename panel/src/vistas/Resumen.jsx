@@ -1,6 +1,6 @@
 // Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
-// chats y MCP del día.
-import { ArrowUpRight, BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
+// chats, MCP del día y las tareas de la IA (Ruflo).
+import { ArrowUpRight, BookOpen, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
 import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
@@ -70,12 +70,50 @@ function BuscarBoveda() {
   );
 }
 
+/** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
+function TareasIA({ tareas }) {
+  const [filtro, setFiltro] = useState(null);
+  if (!tareas) return null;
+  const proyectos = Object.entries(tareas.porProyecto).sort(([, a], [, b]) => (b.enCurso + b.pendientes) - (a.enCurso + a.pendientes));
+  const lista = tareas.abiertas.filter((t) => !filtro || t.proyecto === filtro);
+  const chip = (id, texto, n) => (
+    <button key={id ?? 'todas'} type="button" onClick={() => setFiltro(id)} aria-pressed={filtro === id}
+      className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[12px] ${filtro === id ? 'border-raptor/40 bg-raptor/10 text-white' : 'border-borde text-tenue hover:text-texto'}`}>
+      {texto}<span className="tabular-nums text-apagado">{n}</span>
+    </button>
+  );
+  return (
+    <Tarjeta titulo="Tareas de la IA" icono={ListChecks} accion={<span className="text-[11px] text-apagado">{tareas.hechasHoy} hechas hoy</span>}>
+      {tareas.totalAbiertas ? (
+        <>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {chip(null, 'Todas', tareas.totalAbiertas)}
+            {proyectos.map(([p, c]) => chip(p, p, c.enCurso + c.pendientes))}
+          </div>
+          <ul className="space-y-1">
+            {lista.map((t) => (
+              <li key={t.id} className="flex items-start gap-2.5 rounded-xl px-2 py-2">
+                <span className="mt-1.5 flex"><Punto tono={t.estado === 'en curso' ? 'raptor' : 'apagado'} vivo={t.estado === 'en curso'} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-[13px] leading-snug text-texto">{t.texto}</p>
+                  <p className="mt-0.5 text-[11px] text-apagado">{t.proyecto ?? 'Sin proyecto'} · {t.estado} · {haceCuanto(t.creada)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {tareas.totalAbiertas > tareas.abiertas.length && !filtro && <p className="mt-2 px-2 text-[11px] text-apagado">Y {tareas.totalAbiertas - tareas.abiertas.length} más.</p>}
+        </>
+      ) : <Vacio icono={ListChecks} titulo="Sin tareas abiertas">{tareas.hechasHoy ? `${tareas.hechasHoy} terminadas hoy.` : 'La IA apunta aquí lo que va haciendo.'}</Vacio>}
+    </Tarjeta>
+  );
+}
+
 export default function Resumen() {
   const { datos, error, cargando } = useDatos('/api/resumen', { cada: 5000 });
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
-  const { proyectos, boveda, mcp, chats, guardados, remoto = [] } = datos;
+  const { proyectos, boveda, mcp, chats, guardados, remoto = [], tareas = null } = datos;
   const enCurso = proyectos.filter((p) => p.flujo?.bloqueo?.vivo);
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -104,6 +142,7 @@ export default function Resumen() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
           <div className="space-y-6">
+            <TareasIA tareas={tareas} />
             <Tarjeta titulo="Proyectos" icono={FolderGit2} accion={<a href="#/proyectos" className="text-[12px] text-apagado hover:text-raptor">Ver proyectos →</a>}>
               {proyectos.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">{proyectos.map((p) => <TarjetaProyecto key={p.nombre} p={p} />)}</div>

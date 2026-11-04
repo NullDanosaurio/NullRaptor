@@ -23,6 +23,7 @@ import { Equipo } from './lib/equipo.mjs';
 import { Proyectos } from './lib/proyectos.mjs';
 import { crearRutasEquipo } from './lib/rutas-equipo.mjs';
 import { crearRutasVoz } from './lib/rutas-voz.mjs';
+import { archivoTareasRuflo, leerTareasRuflo, resumenTareas } from './lib/tareas-ruflo.mjs';
 import { assetlinks, leerFirma, origenesApp } from './lib/app-android.mjs';
 import { Voz } from './lib/voz.mjs';
 import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
@@ -131,7 +132,7 @@ export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
   dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
   env = process.env, prepararMcp = null, proyectos = new Proyectos({ trabajo, memoria, env }),
-  equipo = new Equipo({ trabajo, env }), voz = new Voz(),
+  equipo = new Equipo({ trabajo, env }), voz = new Voz(), tareasRuflo = archivoTareasRuflo(env),
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -163,6 +164,7 @@ export function crearServidor({
       chats: chats.lista(),
       guardados: chats.guardados().slice(0, 5),
       remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
+      tareas: resumenTareas(leerTareasRuflo(tareasRuflo)),
       hoy: new Date().toISOString().slice(0, 10),
     }),
     // Ajustes: versión de la imagen, cómo se entra, carpetas y servidores MCP.
