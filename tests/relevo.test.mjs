@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { anotarSenal, esLimite, proyectoDe } from '../scripts/relevo.mjs';
+import { anotarSenal, armarBriefing, esLimite, leerEnCurso, proyectoDe } from '../scripts/relevo.mjs';
 
 const trabajo = () => fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-'));
 
@@ -32,4 +32,31 @@ test('anotarSenal escribe la señal del proyecto y no hace nada si no procede', 
   assert.equal(r.ruta, path.join(t, '.relevo', 'Demo.senal.json'));
   assert.equal(anotarSenal({ error: 'server_error', cwd }, t), null);
   assert.equal(anotarSenal({ error: 'rate_limit', cwd: '/tmp' }, t), null);
+});
+
+test('leerEnCurso saca el valor de la tabla de Ruflo y devuelve null si falla', () => {
+  const tabla = '[INFO] x\n+---- Memory Entry ----+\n| Key: en-curso   |\n| Value:   |\n| {"tarea":"X"}    |\n+------+\n';
+  assert.equal(leerEnCurso('Demo', { correr: () => tabla }), '{"tarea":"X"}');
+  assert.equal(leerEnCurso('Demo', { correr: () => 'Entry not found' }), null);
+  assert.equal(leerEnCurso('Demo', { correr: () => { throw new Error('timeout'); } }), null);
+});
+
+test('armarBriefing: tareas abiertas del proyecto, estado de Ruflo, git y reglas del relevo', () => {
+  const tareas = [
+    { id: 't1', proyecto: 'Demo', texto: 'Hacer A', estado: 'en curso' },
+    { id: 't2', proyecto: 'Demo', texto: 'Hacer B', estado: 'pendiente' },
+    { id: 't3', proyecto: 'Demo', texto: 'Ya hecha', estado: 'hecha' },
+    { id: 't4', proyecto: 'Otro', texto: 'De otro', estado: 'pendiente' },
+  ];
+  const b = armarBriefing({ proyecto: 'Demo', cwd: '/w/proyectos/Demo', senal: { en: '2026-11-04T10:00:00Z' }, tareas, enCurso: '{"tarea":"X"}', rama: 'feat', estadoGit: ' M a.js', commits: 'abc1234 algo' });
+  assert.match(b, /relevas a Claude en el desarrollo de «Demo»/);
+  assert.match(b, /\[en curso\] t1: Hacer A\n- \[pendiente\] t2: Hacer B/);
+  assert.doesNotMatch(b, /Ya hecha|De otro/);
+  assert.match(b, /proyecto-Demo \/ en-curso\)\n\{"tarea":"X"\}/);
+  assert.match(b, /rama feat\)\n M a\.js/);
+  assert.match(b, /sin Co-Authored-By/);
+  assert.match(b, /\.relevo\/Demo\.codex\.md/);
+  const vacio = armarBriefing({ proyecto: 'Demo', cwd: '/w', tareas: [], enCurso: null, rama: '', estadoGit: '', commits: '' });
+  assert.match(vacio, /\(ninguna registrada en Ruflo\)/);
+  assert.match(vacio, /\(no disponible\)/);
 });
