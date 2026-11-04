@@ -52,6 +52,25 @@ export const estadoRelevo = (trabajo, proyecto) => {
   return e?.estado === 'en curso' && !vivo(e.pid) ? { ...e, estado: 'error', error: 'interrumpido' } : e;
 };
 
+/** Relevos que muestra el panel: en curso y los de las últimas 24 h, el más reciente primero. */
+export function listarRelevos(trabajo, ahora = Date.now()) {
+  const dir = path.join(trabajo, CARPETA);
+  let nombres = [];
+  try { nombres = fs.readdirSync(dir).filter((n) => n.endsWith('.estado.json')).map((n) => n.slice(0, -'.estado.json'.length)); } catch { return []; }
+  return nombres.map((proyecto) => ({ proyecto, ...estadoRelevo(trabajo, proyecto), resumen: fs.existsSync(rutaDe(trabajo, proyecto, 'codex.md')) }))
+    .filter((r) => r.estado === 'en curso' || ahora - Date.parse(r.fin ?? r.inicio) < 24 * HORAS)
+    .sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)));
+}
+
+/** Detalle de un relevo para el panel: su registro (últimas líneas) y el resumen que dejó Codex. null si no existe. */
+export function detalleRelevo(trabajo, proyecto, lineas = 80) {
+  if (!/^[\w.-]{1,80}$/.test(proyecto) || proyecto.includes('..')) return null;
+  const estado = estadoRelevo(trabajo, proyecto);
+  if (!estado) return null;
+  const leer = (ext) => { try { return fs.readFileSync(rutaDe(trabajo, proyecto, ext), 'utf8'); } catch { return ''; } };
+  return { proyecto, ...estado, registro: leer('log').split('\n').slice(-lineas).join('\n').trim(), resumen: leer('codex.md').slice(0, 6000).trim() };
+}
+
 /** Binario de Codex: RUFLO_CODEX_EXE, el del agente o el del PATH. */
 export function binarioCodex(agente = AGENTE, env = process.env) {
   const local = path.join(agente, 'node_modules', '.bin', 'codex');

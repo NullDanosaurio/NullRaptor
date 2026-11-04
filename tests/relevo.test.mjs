@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { anotarSenal, argsCodex, armarBriefing, ejecutar, esLimite, estadoRelevo, lanzar, leerEnCurso, proyectoDe } from '../scripts/relevo.mjs';
+import { anotarSenal, argsCodex, armarBriefing, detalleRelevo, ejecutar, esLimite, estadoRelevo, lanzar, leerEnCurso, listarRelevos, proyectoDe } from '../scripts/relevo.mjs';
 
 const trabajo = () => fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-'));
 
@@ -110,4 +110,23 @@ test('ejecutar corre Codex con el briefing por la entrada y deja el estado final
   assert.equal(estadoRelevo(t, 'Demo').estado, 'error');
   assert.match(fs.readFileSync(path.join(t, 'args.txt'), 'utf8'), /--dangerously-bypass-approvals-and-sandbox/);
   await assert.rejects(ejecutar('Otro', { trabajo: t, env, agente: t }), /No hay señal/);
+});
+
+test('listarRelevos y detalleRelevo: para el panel, con registro y resumen, sin salirse de .relevo', () => {
+  const t = trabajo();
+  assert.deepEqual(listarRelevos(t), []);
+  const dir = path.join(t, '.relevo');
+  fs.mkdirSync(dir, { recursive: true });
+  const ahora = Date.parse('2026-11-04T12:00:00Z');
+  const guardar = (p, e) => fs.writeFileSync(path.join(dir, `${p}.estado.json`), JSON.stringify(e));
+  guardar('Viejo', { estado: 'terminado', inicio: '2026-11-01T10:00:00Z', fin: '2026-11-01T11:00:00Z', codigo: 0 });
+  guardar('Hecho', { estado: 'terminado', inicio: '2026-11-04T08:00:00Z', fin: '2026-11-04T09:00:00Z', codigo: 0 });
+  guardar('Vivo', { estado: 'en curso', pid: process.pid, inicio: '2026-11-04T11:00:00Z' });
+  fs.writeFileSync(path.join(dir, 'Hecho.codex.md'), 'Hice A');
+  fs.writeFileSync(path.join(dir, 'Hecho.log'), Array.from({ length: 100 }, (_, i) => `l${i}`).join('\n'));
+  assert.deepEqual(listarRelevos(t, ahora).map((r) => [r.proyecto, r.estado, r.resumen]), [['Vivo', 'en curso', false], ['Hecho', 'terminado', true]]);
+  const d = detalleRelevo(t, 'Hecho', 5);
+  assert.equal(d.resumen, 'Hice A');
+  assert.equal(d.registro, 'l95\nl96\nl97\nl98\nl99');
+  for (const malo of ['../x', '..', 'a/b', '', 'No-existe']) assert.equal(detalleRelevo(t, malo), null);
 });

@@ -31,6 +31,7 @@ import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
 import { crearRutasProyectos } from './lib/rutas-proyectos.mjs';
 import { crearRutasRemoto } from './lib/rutas-remoto.mjs';
 import { escribirMcp } from '../scripts/ia.mjs';
+import { detalleRelevo, listarRelevos } from '../scripts/relevo.mjs';
 import { detalleProyecto, estadoMcp, listarProyectos, rutaProyecto } from './lib/trabajo.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -158,6 +159,7 @@ export function crearServidor({
   const sinBoveda = () => ({ error: 'Sin bóveda: arranca el panel con preparar.mjs (BOVEDA_DIR).' });
 
   const rutas = {
+    'GET /api/relevo': (q) => detalleRelevo(trabajo, q.get('proyecto') ?? '') ?? [404, { error: 'Sin relevo para ese proyecto.' }],
     'GET /api/gasto': (q) => gasto.resumen(q.get('dias') ?? 7),
     'GET /api/resumen': () => ({
       boveda: memoria ? { git: estadoGit(memoria), notas: listarNotas(memoria).length, cambios: cambiosRecientes(memoria, 6) } : null,
@@ -167,6 +169,7 @@ export function crearServidor({
       guardados: chats.guardados().slice(0, 5),
       remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
       tareas: resumenTareas(leerTareasRuflo(tareasRuflo)),
+      relevos: listarRelevos(trabajo),
       hoy: new Date().toISOString().slice(0, 10),
     }),
     // Ajustes: versión de la imagen, cómo se entra, carpetas y servidores MCP.

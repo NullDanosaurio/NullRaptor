@@ -108,6 +108,14 @@ test('API del panel', async (t) => {
   const resumen = await pedir(port, 'GET', '/api/resumen');
   assert.equal(resumen.estado, 200);
   assert.equal(resumen.datos.boveda.notas, 3); // con la tarea T1
+  assert.deepEqual(resumen.datos.relevos, []);
+  assert.equal((await pedir(port, 'GET', '/api/relevo?proyecto=Demo')).estado, 404);
+  fs.mkdirSync(path.join(trabajo, '.relevo'), { recursive: true });
+  fs.writeFileSync(path.join(trabajo, '.relevo', 'Demo.estado.json'), JSON.stringify({ estado: 'terminado', inicio: new Date().toISOString(), fin: new Date().toISOString(), codigo: 0 }));
+  fs.writeFileSync(path.join(trabajo, '.relevo', 'Demo.codex.md'), 'Hice A');
+  assert.deepEqual((await pedir(port, 'GET', '/api/resumen')).datos.relevos.map((r) => [r.proyecto, r.estado]), [['Demo', 'terminado']]);
+  assert.equal((await pedir(port, 'GET', '/api/relevo?proyecto=Demo')).datos.resumen, 'Hice A');
+  assert.equal((await pedir(port, 'GET', '/api/relevo?proyecto=..%2Fx')).estado, 404);
   const demo = resumen.datos.proyectos.find((p) => p.nombre === 'Demo');
   assert.equal(demo.local, true);
   assert.equal(demo.repo, 'https://github.com/x/Demo');

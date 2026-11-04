@@ -1,6 +1,6 @@
 // Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
-// chats, MCP del día y las tareas de la IA (Ruflo).
-import { ArrowUpRight, BookOpen, Gauge, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
+// chats, MCP del día, las tareas de la IA (Ruflo) y el relevo a Codex cuando Claude se queda sin tokens.
+import { ArrowUpRight, ArrowRightLeft, BookOpen, Gauge, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
 import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
@@ -96,6 +96,48 @@ function GastoIA() {
   );
 }
 
+const ESTADO_RELEVO = {
+  'en curso': { tono: 'raptor', texto: (r) => `Claude se quedó sin tokens: Codex sigue con ${r.proyecto}` },
+  terminado: { tono: 'ok', texto: (r) => `Codex terminó su turno en ${r.proyecto}: Claude lo revisará al volver` },
+  error: { tono: 'fallo', texto: (r) => `El relevo de Codex en ${r.proyecto} se detuvo${r.error === 'interrumpido' ? ' (interrumpido)' : ''}` },
+};
+
+function DetalleRelevo({ proyecto }) {
+  const { datos, error } = useDatos(`/api/relevo?proyecto=${encodeURIComponent(proyecto)}`, { cada: 5000 });
+  if (!datos) return <p className="mt-2 text-[11px] text-apagado">{error ? 'No se pudo leer el registro.' : 'Cargando…'}</p>;
+  return (
+    <div className="mt-2 space-y-2">
+      {datos.resumen && <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[11px] text-texto">{datos.resumen}</pre>}
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[11px] text-apagado">{datos.registro || 'Sin registro todavía.'}</pre>
+    </div>
+  );
+}
+
+/** Relevo a Codex: qué proyectos sigue Codex (o siguió) por falta de tokens de Claude, con su resumen y registro. */
+function RelevoCodex({ relevos }) {
+  const [abierto, setAbierto] = useState(null);
+  if (!relevos?.length) return null;
+  return (
+    <div className="mb-4 space-y-2">
+      {relevos.map((r) => {
+        const e = ESTADO_RELEVO[r.estado] ?? ESTADO_RELEVO.error;
+        return (
+          <div key={r.proyecto} className="rounded-xl border border-borde bg-panel/80 px-3 py-2 text-[13px] text-texto">
+            <div className="flex items-center gap-2.5">
+              <ArrowRightLeft className="size-4 shrink-0 text-apagado" />
+              <span className="min-w-0 flex-1">{e.texto(r)} <span className="text-[11px] text-apagado">· {haceCuanto(r.fin ?? r.inicio)}</span></span>
+              <Punto tono={e.tono} vivo={r.estado === 'en curso'} />
+              <button type="button" onClick={() => setAbierto(abierto === r.proyecto ? null : r.proyecto)} aria-expanded={abierto === r.proyecto}
+                className="h-9 rounded-lg border border-borde px-3 text-[12px] text-tenue hover:text-texto">{abierto === r.proyecto ? 'Ocultar' : 'Ver registro'}</button>
+            </div>
+            {abierto === r.proyecto && <DetalleRelevo proyecto={r.proyecto} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
 function TareasIA({ tareas }) {
   const [filtro, setFiltro] = useState(null);
@@ -139,7 +181,7 @@ export default function Resumen() {
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
-  const { proyectos, boveda, mcp, chats, guardados, remoto = [], tareas = null } = datos;
+  const { proyectos, boveda, mcp, chats, guardados, remoto = [], tareas = null, relevos = [] } = datos;
   const enCurso = proyectos.filter((p) => p.flujo?.bloqueo?.vivo);
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -148,6 +190,7 @@ export default function Resumen() {
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
         <Cabecera titulo={`${saludo()}, Dano`} subtitulo={<span className="capitalize">{fecha}</span>} />
         <Fallo error={error} className="mb-4" />
+        <RelevoCodex relevos={relevos} />
         {remoto.length > 0 && (
           <div className="mb-4 rounded-xl border border-aviso/25 bg-aviso/10 px-3 py-2 text-[13px] text-aviso">
             <p className="flex items-center gap-2.5"><MonitorSmartphone className="size-4 shrink-0" />{remoto.length === 1 ? '1 sesión de Claude abierta' : `${remoto.length} sesiones de Claude abiertas`}</p>
