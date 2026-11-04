@@ -57,18 +57,21 @@ export function conAhorro(ajustes) {
   return { ...base, model: AHORRO.model, env: { ...env, ...AHORRO.env } };
 }
 
-/** Relevo a Codex: cuando Claude se queda sin tokens, el evento StopFailure (error rate_limit o billing_error) llama a
- * scripts/relevo.mjs, que lanza Codex en segundo plano con el estado del desarrollo. */
+/** Relevo a Codex: StopFailure (error rate_limit o billing_error) llama a scripts/relevo.mjs, que lanza Codex en segundo
+ * plano con el estado del desarrollo; SessionStart lo llama al volver Claude para que revise lo que hizo Codex. */
 const MARCA_RELEVO = 'relevo.mjs';
+const HOOKS_RELEVO = { StopFailure: 'senal', SessionStart: 'revision' };
 
-/** settings.json con el hook StopFailure del relevo (una sola vez; los demás hooks se conservan). */
+/** settings.json con los hooks del relevo (una sola vez cada uno; los demás hooks se conservan). */
 export function conRelevo(ajustes, agente) {
   const base = ajustes && typeof ajustes === 'object' && !Array.isArray(ajustes) ? ajustes : {};
   const hooks = base.hooks && typeof base.hooks === 'object' && !Array.isArray(base.hooks) ? base.hooks : {};
-  const previos = Array.isArray(hooks.StopFailure) ? hooks.StopFailure : [];
-  const ajenos = previos.filter((g) => !g?.hooks?.some((h) => String(h?.command).includes(MARCA_RELEVO)));
-  const propio = { hooks: [{ type: 'command', command: `node "${path.join(agente, 'scripts', MARCA_RELEVO)}" senal`, timeout: 30 }] };
-  return { ...base, hooks: { ...hooks, StopFailure: [...ajenos, propio] } };
+  const nuevos = { ...hooks };
+  for (const [evento, orden] of Object.entries(HOOKS_RELEVO)) {
+    const ajenos = (Array.isArray(hooks[evento]) ? hooks[evento] : []).filter((g) => !g?.hooks?.some((h) => String(h?.command).includes(MARCA_RELEVO)));
+    nuevos[evento] = [...ajenos, { hooks: [{ type: 'command', command: `node "${path.join(agente, 'scripts', MARCA_RELEVO)}" ${orden}`, timeout: 30 }] }];
+  }
+  return { ...base, hooks: nuevos };
 }
 
 function aplicarAjustes(configDir, agente) {

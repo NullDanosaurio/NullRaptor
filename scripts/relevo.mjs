@@ -1,6 +1,7 @@
 // Relevo a Codex: cuando Claude se queda sin tokens, Codex sigue el desarrollo en segundo plano.
 //   node scripts/relevo.mjs senal     hook StopFailure de Claude Code (JSON por la entrada estándar): anota la señal y
 //                                     deja a Codex trabajando en segundo plano (ejecutar)
+//   node scripts/relevo.mjs revision  hook SessionStart: al volver Claude, le dice qué hizo Codex (una sola vez)
 //   node scripts/relevo.mjs ejecutar <Proyecto>   corre Codex con el briefing hasta que acaba (lo lanza «senal»)
 // Codex usa el sandbox workspace-write; en el contenedor hace falta el perfil seccomp de AHO-5 (bwrap necesita
 // namespaces). Solo con RELEVO_SIN_SANDBOX=1 (decisión de Daniel) se ejecuta sin sandbox: el contenedor es el límite.
@@ -51,6 +52,23 @@ export const estadoRelevo = (trabajo, proyecto) => {
   // Un «en curso» cuyo proceso ya no existe (reinicio del contenedor) cuenta como interrumpido.
   return e?.estado === 'en curso' && !vivo(e.pid) ? { ...e, estado: 'error', error: 'interrumpido' } : e;
 };
+
+/** Nota para Claude al abrir una sesión en un proyecto con relevo sin revisar (o en curso). Marca el relevo como
+ * avisado para no repetirla. Devuelve el texto, o null si no hay nada que decir. */
+export function notaDeVuelta(proyecto, trabajo, ahora = new Date()) {
+  const e = estadoRelevo(trabajo, proyecto);
+  if (!e || e.revisado) return null;
+  const resumen = rutaDe(trabajo, proyecto, 'codex.md');
+  if (e.estado === 'en curso') {
+    return `Relevo en curso: Codex está trabajando ahora en «${proyecto}» porque Claude se quedó sin tokens (desde ${e.inicio}). No edites el mismo código a la vez; mira git log y ${resumen} cuando termine.`;
+  }
+  escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { ...e, revisado: ahora.toISOString() });
+  return [
+    `Relevo de Codex en «${proyecto}»: Claude se quedó sin tokens y Codex siguió el desarrollo (${e.estado}, ${e.fin ?? e.inicio}).`,
+    `Antes de continuar: lee su resumen (${resumen}) y su registro (${rutaDe(trabajo, proyecto, 'log')}), revisa sus commits con git log y git diff,`,
+    'ejecuta las pruebas del proyecto y corrige o aprueba lo hecho. Después sigue la lista de tareas de Ruflo y dile a Daniel qué hizo Codex.',
+  ].join('\n');
+}
 
 /** Relevos que muestra el panel: en curso y los de las últimas 24 h, el más reciente primero. */
 export function listarRelevos(trabajo, ahora = Date.now()) {
@@ -186,5 +204,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
       const senal = anotarSenal(leerEntrada(), trabajo);
       if (senal) lanzar(JSON.parse(fs.readFileSync(senal.ruta, 'utf8')), { trabajo });
     } catch (e) { console.error(`relevo: ${e.message}`); }
-  } else { console.error('Uso: node scripts/relevo.mjs senal | ejecutar <Proyecto>'); process.exit(2); }
+  } else if (orden === 'revision') {
+    try {
+      const proyectoActual = proyectoDe(leerEntrada()?.cwd, trabajo);
+      const nota = proyectoActual && notaDeVuelta(proyectoActual, trabajo);
+      if (nota) console.log(nota); // la salida de SessionStart llega a Claude como contexto
+    } catch (e) { console.error(`relevo: ${e.message}`); }
+  } else { console.error('Uso: node scripts/relevo.mjs senal | revision | ejecutar <Proyecto>'); process.exit(2); }
 }

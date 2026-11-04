@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { anotarSenal, argsCodex, armarBriefing, detalleRelevo, ejecutar, esLimite, estadoRelevo, lanzar, leerEnCurso, listarRelevos, proyectoDe } from '../scripts/relevo.mjs';
+import { anotarSenal, argsCodex, armarBriefing, detalleRelevo, ejecutar, esLimite, estadoRelevo, lanzar, leerEnCurso, listarRelevos, notaDeVuelta, proyectoDe } from '../scripts/relevo.mjs';
 
 const trabajo = () => fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-'));
 
@@ -129,4 +129,22 @@ test('listarRelevos y detalleRelevo: para el panel, con registro y resumen, sin 
   assert.equal(d.resumen, 'Hice A');
   assert.equal(d.registro, 'l95\nl96\nl97\nl98\nl99');
   for (const malo of ['../x', '..', 'a/b', '', 'No-existe']) assert.equal(detalleRelevo(t, malo), null);
+});
+
+test('notaDeVuelta: avisa a Claude una sola vez de lo que hizo Codex, o de que sigue trabajando', () => {
+  const t = trabajo();
+  assert.equal(notaDeVuelta('Demo', t), null);
+  const dir = path.join(t, '.relevo');
+  fs.mkdirSync(dir, { recursive: true });
+  const estado = path.join(dir, 'Demo.estado.json');
+  fs.writeFileSync(estado, JSON.stringify({ estado: 'en curso', pid: process.pid, inicio: '2026-11-04T10:00:00Z' }));
+  assert.match(notaDeVuelta('Demo', t), /Codex está trabajando ahora en «Demo»/);
+  assert.match(notaDeVuelta('Demo', t), /Codex está trabajando/); // en curso: se repite, no se marca
+  fs.writeFileSync(estado, JSON.stringify({ estado: 'terminado', inicio: '2026-11-04T10:00:00Z', fin: '2026-11-04T11:00:00Z', codigo: 0 }));
+  const nota = notaDeVuelta('Demo', t, new Date('2026-11-04T12:00:00Z'));
+  assert.match(nota, /Codex siguió el desarrollo \(terminado/);
+  assert.match(nota, /Demo\.codex\.md/);
+  assert.match(nota, /ejecuta las pruebas/);
+  assert.equal(JSON.parse(fs.readFileSync(estado, 'utf8')).revisado, '2026-11-04T12:00:00.000Z');
+  assert.equal(notaDeVuelta('Demo', t), null);
 });
