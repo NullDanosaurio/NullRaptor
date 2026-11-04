@@ -23,6 +23,7 @@ import { Equipo } from './lib/equipo.mjs';
 import { Proyectos } from './lib/proyectos.mjs';
 import { crearRutasEquipo } from './lib/rutas-equipo.mjs';
 import { crearRutasVoz } from './lib/rutas-voz.mjs';
+import { Gasto } from './lib/gasto.mjs';
 import { archivoTareasRuflo, leerTareasRuflo, resumenTareas } from './lib/tareas-ruflo.mjs';
 import { assetlinks, leerFirma, origenesApp } from './lib/app-android.mjs';
 import { Voz } from './lib/voz.mjs';
@@ -132,7 +133,7 @@ export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
   dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
   env = process.env, prepararMcp = null, proyectos = new Proyectos({ trabajo, memoria, env }),
-  equipo = new Equipo({ trabajo, env }), voz = new Voz(), tareasRuflo = archivoTareasRuflo(env),
+  equipo = new Equipo({ trabajo, env }), voz = new Voz(), tareasRuflo = archivoTareasRuflo(env), gasto = new Gasto(),
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -157,6 +158,7 @@ export function crearServidor({
   const sinBoveda = () => ({ error: 'Sin bóveda: arranca el panel con preparar.mjs (BOVEDA_DIR).' });
 
   const rutas = {
+    'GET /api/gasto': (q) => gasto.resumen(q.get('dias') ?? 7),
     'GET /api/resumen': () => ({
       boveda: memoria ? { git: estadoGit(memoria), notas: listarNotas(memoria).length, cambios: cambiosRecientes(memoria, 6) } : null,
       proyectos: listarProyectos(trabajo, memoria),

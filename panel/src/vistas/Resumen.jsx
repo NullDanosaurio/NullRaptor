@@ -1,6 +1,6 @@
 // Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
 // chats, MCP del día y las tareas de la IA (Ruflo).
-import { ArrowUpRight, BookOpen, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Gauge, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
 import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
@@ -66,6 +66,32 @@ function BuscarBoveda() {
         {consulta && <button type="button" onClick={() => setConsulta('')} aria-label="Borrar búsqueda" className="text-apagado hover:text-texto"><X className="size-3.5" /></button>}
       </label>
       {consulta && <div className="max-h-80 overflow-y-auto"><Busqueda consulta={consulta} /></div>}
+    </Tarjeta>
+  );
+}
+
+/** Gasto de tokens de Claude de los últimos 7 días (estimado con precios de API): para ver si un cambio ahorra. */
+function GastoIA() {
+  const { datos } = useDatos('/api/gasto?dias=7', { cada: 120_000 });
+  if (!datos?.llamadas) return null;
+  const max = Math.max(...datos.porDia.map((d) => d.usd), 1);
+  const miles = (n) => `${Math.round(n / 1000)} k`;
+  return (
+    <Tarjeta titulo="Gasto de Claude · 7 días" icono={Gauge} accion={<span className="text-[11px] text-apagado" title="Estimado con precios de API: da la proporción, no lo que se paga con la suscripción">estimado</span>}>
+      <p className="text-[24px] font-semibold tabular-nums text-white">~{Math.round(datos.usd)} USD <span className="text-[13px] font-normal text-apagado">· {datos.llamadas} llamadas</span></p>
+      <div className="mt-3 flex h-16 items-end gap-1" aria-label="Gasto por día">
+        {datos.porDia.map((d) => (
+          <div key={d.nombre} className="flex flex-1 flex-col items-center gap-1" title={`${d.nombre}: ~${d.usd} USD`}>
+            <div className="w-full rounded-t bg-raptor/70" style={{ height: `${Math.max(4, (d.usd / max) * 52)}px` }} />
+            <span className="text-[10px] tabular-nums text-apagado">{d.nombre.slice(8)}</span>
+          </div>
+        ))}
+      </div>
+      <ul className="mt-3 space-y-1 text-[12px] text-tenue">
+        <li>Modelos: {datos.porModelo.slice(0, 3).map((m) => `${m.nombre.replace(/-\d.*$/, '')} ${m.pct} %`).join(' · ')}</li>
+        <li>Releer contexto: <span className="text-texto">{datos.partes.leer} %</span> · respuestas {datos.partes.salida} %</li>
+        <li>Contexto por llamada: mediana {miles(datos.contexto.mediana)} · p90 {miles(datos.contexto.p90)} tokens</li>
+      </ul>
     </Tarjeta>
   );
 }
@@ -168,6 +194,7 @@ export default function Resumen() {
           </div>
 
           <div className="space-y-6">
+            <GastoIA />
             <BuscarBoveda />
             <Tarjeta titulo="Bóveda: últimos cambios" icono={GitCommitHorizontal} cuerpo="p-2">
               {boveda?.cambios?.length ? (
