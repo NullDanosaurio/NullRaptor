@@ -1,5 +1,19 @@
 # Registro de trabajo
 
+## 04/11/2026 — Relevo a Codex cuando Claude se queda sin tokens
+- [U] Daniel: «cuando claude se quede sin tokens se pueda usar codex para que coja el lugar de claude y siga
+  trabajando en los desarrollos». Elegido [U]: automático en segundo plano, y Claude retoma y revisa al volver
+  (Codex no acaba solo el desarrollo).
+- Hecho: hook `StopFailure` → `scripts/relevo.mjs` (señal, briefing, `codex exec` aparte, estado y registro en
+  `$TRABAJO_DIR/.relevo/`); hook `SessionStart` con la nota de vuelta; aviso y registro en Resumen (`/api/relevo`).
+- Decisión [O]: el estado de Ruflo se lee con su CLI (opcional); Codex deja su resumen en `.relevo/<X>.codex.md`
+  en lugar de escribir en la memoria de Ruflo (no tiene su MCP).
+- Hallazgo [O]: el sandbox de Codex falla en el contenedor (`bwrap: No permissions to create a new namespace`), así
+  que Codex no puede escribir archivos hasta que se autorice el perfil seccomp (AHO-5). Interruptor explícito
+  `RELEVO_SIN_SANDBOX=1`, apagado: lo decide Daniel.
+- Probado: hook real con Codex falso (vuelve en 29 ms; estado en curso → terminado), aviso de vuelta una sola vez,
+  157 pruebas. Sin probar con el límite real de Claude ni con Codex real escribiendo (por el sandbox).
+
 ## 04/11/2026 — Ahorro de tokens: medir primero
 - [U] Daniel: «realmente quiero ahorrar tokens… siento que apenas estamos raspando lo que podemos hacer contigo»;
   acepta todas las mejoras y `opusplan`. Y: «no veo tus tareas en la pestaña resumen».

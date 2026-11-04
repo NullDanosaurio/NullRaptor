@@ -295,6 +295,28 @@ y el **65 %** fue releer contexto, con una mediana de 177 k tokens por llamada (
 - Pendiente (necesita a Daniel): el filtro `config/seccomp.json` para que el sandbox de Codex funcione en el
   contenedor, y las skills oficiales de Anthropic y Context7 (código externo).
 
+## Relevo a Codex cuando Claude se queda sin tokens (04/11/2026)
+
+Si Claude agota el límite de uso (o el saldo) en mitad de un desarrollo, Codex sigue por él en segundo plano:
+
+1. **Detección**: `prepararIA` añade a `settings.json` el hook `StopFailure` (errores `rate_limit` y `billing_error`),
+   que llama a `node scripts/relevo.mjs senal`. Solo vale dentro de `$TRABAJO_DIR/proyectos/<Proyecto>`.
+2. **Briefing**: se arma con el estado `proyecto-<X>/en-curso` de Ruflo (si responde), las tareas abiertas `[<X>]`,
+   la rama, `git status` y los últimos commits, más las reglas del relevo (una tarea cada vez, pruebas, commit pequeño
+   sin `Co-Authored-By`, sin push ni instalaciones, parar si hace falta una decisión de Daniel).
+3. **Codex**: `codex exec --sandbox workspace-write` en el proyecto, en un proceso aparte (el hook vuelve al instante),
+   con tope de 3 h. Una sola vez por proyecto mientras siga en curso. Todo queda en `$TRABAJO_DIR/.relevo/`
+   (nunca en el proyecto): `<X>.estado.json`, `.briefing.md`, `.log`, `.final.md` y el resumen `<X>.codex.md`.
+4. **Panel**: Resumen muestra un aviso por relevo (en curso, terminado o detenido) con su resumen y su registro
+   (`/api/relevo?proyecto=<X>`).
+5. **Vuelta de Claude**: el hook `SessionStart` (`relevo.mjs revision`) le dice, una sola vez, que lea el resumen y el
+   registro de Codex, revise sus commits, pase las pruebas y retome la lista. Codex no termina el desarrollo solo.
+
+**Sandbox**: el de Codex (`bwrap`) no puede crear namespaces dentro del contenedor, y sin él Codex no escribe archivos.
+Hace falta el perfil `config/seccomp.json` (AHO-5, pendiente de tu autorización). Mientras tanto,
+`RELEVO_SIN_SANDBOX=1` lanza Codex con `--dangerously-bypass-approvals-and-sandbox` (el contenedor es el límite).
+Está apagado por defecto. Los hooks y el panel llegan con la imagen nueva (como todo cambio en `/nullraptor`).
+
 ## Panel web: una sola interfaz
 
 `panel/` (añadido el 29/10/2026; reorganizado en la fase 4, 02/11/2026). Servidor Node sin dependencias
