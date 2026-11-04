@@ -266,9 +266,11 @@ export function crearServidor({
 }
 
 /** Primer mensaje de una sesión reabierta tras reiniciar el contenedor. */
-export const AVISO_REANUDAR = 'Nullraptor se ha reiniciado (actualización o parada) y esta sesión se ha reabierto con la conversación anterior. '
-  + 'Si estabas a mitad de un trabajo: revisa la lista de tareas de este proyecto (tu lista y las de Ruflo), di en una línea dónde lo dejaste y sigue con la siguiente pendiente. '
-  + 'Si no había nada en curso, no hagas nada y espera instrucciones.';
+/** Primer mensaje de una sesión reabierta tras reiniciar. Empieza limpia (sin --continue): releer la conversación
+ * entera en cada mensaje era la mayor parte del gasto de tokens; el estado vive en Ruflo y en los commits. */
+export const avisoReanudar = (proyecto) => `Nullraptor se ha reiniciado (actualización o parada) y esta sesión de ${proyecto} empieza limpia, sin la conversación anterior. `
+  + `Recupera el estado sin leer de más: task_list de Ruflo (las de [${proyecto}]), memory_retrieve (namespace proyecto-${proyecto}, clave en-curso) y git log --oneline -5. `
+  + 'Si había algo a medias, di en una línea dónde se quedó y sigue con la siguiente tarea pendiente. Si no, no hagas nada y espera instrucciones.';
 
 const esPrincipal = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (esPrincipal) {
@@ -300,7 +302,7 @@ if (esPrincipal) {
     });
   }
   for (const { proyecto, perfil } of actualizacion.tomarReanudar()) {
-    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', continuar: true, aviso: AVISO_REANUDAR, perfil }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
+    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', aviso: avisoReanudar(proyecto), perfil }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
     catch (e) { console.warn(`[panel] No se pudo reanudar la sesión de ${proyecto}: ${e.message}`); }
   }
   const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;

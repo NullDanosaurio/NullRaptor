@@ -78,3 +78,13 @@ test('reanudar: al pararse apunta los proyectos con sesión; al arrancar los da 
   escribir(trabajo, 'reanudar.json', 'no es json');
   assert.deepEqual(a.tomarReanudar(), []);
 });
+
+test('reanudar: la sesión empieza limpia y recupera el estado de Ruflo de su proyecto', async () => {
+  const { avisoReanudar } = await import('../panel/servidor.mjs');
+  const aviso = avisoReanudar('Modelos3D');
+  assert.match(aviso, /empieza limpia/);
+  assert.match(aviso, /proyecto-Modelos3D/);
+  assert.match(aviso, /\[Modelos3D\]/);
+  const fuente = fs.readFileSync(new URL('../panel/servidor.mjs', import.meta.url), 'utf8');
+  assert.ok(!/reanudada tras reiniciar', continuar: true/.test(fuente)); // nunca --continue al reanudar
+});
