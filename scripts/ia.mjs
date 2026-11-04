@@ -4,6 +4,8 @@
 //    para pasarlo con --mcp-config.
 //  - el equipo del Director IA (config/agentes/equipo-*.md → CLAUDE_CONFIG_DIR/agents/) y los perfiles que se añaden a
 //    una sesión con --append-system-prompt (config/perfiles/<perfil>.md; lista cerrada PERFILES).
+//  - las skills propias (config/skills/nullraptor-* → CLAUDE_CONFIG_DIR/skills/): se cargan solo cuando hacen falta,
+//    así las instrucciones largas (usar el PC, crear herramientas) no van en cada mensaje;
 //  - los ajustes de ahorro de tokens (AHORRO) en CLAUDE_CONFIG_DIR/settings.json, sin tocar el resto del archivo;
 // También retira las copias de Ruflo que versiones anteriores dejaban en la configuración global.
 import fs from 'node:fs';
@@ -15,6 +17,24 @@ export const ARCHIVO_MCP = '.mcp-agente.json';
 /** Perfiles que se pueden pedir al abrir una sesión o un chat. Lista cerrada: nunca una ruta que venga del cliente. */
 export const PERFILES = ['director'];
 const PREFIJO_EQUIPO = 'equipo-';
+
+/** Copia las skills propias (config/skills/nullraptor-*) a <configDir>/skills y retira las nullraptor-* que ya no
+ * existan en config/skills. Las demás skills no se tocan; sin config/skills no se borra nada. */
+export function instalarSkills(agente, configDir) {
+  const origen = path.join(agente, 'config', 'skills');
+  if (!fs.existsSync(origen)) return [];
+  const destino = path.join(configDir, 'skills');
+  fs.mkdirSync(destino, { recursive: true });
+  const nuestras = fs.readdirSync(origen).filter((n) => n.startsWith('nullraptor-') && fs.existsSync(path.join(origen, n, 'SKILL.md')));
+  for (const n of nuestras) {
+    fs.rmSync(path.join(destino, n), { recursive: true, force: true });
+    fs.cpSync(path.join(origen, n), path.join(destino, n), { recursive: true });
+  }
+  for (const n of fs.readdirSync(destino)) {
+    if (n.startsWith('nullraptor-') && !nuestras.includes(n)) fs.rmSync(path.join(destino, n), { recursive: true, force: true });
+  }
+  return nuestras;
+}
 
 /** Ahorro de tokens (decisión [U] 04/11/2026, medido: 99,6 % del gasto en Opus y 65 % en releer contexto):
  * Opus solo para planificar (opusplan: Sonnet ejecuta), compactar antes la conversación, acotar la salida de Bash y
@@ -116,6 +136,7 @@ export function prepararIA({ agente, env, memoria, trabajo }) {
     fs.copyFileSync(path.join(agente, 'config', 'claude-global.md'), path.join(configDir, 'CLAUDE.md'));
     retirarAntiguos(configDir);
     instalarEquipo(agente, configDir);
+    instalarSkills(agente, configDir);
     aplicarAhorro(configDir);
   }
   return escribirMcp({ agente, env, memoria, trabajo });

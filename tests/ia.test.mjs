@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AHORRO, ARCHIVO_MCP, conAhorro, instalarEquipo, leerPerfil, PERFILES, prepararIA } from '../scripts/ia.mjs';
+import { AHORRO, ARCHIVO_MCP, conAhorro, instalarEquipo, instalarSkills, leerPerfil, PERFILES, prepararIA } from '../scripts/ia.mjs';
 import { construirEncargo, extraerDiff, leerArchivos, rutaDentro } from '../scripts/codex-parche.mjs';
 
 const agente = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -142,4 +142,22 @@ test('prepararIA aplica el ahorro de tokens en settings.json sin perder lo demá
   fs.writeFileSync(path.join(configDir, 'settings.json'), '{roto');
   prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
   assert.equal(JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8')).model, 'opusplan');
+});
+
+test('skills propias: se instalan nullraptor-*, se retiran las obsoletas y el CLAUDE.md global solo las nombra', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-skills-'));
+  const configDir = path.join(base, '.claude');
+  for (const n of ['nullraptor-vieja', 'mia']) { fs.mkdirSync(path.join(configDir, 'skills', n), { recursive: true }); fs.writeFileSync(path.join(configDir, 'skills', n, 'SKILL.md'), 'x'); }
+  prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
+  for (const n of ['nullraptor-pc', 'nullraptor-herramienta']) {
+    const texto = fs.readFileSync(path.join(configDir, 'skills', n, 'SKILL.md'), 'utf8');
+    assert.match(texto, new RegExp(`^---\\nname: ${n}\\ndescription: .{40,}\\n---\\n`));
+  }
+  assert.ok(!fs.existsSync(path.join(configDir, 'skills', 'nullraptor-vieja')));
+  assert.ok(fs.existsSync(path.join(configDir, 'skills', 'mia', 'SKILL.md')));
+  assert.deepEqual(instalarSkills(fs.mkdtempSync(path.join(os.tmpdir(), 'ia-sin-')), configDir), []);
+  const global = fs.readFileSync(path.join(agente, 'config', 'claude-global.md'), 'utf8');
+  assert.ok(global.includes('nullraptor-pc') && global.includes('nullraptor-herramienta'));
+  assert.ok(global.length < 6000, `CLAUDE.md global de ${global.length} caracteres`); // va en cada mensaje
+  assert.match(global, /%LOCALAPPDATA%\\Nullraptor/); // las reglas de seguridad del PC siguen siempre cargadas
 });

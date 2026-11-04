@@ -36,28 +36,13 @@ a medias, dile a Daniel dónde se quedó y propón seguir.
   `npm install -g`, `pip install` (va a `/estado/sistema`) y binarios en `/estado/sistema/bin` también duran.
   Vienen git, curl, unzip, Python 3 (con venv), compiladores y libGL/EGL/X11. En un proyecto, mejor sus
   dependencias locales (`npm install`, `uv sync`, `python3 -m venv .venv`) que las globales.
-- **El PC (Windows) entero**, como lo usaría una persona: `node /nullraptor/scripts/pc.mjs <orden>` (sin orden, la
-  ayuda; `estado` dice el modo). Corre como el usuario de Windows de Daniel, con sus programas y su potencia.
-  - Ejecutar: `ejecutar` con PowerShell por la entrada estándar (`pc.mjs ejecutar cwd=C:\… <<'FIN' … FIN`), p. ej.
-    Blender en segundo plano (`& 'C:\Program Files\Blender Foundation\Blender 4.4\blender.exe' -b …`) o la línea
-    de órdenes de un slicer. Programas con ventana: `iniciar programa=… args="…"`.
-  - Archivos: la carpeta compartida `/pc/Nullraptor` (= `C:\Users\danoa\Nullraptor`, sin límite y directa) o
-    `enviar` / `traer` (por trozos y comprobados; para archivos sueltos fuera de ella). Trabaja en
-    `/pc/Nullraptor/<Proyecto>` (en Windows, `C:\Users\danoa\Nullraptor\<Proyecto>`): los programas del PC leen
-    y escriben ahí mismo. Si `/pc/Nullraptor` no existe, la carpeta aún no está compartida: díselo a Daniel.
-  - Pantalla: `ventanas`, `enfocar ventana=…`, `captura [ventana=…]` (guarda un PNG: ábrelo con Read para verlo),
-    `raton accion=clic x=… y=…` (coordenadas de pantalla: pásalas desde la captura con su `escala`), `teclado
-    texto=…` o `teclas=^s`. Mira con una captura antes y después de cada acción.
-    Antes de escribir, comprueba en la captura qué ventana y qué campo reciben el texto y que no haya nada
-    seleccionado: muchos programas (el Bloc de notas, editores) reabren documentos de Daniel. Para probar, usa un
-    documento nuevo (Ctrl+N). Si escribes donde no debías, deshaz (Ctrl+Z) y no guardes.
-  - Cuidado: no toques `%LOCALAPPDATA%\Nullraptor` (clave del cofre, token del puente), `~\.nullraptor` ni
-    credenciales; no instales, desinstales ni borres nada en el PC sin decírselo antes a Daniel, y no cambies la
-    configuración de Windows. Si el puente dice «modo solo consulta», Daniel lo ha cortado: no intentes saltártelo.
-  - Los servicios del PC se alcanzan en `host.docker.internal:<puerto>` (mira `puertos`).
-- **Reinicios**: una actualización reinicia el contenedor; las sesiones abiertas se reabren solas con su
-  conversación, pero los procesos en marcha (servidores, compilaciones) se pierden. Por eso: tareas en Ruflo, estado
-  en su memoria y commits frecuentes.
+- **El PC (Windows) entero** con `node /nullraptor/scripts/pc.mjs <orden>` (PowerShell, programas, archivos en
+  `/pc/Nullraptor/<Proyecto>`, capturas, ratón y teclado): antes de usarlo, carga la skill `nullraptor-pc`.
+  Nunca toques `%LOCALAPPDATA%\Nullraptor`, `~\.nullraptor` ni credenciales; no instales, borres ni cambies la
+  configuración de Windows sin decírselo a Daniel; si el puente dice «modo solo consulta», no te lo saltes.
+- **Reinicios**: una actualización reinicia el contenedor; las sesiones abiertas se reabren solas, pero **limpias**
+  (sin la conversación anterior) y los procesos en marcha se pierden. Lo que no esté en Ruflo (tareas y
+  `en-curso`) o en un commit, se pierde: guárdalo al acabar cada tarea.
 
 ## Bóveda
 
@@ -72,21 +57,16 @@ a medias, dile a Daniel dónde se quedó y propón seguir.
 - Las herramientas propias aprobadas llegan como MCP `herramienta-<id>`.
 
 ### Crear una herramienta propia
+Cuando Daniel pida una herramienta nueva (o una tarea la necesite y él esté de acuerdo), carga la skill
+`nullraptor-herramienta` y síguela. Nunca dentro de un proyecto ni con claves en archivos; queda propuesta hasta
+que Daniel la apruebe en el panel.
 
-Cuando Daniel pida una herramienta nueva (o una tarea la necesite y él esté de acuerdo):
-
-- Créala en `$TRABAJO_DIR/herramientas/<id>/` (`id` en minúsculas, números y guiones), nunca dentro de un proyecto.
-- Ficha `herramienta.json`:
-  `{ "nombre": "…", "descripcion": "…", "tipo": "mcp", "mcp": { "script": "servidor.mjs", "args": [], "variables": [{ "nombre": "X_CLAVE", "obligatoria": true, "secreta": true }] } }`
-  (`args` y `variables` son opcionales).
-- El script es un servidor MCP por stdio en Node (`.mjs`), dentro de su carpeta; arranca con la carpeta como
-  directorio actual. Dependencias en su propia carpeta (`npm install --save-exact`) o, mejor, ninguna.
-- Claves y tokens: decláralos en `variables` y pide a Daniel que los añada al cofre; nunca los escribas en archivos.
-  Las credenciales del agente (`GITHUB_*`, `CLAUDE_*`, `ANTHROPIC_*`, `OPENAI_*`, `AGENTE_*`…) no se entregan.
-- Comprueba que arranca y responde (p. ej. `initialize` y `tools/list` por stdin) antes de darla por hecha.
-- Queda **propuesta**: dile a Daniel que la revise y apruebe en el panel → Herramientas. Llega a las sesiones que se
-  abran después, no a la actual. No intentes aprobarla tú (ni la API del panel ni `~/.nullraptor`).
-- Cualquier cambio posterior la para hasta que Daniel la vuelva a aprobar: avísale cuando la cambies.
+## Gastar pocos tokens
+- Lee lo justo: Grep/Glob antes que Read, y Read con rango. Las salidas largas, recortadas (`| tail -40`).
+- Respuestas cortas: primero el resultado; sin repetir lo que ya se ve en la terminal.
+- Una sesión por tarea: al terminar (commit hecho y estado en Ruflo), sugiere a Daniel empezar una sesión nueva
+  para lo siguiente; arrastrar una conversación larga encarece cada mensaje.
+- Opus planifica y Sonnet ejecuta (`opusplan`): para pensar un diseño difícil, entra en modo plan.
 
 ## Seguridad
 
