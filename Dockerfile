@@ -18,7 +18,7 @@ FROM node:24.22.1-bookworm-slim
 # sudo (decisión [U] 02/11/2026): la IA puede usar apt; con «paquetes instalar» lo instalado se reinstala solo tras
 # cada actualización (scripts/paquetes.mjs, lista en /estado/sistema/apt-paquetes.txt).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates curl unzip python3 python3-pip python3-venv build-essential \
+ && apt-get install -y --no-install-recommends git gh ca-certificates curl unzip python3 python3-pip python3-venv build-essential \
       sudo libgl1 libegl1 libglu1-mesa libx11-6 libxrender1 libxext6 libxi6 libxxf86vm1 libxfixes3 libxkbcommon0 libsm6 libfontconfig1 \
  && rm -rf /var/lib/apt/lists/* \
  && echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/nullraptor && chmod 0440 /etc/sudoers.d/nullraptor \

@@ -173,6 +173,14 @@ test('skills propias: se instalan nullraptor-*, se retiran las obsoletas y el CL
   assert.ok(!fs.existsSync(path.join(configDir, 'skills', 'nullraptor-vieja')));
   assert.ok(fs.existsSync(path.join(configDir, 'skills', 'mia', 'SKILL.md')));
   assert.deepEqual(instalarSkills(fs.mkdtempSync(path.join(os.tmpdir(), 'ia-sin-')), configDir), []);
+  // Skills oficiales de Anthropic (Apache 2.0): se instalan con su licencia y el nombre igual que la carpeta.
+  const oficialesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-oficiales-'));
+  const oficiales = instalarSkills(agente, oficialesDir).filter((n) => n.startsWith('anthropic-'));
+  assert.deepEqual(oficiales.sort(), ['anthropic-frontend-design', 'anthropic-mcp-builder', 'anthropic-webapp-testing']);
+  for (const n of oficiales) {
+    assert.match(fs.readFileSync(path.join(oficialesDir, 'skills', n, 'SKILL.md'), 'utf8'), new RegExp(`^---\\nname: ${n}\\n`));
+    assert.ok(fs.existsSync(path.join(oficialesDir, 'skills', n, 'LICENSE.txt')));
+  }
   const global = fs.readFileSync(path.join(agente, 'config', 'claude-global.md'), 'utf8');
   assert.ok(global.includes('nullraptor-pc') && global.includes('nullraptor-herramienta'));
   assert.ok(global.length < 6000, `CLAUDE.md global de ${global.length} caracteres`); // va en cada mensaje

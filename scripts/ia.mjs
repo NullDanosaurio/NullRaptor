@@ -19,20 +19,24 @@ export const ARCHIVO_MCP = '.mcp-agente.json';
 export const PERFILES = ['director'];
 const PREFIJO_EQUIPO = 'equipo-';
 
-/** Copia las skills propias (config/skills/nullraptor-*) a <configDir>/skills y retira las nullraptor-* que ya no
- * existan en config/skills. Las demás skills no se tocan; sin config/skills no se borra nada. */
+const PREFIJOS_SKILL = ['nullraptor-', 'anthropic-'];
+const esNuestra = (n) => PREFIJOS_SKILL.some((p) => n.startsWith(p));
+
+/** Copia las skills propias (config/skills/nullraptor-*) y las oficiales de Anthropic con licencia Apache 2.0
+ * (config/skills/anthropic-*) a <configDir>/skills y retira las de esos prefijos que ya no existan en config/skills.
+ * Las demás skills no se tocan; sin config/skills no se borra nada. */
 export function instalarSkills(agente, configDir) {
   const origen = path.join(agente, 'config', 'skills');
   if (!fs.existsSync(origen)) return [];
   const destino = path.join(configDir, 'skills');
   fs.mkdirSync(destino, { recursive: true });
-  const nuestras = fs.readdirSync(origen).filter((n) => n.startsWith('nullraptor-') && fs.existsSync(path.join(origen, n, 'SKILL.md')));
+  const nuestras = fs.readdirSync(origen).filter((n) => esNuestra(n) && fs.existsSync(path.join(origen, n, 'SKILL.md')));
   for (const n of nuestras) {
     fs.rmSync(path.join(destino, n), { recursive: true, force: true });
     fs.cpSync(path.join(origen, n), path.join(destino, n), { recursive: true });
   }
   for (const n of fs.readdirSync(destino)) {
-    if (n.startsWith('nullraptor-') && !nuestras.includes(n)) fs.rmSync(path.join(destino, n), { recursive: true, force: true });
+    if (esNuestra(n) && !nuestras.includes(n)) fs.rmSync(path.join(destino, n), { recursive: true, force: true });
   }
   return nuestras;
 }

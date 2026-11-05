@@ -13,6 +13,13 @@
         "CLAUDE_FLOW_MAX_AGENTS": "3",
         "CLAUDE_FLOW_TOPOLOGY": "hierarchical"
       }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@4.5.0"
+      ]
     }
   }
 }

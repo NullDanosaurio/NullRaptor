@@ -383,3 +383,9 @@
   guardaba la memoria con el motor AgentDB fuera del volumen. Ahora: `CLAUDE_FLOW_MEMORY_PATH=/estado/ruflo/swarm`,
   `CLAUDE_FLOW_DISABLE_BRIDGE=1` (sql.js) y variables pasadas explícitamente. (3) La verificación de memoria era
   laxa; ahora compara el JSON de Ruflo.
+
+## 05/11/2026 — Código externo (AHO-6)
+- Autorizado por Daniel («todo»): `gh` en la imagen, Context7 fijado a 4.5.0 en `config/mcp.json` y tres skills de
+  Anthropic con licencia Apache 2.0 en `config/skills/anthropic-*`. `instalarSkills` ahora gestiona los prefijos
+  `nullraptor-` y `anthropic-`.
+- Descartadas docx, pdf, pptx y xlsx: licencia propietaria, no redistribuible en el repositorio.

@@ -294,7 +294,10 @@ y el **65 %** fue releer contexto, con una mediana de 177 k tokens por llamada (
 - **Tareas de la IA en Resumen**: las de Ruflo (`/estado/ruflo/tasks/store.json`), por proyecto.
 - Sandbox de Codex en el contenedor: perfil `config/seccomp.json` aplicado por el lanzador y por compose (autorizado
   por Daniel el 04/11; ver «Relevo a Codex»).
-- Pendiente (necesita a Daniel): las skills oficiales de Anthropic y Context7 (código externo).
+- Código externo (autorizado por Daniel el 05/11): `gh` en la imagen; Context7 (`@upstash/context7-mcp@4.5.0`, versión
+  fija) en `config/mcp.json`; y las skills oficiales de Anthropic con licencia Apache 2.0 (`frontend-design`,
+  `webapp-testing`, `mcp-builder`) copiadas a `config/skills/anthropic-*` con su `LICENSE.txt`. Las de documentos
+  (docx, pdf, pptx, xlsx) no se copian: su licencia no permite redistribuirlas.
 
 ## Relevo a Codex cuando Claude se queda sin tokens (04/11/2026)
 

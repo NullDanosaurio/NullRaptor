@@ -57,7 +57,7 @@ test('MCP de las sesiones: la aprobada entra con el lanzador; sin aprobar, no', 
   const e = conHerramienta();
   const env = { ...e.env, TIEMPO_CLAVE: 'k' };
   const leer = () => JSON.parse(fs.readFileSync(escribirMcp({ agente, env, memoria: null, trabajo: e.trabajo }), 'utf8')).mcpServers;
-  assert.deepEqual(Object.keys(leer()), ['ruflo']);
+  assert.deepEqual(Object.keys(leer()), ['ruflo', 'context7']);
   aprobar({ trabajo: e.trabajo, env, id: 'tiempo' });
   const m = leer();
   assert.deepEqual(m['herramienta-tiempo'].args, [LANZADOR, 'tiempo']);
