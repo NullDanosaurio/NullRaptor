@@ -4,6 +4,7 @@
 // (modo manual: pregunta siempre) y unas reglas deny protegen cofre, credenciales, passkeys y registros.
 // Viven en memoria del panel y mueren con él. Probado con Claude Code 2.1.308.
 import { argsDesarrolloCodex, sesionesCodex, relevosCodex } from '../../scripts/sesiones-codex.mjs';
+import { prepararSesionCodex } from '../../scripts/codex-sesion.mjs';
 import { binarioCodex, estadoRelevo } from '../../scripts/relevo.mjs';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -119,7 +120,7 @@ export class Remoto {
   abrir(nombre, { quien = 'este equipo', cols = 120, filas = 36, continuar = false, aviso = null, perfil = null, ia = 'claude', sesionCodex = null } = {}) {
     const ruta = rutaProyecto(this.trabajo, nombre); // sin memoria: la bóveda no vale, solo proyectos
     if (!ruta) throw fallo('Proyecto no encontrado en este equipo.', 404);
-    if (!['claude', 'codex'].includes(ia) || (ia === 'codex' && perfil)) throw fallo('IA o perfil incompatible.', 400);
+    if (!['claude', 'codex'].includes(ia)) throw fallo('IA desconocida.', 400);
     if (ia === 'codex' && continuar && !sesionCodex) {
       sesionCodex = this.historialCodex(nombre)[0]?.id;
       if (!sesionCodex) throw fallo('No hay sesiones de desarrollo de Codex para continuar.', 404);
@@ -140,15 +141,20 @@ export class Remoto {
     const args = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes, '--add-dir', this.adjuntos];
     // MCP (Ruflo, los autorizados y las herramientas aprobadas) desde fuera del proyecto: scripts/ia.mjs lo prepara al
     // arrancar y se rehace aquí, para que una herramienta recién aprobada llegue a la sesión nueva.
-    try { this.prepararMcp?.(); } catch (e) { console.warn(`[panel] MCP: ${e.message}`); }
+    try { this.prepararMcp?.(); } catch (e) {
+      if (ia === 'codex') throw fallo('No se pudo actualizar la configuración MCP de Codex.', 503);
+      console.warn(`[panel] MCP: ${e.message}`);
+    }
     const mcp = path.join(this.trabajo, ARCHIVO_MCP);
     if (fs.existsSync(mcp)) args.push('--mcp-config', mcp);
     // Seguir la última conversación de este proyecto (Claude la guarda en el volumen) y, si lo hay, un primer mensaje.
     if (textoPerfil) args.push('--append-system-prompt', textoPerfil);
     if (continuar) args.push('--continue');
     if (typeof aviso === 'string' && aviso.trim()) args.push('--', aviso.trim());
-    const finales = ia === 'codex' ? argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, sesion: sesionCodex, continuar,
-      instrucciones: fs.readFileSync(path.join(AGENTE, 'config', 'claude-global.md'), 'utf8') }) : args;
+    const preparada = ia === 'codex' ? prepararSesionCodex({ agente: AGENTE, env, memoria: this.memoria,
+      trabajo: this.trabajo, perfil: textoPerfil }) : null;
+    const finales = ia === 'codex' ? argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, memoria: this.memoria,
+      sesion: sesionCodex, continuar, aviso, configuracion: preparada.args }) : args;
     const hijo = this.lanzar(finales, { cwd: ruta, env, cols, filas, ia });
     const id = randomUUID();
     const s = { id, proyecto: nombre, ia, sesionCodex, perfil: textoPerfil ? perfil : null, url: null, entorno: null, inicio: new Date().toISOString(), estado: ia === 'codex' ? 'conectada' : 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };

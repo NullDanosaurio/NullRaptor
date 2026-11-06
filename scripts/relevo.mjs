@@ -7,6 +7,7 @@
 // namespaces; lo aplican arrancar.ps1 y compose.yaml). Solo con RELEVO_SIN_SANDBOX=1 se ejecuta sin sandbox.
 // Las señales y los registros van en $TRABAJO_DIR/.relevo/<Proyecto>.*, nunca dentro del proyecto.
 import { registrarRelevoCodex } from './sesiones-codex.mjs';
+import { prepararSesionCodex } from './codex-sesion.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -98,12 +99,12 @@ export function binarioCodex(agente = AGENTE, env = process.env) {
 }
 
 /** Argumentos de `codex exec` para el relevo. La salida final y el resumen van en la carpeta .relevo (fuera del proyecto). */
-export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false }) {
+export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false, configuracion = [], memoria = null }) {
   const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox']
     // El sandbox de Codex deja `.git` en solo lectura y sin él no puede hacer commits: se le da escritura solo sobre el del proyecto.
     : ['--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', dirRelevo,
       ...(fs.existsSync(path.join(cwd, '.git')) && fs.statSync(path.join(cwd, '.git')).isDirectory() ? ['--add-dir', path.join(cwd, '.git')] : [])];
-  return ['--no-daemon', 'exec', ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
+  return ['--no-daemon', ...configuracion, 'exec', ...sandbox, ...(memoria ? ['--add-dir', memoria] : []), '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
 
 /** Lanza el relevo en segundo plano (proceso aparte, que sobrevive al hook). Una sola vez por proyecto mientras
@@ -124,13 +125,15 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   const dir = path.join(trabajo, CARPETA);
   const briefing = rutaDe(trabajo, proyecto, 'briefing.md');
   const resumen = rutaDe(trabajo, proyecto, 'codex.md');
+  const preparada = prepararSesionCodex({ agente, env, memoria: env.BOVEDA_DIR, trabajo });
   fs.writeFileSync(briefing, briefingDe({ ...senal, resumen }, { trabajo, agente, env }));
   const log = fs.openSync(rutaDe(trabajo, proyecto, 'log'), 'a');
   const inicio = new Date().toISOString();
   let sesionCodex = null;
   const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...datos });
   estado({ estado: 'en curso' });
-  const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox: env.RELEVO_SIN_SANDBOX === '1' });
+  const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox: env.RELEVO_SIN_SANDBOX === '1',
+    configuracion: preparada.args, memoria: env.BOVEDA_DIR });
   const codigo = await new Promise((listo) => {
     const hijo = arrancar(binarioCodex(agente, env), args, { cwd: senal.cwd, stdio: ['pipe', 'pipe', log], env });
     hijo.stdin.on('error', () => {});
@@ -185,7 +188,8 @@ export function armarBriefing({ proyecto, cwd, senal, tareas, enCurso, rama, est
     '## Reglas del relevo',
     '- Continúa la lista de tareas en orden, una cada vez; no cambies el alcance ni empieces desarrollos nuevos.',
     '- Tras cada tarea, ejecuta las pruebas del proyecto y, si pasan, haz un commit pequeño (en español, sin Co-Authored-By).',
-    '- No hagas push, no instales nada global, no toques credenciales ni archivos fuera del proyecto.',
+    '- No hagas push, no instales nada global ni toques credenciales. Fuera del proyecto, solo actualiza Ruflo, el resumen del relevo y la bóveda autorizada.',
+    '- Recupera las tareas y proyecto-<Proyecto> / en-curso con el MCP de Ruflo al empezar y actualízalos tras cada tarea y al terminar. El briefing es una instantánea: contrástalo con Ruflo.',
     '- Si algo exige una decisión de Daniel, o las pruebas no pasan tras dos intentos, para y déjalo escrito.',
     `- Al terminar (o al parar), escribe en ${resumen} un resumen: qué hiciste (commits), qué falta y qué dudas quedan. Claude lo revisará al volver.`,
     '',

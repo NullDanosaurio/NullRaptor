@@ -155,7 +155,7 @@ function SesionProyecto({ nombre }) {
   // continuar: retoma la última conversación de Claude en este proyecto (p. ej. tras una actualización).
   const abrir = (continuar = false, sesionCodex = null) => intentar(async () => {
     setAbriendo(true);
-    try { const s = await post('/api/remoto/abrir', { proyecto: nombre, cols: 120, filas: 36, continuar, ia: sesionCodex ? 'codex' : ia, sesionCodex, perfil: (sesionCodex || ia === 'codex') ? null : perfil }); window.location.hash = enlaceTerminal(s); } finally { setAbriendo(false); recargar(); }
+    try { const s = await post('/api/remoto/abrir', { proyecto: nombre, cols: 120, filas: 36, continuar, ia: sesionCodex ? 'codex' : ia, sesionCodex, perfil }); window.location.hash = enlaceTerminal(s); } finally { setAbriendo(false); recargar(); }
   });
   const cerrar = (id) => intentar(async () => { await post(`/api/remoto/${id}/cerrar`); recargar(); });
   if (!datos) return null;
@@ -181,8 +181,8 @@ function SesionProyecto({ nombre }) {
                 : 'Trabaja con Claude o Codex desde la terminal de este proyecto.'}
           </p>
           <label className="text-sm">IA <select aria-label="IA de desarrollo" value={ia} onChange={(e) => setIa(e.target.value)} className="rounded bg-panel p-2"><option value="claude">Claude</option><option value="codex">Codex</option></select></label>
-          {ia === 'claude' && <SelectorPerfil valor={perfil} alCambiar={setPerfil} className="w-full sm:max-w-sm"
-            nota={perfil === 'director' ? 'Coordina al equipo (Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño).' : null} />}
+          <SelectorPerfil valor={perfil} alCambiar={setPerfil} className="w-full sm:max-w-sm"
+            nota={perfil === 'director' ? 'Coordina al equipo (Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño).' : null} />
           {/* En el móvil, los botones debajo del texto y a lo ancho (fáciles de pulsar). */}
           <div className="flex w-full gap-2 sm:w-auto">
             <Boton className="flex-1 justify-center sm:flex-none" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true)} title="Retoma la última conversación de la IA elegida en este proyecto">

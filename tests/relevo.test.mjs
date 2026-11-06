@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { anotarSenal, argsCodex, armarBriefing, detalleRelevo, ejecutar, esLimite, estadoRelevo, lanzar, leerEnCurso, listarRelevos, notaDeVuelta, proyectoDe } from '../scripts/relevo.mjs';
 
 const trabajo = () => fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-'));
@@ -104,13 +105,20 @@ test('lanzar: arranca el relevo aparte una sola vez mientras siga en curso', () 
 test('ejecutar corre Codex con el briefing por la entrada y deja el estado final', async () => {
   const t = trabajo();
   senalDe(t);
+  const agenteReal = fileURLToPath(new URL('..', import.meta.url));
+  fs.cpSync(path.join(agenteReal, 'config'), path.join(t, 'config'), { recursive: true });
   const falso = path.join(t, 'codex-falso.sh');
   fs.writeFileSync(falso, `#!/bin/sh\necho "$@" > "${t}/args.txt"\ncat > "${t}/entrada.txt"\nprintf '%s\\n' '{"type":"thread.started","thread_id":"11111111-1111-4111-8111-111111111111"}'\nexit \${CODIGO:-0}\n`, { mode: 0o755 });
-  const env = { ...process.env, RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin-tareas.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
+  const env = { ...process.env, HOME: path.join(t, 'casa'), BOVEDA_DIR: '', RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin-tareas.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
   assert.equal(await ejecutar('Demo', { trabajo: t, env, agente: t }), 0);
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), /relevas a Claude en el desarrollo de «Demo»/);
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo.codex.md').replace(/\./g, '\\.')} un resumen`));
-  assert.match(fs.readFileSync(path.join(t, 'args.txt'), 'utf8'), /^--no-daemon exec --sandbox workspace-write /);
+  const args = fs.readFileSync(path.join(t, 'args.txt'), 'utf8');
+  assert.match(args, /^--no-daemon -c mcp_servers=/);
+  assert.match(args, /exec --sandbox workspace-write /);
+  assert.match(args, /project_doc_fallback_filenames=.*CLAUDE.md/);
+  assert.match(args, /developer_instructions=/);
+  assert.ok(fs.existsSync(path.join(env.HOME, '.agents', 'skills', 'nullraptor-pc', 'SKILL.md')));
   const fin = estadoRelevo(t, 'Demo');
   assert.equal(fin.estado, 'terminado');
   assert.equal(fin.codigo, 0);

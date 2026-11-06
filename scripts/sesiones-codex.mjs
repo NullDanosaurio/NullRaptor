@@ -33,13 +33,16 @@ export function sesionesCodex(env = process.env) {
   return sesiones.sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)));
 }
 
-export function argsDesarrolloCodex({ ruta, adjuntos, sesion = null, continuar = false, instrucciones = '' }) {
+export function argsDesarrolloCodex({ ruta, adjuntos, memoria = null, sesion = null, continuar = false, instrucciones = '', configuracion = [], aviso = null }) {
   const args = ['--no-daemon', '--sandbox', 'workspace-write', '--ask-for-approval', 'on-request', '-C', ruta,
-    '--add-dir', adjuntos, '-c', `developer_instructions=${JSON.stringify(instrucciones)}`];
+    '--add-dir', adjuntos, ...configuracion];
+  if (instrucciones) args.push('-c', `developer_instructions=${JSON.stringify(instrucciones)}`);
+  if (memoria) args.push('--add-dir', memoria);
   // Igual que el relevo: permitir commits solo en el git del proyecto (los worktrees usan un archivo .git).
   if (fs.existsSync(path.join(ruta, '.git')) && fs.statSync(path.join(ruta, '.git')).isDirectory()) args.push('--add-dir', path.join(ruta, '.git'));
   if (sesion) args.push('resume', sesion);
   else if (continuar) args.push('resume', '--last');
+  if (typeof aviso === 'string' && aviso.trim()) args.push('--', aviso.trim());
   return args;
 }
 

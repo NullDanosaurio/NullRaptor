@@ -6,6 +6,9 @@ import path from 'node:path';
 import { entorno, nuevo } from './apoyo/remoto.mjs';
 import { registrarRelevoCodex, sesionesCodex } from '../scripts/sesiones-codex.mjs';
 import { Actualizacion } from '../panel/lib/actualizacion.mjs';
+import TOML from '@iarna/toml';
+import { EventEmitter } from 'node:events';
+import { abrirCodex } from '../scripts/codex.mjs';
 
 const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333'];
 function preparar(t) {
@@ -22,7 +25,7 @@ function preparar(t) {
   return { ...e, ...r, guardar, dir };
 }
 
-test('Codex abre la terminal con escritura, sin daemon ni perfil; Claude sigue siendo el predeterminado', (t) => {
+test('Codex abre la terminal con MCP, skills y Director adaptados; Claude sigue siendo el predeterminado', (t) => {
   const { remoto, lanzados, trabajo } = preparar(t);
   const s = remoto.abrir('A', { ia: 'codex' });
   assert.equal(s.ia, 'codex');
@@ -36,7 +39,13 @@ test('Codex abre la terminal con escritura, sin daemon ni perfil; Claude sigue s
   assert.equal(h.args[h.args.indexOf('--ask-for-approval') + 1], 'on-request');
   remoto.escribir(s.id, 'Modifica el proyecto\r');
   assert.equal(h.stdin.read(), 'Modifica el proyecto\r');
-  assert.throws(() => remoto.abrir('B', { ia: 'codex', perfil: 'director' }), { codigo: 400 });
+  const director = remoto.abrir('C', { ia: 'codex', perfil: 'director', aviso: 'Recupera el estado de Ruflo' });
+  assert.equal(director.perfil, 'director');
+  assert.ok(lanzados[1].args.some((a) => a.includes('Perfil: Director IA')));
+  assert.deepEqual(lanzados[1].args.slice(-2), ['--', 'Recupera el estado de Ruflo']);
+  assert.ok(h.args.some((a) => a.startsWith('mcp_servers=') && a.includes('ruflo') && a.includes('context7')));
+  assert.ok(fs.existsSync(path.join(lanzados[0].opciones.env.HOME, '.agents', 'skills', 'nullraptor-pc', 'SKILL.md')));
+  assert.throws(() => remoto.abrir('B', { ia: 'codex', perfil: '../../fuera' }), { codigo: 400 });
   assert.throws(() => remoto.abrir('B', { ia: 'otra' }), { codigo: 400 });
   assert.equal(remoto.abrir('B').ia, 'claude');
   t.after(() => remoto.cerrarTodas());
@@ -83,4 +92,51 @@ test('reinicio del panel conserva el motor de cada proyecto', (t) => {
   const a = new Actualizacion({ trabajo });
   a.guardarReanudar(['A', 'B'], {}, { A: 'codex', B: 'claude' }, { A: ids[0] });
   assert.deepEqual(a.tomarReanudar(), [{ proyecto: 'A', perfil: null, ia: 'codex', sesionCodex: ids[0] }, { proyecto: 'B', perfil: null }]);
+});
+
+function configDe(args) {
+  return Object.assign({}, ...args.flatMap((arg, i) => arg === '-c' ? [TOML.parse(args[i + 1])] : []));
+}
+
+test('Codex refresca autorizaciones al abrir y reanudar, conserva el aviso y no arranca si falla la preparación', async (t) => {
+  const { base, trabajo, configDir, guardar } = preparar(t);
+  const estadoMcp = path.join(base, 'memoria', 'MCP');
+  fs.mkdirSync(estadoMcp, { recursive: true });
+  const estado = (instalados) => fs.writeFileSync(path.join(estadoMcp, 'estado.json'), JSON.stringify({ instalados }));
+  const ficha = { id: 'mcp-prueba', instalacion: { tipo: 'npm', paquete: 'prueba', version: '1.0.0', variables: [] } };
+  const { remoto, lanzados } = nuevo({ base, trabajo, configDir }, { memoria: path.join(base, 'memoria') });
+  t.after(() => remoto.cerrarTodas());
+  estado([ficha]);
+  const s = remoto.abrir('A', { ia: 'codex' });
+  assert.ok(configDe(lanzados[0].args).mcp_servers['mcp-prueba']);
+  const reglas = configDe(lanzados[0].args).developer_instructions;
+  assert.equal(lanzados[0].opciones.env.CODEX_HOME, undefined); // No se cambia la cuenta ni su historial.
+  await remoto.cerrar(s.id);
+  guardar(ids[0], 'A', 'cli');
+  estado([]);
+  remoto.abrir('A', { ia: 'codex', sesionCodex: ids[0], aviso: 'Recupera las tareas compartidas' });
+  assert.equal(configDe(lanzados[1].args).mcp_servers['mcp-prueba'], undefined);
+  assert.equal(configDe(lanzados[1].args).developer_instructions, reglas);
+  assert.deepEqual(lanzados[1].args.slice(-4), ['resume', ids[0], '--', 'Recupera las tareas compartidas']);
+  const fallo = nuevo({ base, trabajo, configDir }, { prepararMcp: () => { throw new Error('MCP roto'); } });
+  assert.throws(() => fallo.remoto.abrir('B', { ia: 'codex' }), { codigo: 503 });
+  assert.equal(fallo.lanzados.length, 0);
+});
+
+test('la entrada de terminal prepara el mismo flujo sin cambiar la cuenta ni pasar la clave del cofre', async (t) => {
+  const { base, trabajo } = preparar(t);
+  let lanzamiento;
+  const hijo = new EventEmitter();
+  const env = { HOME: base, TRABAJO_DIR: trabajo, AGENTE_CLAVE: 'no-pasar' };
+  const pendiente = abrirCodex(path.join(trabajo, 'proyectos', 'A'), { env, adicionales: ['resume', ids[0]],
+    arrancar: (binario, args, opciones) => { lanzamiento = { binario, args, opciones }; return hijo; } });
+  const config = configDe(lanzamiento.args);
+  assert.ok(config.mcp_servers.ruflo);
+  assert.ok(config.mcp_servers.context7);
+  assert.match(config.developer_instructions, /incluso al reanudar/);
+  assert.deepEqual(lanzamiento.args.slice(-2), ['resume', ids[0]]);
+  assert.equal(lanzamiento.opciones.env.AGENTE_CLAVE, undefined);
+  assert.equal(lanzamiento.opciones.env.HOME, base);
+  hijo.emit('exit', 0);
+  assert.equal(await pendiente, 0);
 });

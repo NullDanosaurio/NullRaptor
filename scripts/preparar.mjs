@@ -143,9 +143,10 @@ const proyecto = await elegirProyecto({ memoria, trabajo, env, git, clonar: clon
 if (!proyecto) process.exit(0);
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
-const modo = (await rl.question('\nIntro = Claude Code · c = chat con Claude y Codex: ')).trim().toLowerCase();
+const modo = (await rl.question('\nIntro = Claude Code · d = desarrollo con Codex · c = chat con Claude y Codex: ')).trim().toLowerCase();
 rl.close();
 if (modo === 'c') process.exit(ejecutar(process.execPath, [path.join(agente, 'scripts', 'chat.mjs'), proyecto], proyecto));
+if (modo === 'd') process.exit(ejecutar(process.execPath, [path.join(agente, 'scripts', 'codex.mjs'), proyecto], proyecto));
 
 // Con sesión de claude.ai guardada (/login), se usa esa: el token de setup-token no carga los conectores de claude.ai.
 // shortcut: en macOS la sesión va en el llavero y no en este archivo, así que allí se sigue usando el token.
