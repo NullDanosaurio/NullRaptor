@@ -6,6 +6,7 @@
 // Codex usa el sandbox workspace-write; en el contenedor lo permite el perfil seccomp de config/seccomp.json (bwrap necesita
 // namespaces; lo aplican arrancar.ps1 y compose.yaml). Solo con RELEVO_SIN_SANDBOX=1 se ejecuta sin sandbox.
 // Las señales y los registros van en $TRABAJO_DIR/.relevo/<Proyecto>.*, nunca dentro del proyecto.
+import { registrarRelevoCodex } from './sesiones-codex.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +25,7 @@ export const esLimite = (entrada) => ERRORES_LIMITE.includes(entrada?.error);
 /** Nombre del proyecto si `cwd` está dentro de $TRABAJO_DIR/proyectos/<Proyecto>; si no, null (no se releva). */
 export function proyectoDe(cwd, trabajo) {
   if (!cwd || !trabajo) return null;
+  if (path.resolve(cwd) === path.join(trabajo, 'nullraptor')) return 'Nullraptor';
   const rel = path.relative(path.join(trabajo, 'proyectos'), path.resolve(cwd));
   const [nombre] = rel.split(path.sep);
   return !rel || rel.startsWith('..') || path.isAbsolute(rel) || !nombre ? null : nombre;
@@ -101,7 +103,7 @@ export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false }) {
     // El sandbox de Codex deja `.git` en solo lectura y sin él no puede hacer commits: se le da escritura solo sobre el del proyecto.
     : ['--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', dirRelevo,
       ...(fs.existsSync(path.join(cwd, '.git')) && fs.statSync(path.join(cwd, '.git')).isDirectory() ? ['--add-dir', path.join(cwd, '.git')] : [])];
-  return ['exec', ...sandbox, '--ephemeral', '--color', 'never', '-C', cwd, '-o', salida, '-'];
+  return ['--no-daemon', 'exec', ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
 
 /** Lanza el relevo en segundo plano (proceso aparte, que sobrevive al hook). Una sola vez por proyecto mientras
@@ -125,11 +127,31 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   fs.writeFileSync(briefing, briefingDe({ ...senal, resumen }, { trabajo, agente, env }));
   const log = fs.openSync(rutaDe(trabajo, proyecto, 'log'), 'a');
   const inicio = new Date().toISOString();
-  const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, ...datos });
+  let sesionCodex = null;
+  const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...datos });
   estado({ estado: 'en curso' });
   const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox: env.RELEVO_SIN_SANDBOX === '1' });
   const codigo = await new Promise((listo) => {
-    const hijo = arrancar(binarioCodex(agente, env), args, { cwd: senal.cwd, stdio: [fs.openSync(briefing, 'r'), log, log], env });
+    const hijo = arrancar(binarioCodex(agente, env), args, { cwd: senal.cwd, stdio: ['pipe', 'pipe', log], env });
+    hijo.stdin.on('error', () => {});
+    hijo.stdin.end(fs.readFileSync(briefing));
+    let pendiente = '';
+    hijo.stdout.on('data', (datos) => {
+      fs.writeSync(log, datos);
+      pendiente += datos.toString();
+      const lineas = pendiente.split('\n');
+      pendiente = lineas.pop();
+      for (const linea of lineas) {
+        try {
+          const evento = JSON.parse(linea);
+          if (evento.type === 'thread.started' && /^[0-9a-f-]{36}$/i.test(evento.thread_id)) {
+            sesionCodex = evento.thread_id;
+            registrarRelevoCodex(trabajo, { id: sesionCodex, proyecto, cwd: senal.cwd, inicio });
+            estado({ estado: 'en curso' });
+          }
+        } catch { /* Registro ajeno a JSON. */ }
+      }
+    });
     const reloj = setTimeout(() => hijo.kill('SIGTERM'), limite);
     hijo.on('error', (e) => { clearTimeout(reloj); fs.writeSync(log, `No se pudo lanzar Codex: ${e.message}\n`); listo(-1); });
     hijo.on('exit', (code) => { clearTimeout(reloj); listo(code ?? -1); });

@@ -36,13 +36,13 @@ export function TarjetaSesion({ s, alCerrar, conProyecto = false }) {
     <div className="flex flex-col gap-4 rounded-2xl border border-borde bg-elevado/40 p-4 sm:flex-row">
       {s.url && viva ? <Qr texto={s.url} className="size-32" /> : (
         <div className="flex size-32 shrink-0 items-center justify-center rounded-lg border border-dashed border-borde-fuerte text-[12px] text-apagado">
-          {viva ? <Cargando texto="Esperando URL…" /> : 'Sin sesión'}
+          {s.ia === 'codex' ? 'Codex · terminal' : viva ? <Cargando texto="Esperando URL…" /> : 'Sin sesión'}
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Punto tono={e.punto} vivo={s.estado === 'conectando'} />
-          <p className="min-w-0 flex-1 truncate font-medium text-white">{conProyecto ? s.proyecto : 'Sesión de Claude Code'}</p>
+          <p className="min-w-0 flex-1 truncate font-medium text-white">{conProyecto ? s.proyecto : `Sesión de ${s.ia === 'codex' ? 'Codex' : 'Claude Code'}`}</p>
           {s.perfil === 'director' && <Insignia tono="raptor">Director IA</Insignia>}
           <Insignia tono={e.tono}>{e.texto}</Insignia>
         </div>
@@ -71,7 +71,7 @@ export function VistaTerminal({ proyecto, id }) {
     <div className="flex h-full flex-col gap-3 p-3 md:p-5">
       <div className="flex flex-wrap items-center gap-3">
         <a href={enlace('proyectos', proyecto)} className="flex items-center gap-1.5 text-[13px] text-apagado hover:text-raptor"><ArrowLeft className="size-4" /> {proyecto}</a>
-        <p className="min-w-0 flex-1 truncate text-[13px] text-tenue">{s ? `Claude Code · ${ESTADO_SESION[s.estado]?.texto ?? s.estado}` : ''}</p>
+        <p className="min-w-0 flex-1 truncate text-[13px] text-tenue">{s ? `${s.ia === 'codex' ? 'Codex' : 'Claude Code'} · ${ESTADO_SESION[s.estado]?.texto ?? s.estado}` : ''}</p>
         {s?.url && <a href={s.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[12px] text-raptor hover:underline"><ExternalLink className="size-3.5" /> claude.ai</a>}
       </div>
       <Terminal id={id} className="flex-1" />

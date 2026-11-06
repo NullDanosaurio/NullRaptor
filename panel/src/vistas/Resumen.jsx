@@ -263,7 +263,7 @@ export default function Resumen() {
         <CopiaSeguridad copias={copias} />
         {remoto.length > 0 && (
           <div className="mb-4 rounded-xl border border-aviso/25 bg-aviso/10 px-3 py-2 text-[13px] text-aviso">
-            <p className="flex items-center gap-2.5"><MonitorSmartphone className="size-4 shrink-0" />{remoto.length === 1 ? '1 sesión de Claude abierta' : `${remoto.length} sesiones de Claude abiertas`}</p>
+            <p className="flex items-center gap-2.5"><MonitorSmartphone className="size-4 shrink-0" />{remoto.length === 1 ? '1 sesión de desarrollo abierta' : `${remoto.length} sesiones de desarrollo abiertas`}</p>
             <ul className="mt-1.5 flex flex-wrap gap-2">
               {remoto.map((s) => (
                 <li key={s.id}><a href={enlaceTerminal(s)} className="flex items-center gap-1.5 rounded-lg border border-aviso/25 px-2.5 py-1 hover:bg-aviso/15"><SquareTerminal className="size-3.5" /> {s.proyecto}</a></li>

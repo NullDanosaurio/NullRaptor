@@ -102,7 +102,7 @@ async function preguntarCodex(proyecto, entrada, sesion, salida) {
   fs.rmSync(salida, { force: true });
   // resume no admite --sandbox: el modo va por configuración, también en la primera llamada.
   const comunes = ['-c', 'sandbox_mode="read-only"', '--skip-git-repo-check', '--json', '-o', salida];
-  const args = sesion ? ['exec', 'resume', ...comunes, sesion, '-'] : ['exec', ...comunes, '--color', 'never', '-'];
+  const args = ['--no-daemon', ...(sesion ? ['exec', 'resume', ...comunes, sesion, '-'] : ['exec', ...comunes, '--color', 'never', '-'])];
   const r = await correr(BIN.codex, args, { cwd: proyecto, input: entrada, timeout: 10 * 60_000 });
   const id = r.stdout?.match(/"thread_id":"([\w-]+)"/)?.[1] ?? sesion;
   if (!fs.existsSync(salida)) throw new Error(`Codex no respondió (código ${r.status}). ${una(r.stderr, 200)}`);

@@ -76,8 +76,10 @@ test('argsCodex: si el proyecto tiene .git, Codex puede escribir en él (para ha
 
 test('argsCodex: sandbox workspace-write con la carpeta .relevo; sin sandbox solo si se pide', () => {
   const a = argsCodex({ cwd: '/p', dirRelevo: '/t/.relevo', salida: '/t/.relevo/D.final.md' });
-  assert.deepEqual(a.slice(0, 7), ['exec', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', '/t/.relevo']);
+  assert.deepEqual(a.slice(0, 8), ['--no-daemon', 'exec', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', '/t/.relevo']);
   assert.equal(a.at(-1), '-');
+  assert.ok(a.includes('--json'));
+  assert.ok(!a.includes('--ephemeral'));
   assert.ok(!a.includes('--dangerously-bypass-approvals-and-sandbox'));
   assert.ok(argsCodex({ cwd: '/p', dirRelevo: '/d', salida: '/s', sinSandbox: true }).includes('--dangerously-bypass-approvals-and-sandbox'));
 });
@@ -103,15 +105,16 @@ test('ejecutar corre Codex con el briefing por la entrada y deja el estado final
   const t = trabajo();
   senalDe(t);
   const falso = path.join(t, 'codex-falso.sh');
-  fs.writeFileSync(falso, `#!/bin/sh\necho "$@" > "${t}/args.txt"\ncat > "${t}/entrada.txt"\nexit \${CODIGO:-0}\n`, { mode: 0o755 });
+  fs.writeFileSync(falso, `#!/bin/sh\necho "$@" > "${t}/args.txt"\ncat > "${t}/entrada.txt"\nprintf '%s\\n' '{"type":"thread.started","thread_id":"11111111-1111-4111-8111-111111111111"}'\nexit \${CODIGO:-0}\n`, { mode: 0o755 });
   const env = { ...process.env, RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin-tareas.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
   assert.equal(await ejecutar('Demo', { trabajo: t, env, agente: t }), 0);
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), /relevas a Claude en el desarrollo de «Demo»/);
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo.codex.md').replace(/\./g, '\\.')} un resumen`));
-  assert.match(fs.readFileSync(path.join(t, 'args.txt'), 'utf8'), /^exec --sandbox workspace-write /);
+  assert.match(fs.readFileSync(path.join(t, 'args.txt'), 'utf8'), /^--no-daemon exec --sandbox workspace-write /);
   const fin = estadoRelevo(t, 'Demo');
   assert.equal(fin.estado, 'terminado');
   assert.equal(fin.codigo, 0);
+  assert.equal(fin.sesionCodex, '11111111-1111-4111-8111-111111111111');
   // Código de salida distinto de 0 → error; con RELEVO_SIN_SANDBOX=1 → sin sandbox.
   assert.equal(await ejecutar('Demo', { trabajo: t, env: { ...env, CODIGO: '3', RELEVO_SIN_SANDBOX: '1' }, agente: t }), 3);
   assert.equal(estadoRelevo(t, 'Demo').estado, 'error');

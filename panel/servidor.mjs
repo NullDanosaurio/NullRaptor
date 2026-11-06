@@ -154,7 +154,7 @@ export function crearServidor({
   // Para la actualización automática: cuántas sesiones hay abiertas (la tarea de Windows no corta ninguna).
   let latido = null;
   if (actualizacion) {
-    const publicar = () => { try { actualizacion.publicar(remoto.activas().length + chats.lista().length); } catch (e) { console.warn(`[panel] actualización: ${e.message}`); } };
+    const publicar = () => { try { actualizacion.publicar(remoto.activas().length + chats.lista().length + listarRelevos(trabajo).filter((r) => r.estado === 'en curso').length); } catch (e) { console.warn(`[panel] actualización: ${e.message}`); } };
     publicar();
     latido = setInterval(publicar, 20_000);
     latido.unref?.();
@@ -308,12 +308,12 @@ if (esPrincipal) {
   process.on('exit', () => remoto.cerrarTodas());
   for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     process.once(senal, () => {
-      try { actualizacion.guardarReanudar(remoto.activas().map((s) => s.proyecto), Object.fromEntries(remoto.activas().map((s) => [s.proyecto, s.perfil]))); } catch (e) { console.warn(`[panel] reanudar: ${e.message}`); }
+      try { remoto.lista(); actualizacion.guardarReanudar(remoto.activas().map((s) => s.proyecto), Object.fromEntries(remoto.activas().map((s) => [s.proyecto, s.perfil])), Object.fromEntries(remoto.activas().map((s) => [s.proyecto, s.ia])), Object.fromEntries(remoto.activas().map((s) => [s.proyecto, s.sesionCodex]))); } catch (e) { console.warn(`[panel] reanudar: ${e.message}`); }
       remoto.cerrarTodas().then(() => process.exit(0));
     });
   }
-  for (const { proyecto, perfil } of actualizacion.tomarReanudar()) {
-    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', aviso: avisoReanudar(proyecto), perfil }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
+  for (const { proyecto, perfil, ia, sesionCodex } of actualizacion.tomarReanudar()) {
+    try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', ia, sesionCodex, continuar: ia === 'codex', aviso: avisoReanudar(proyecto), perfil }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
     catch (e) { console.warn(`[panel] No se pudo reanudar la sesión de ${proyecto}: ${e.message}`); }
   }
   const copias = new Copias();

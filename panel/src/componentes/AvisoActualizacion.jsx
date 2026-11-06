@@ -11,7 +11,7 @@ export default function AvisoActualizacion() {
   const [error, setError] = useState(null);
   if (!datos?.disponible) return null;
   const pedir = async () => {
-    if (!window.confirm('Se cerrarán las sesiones de Claude y los chats abiertos y Nullraptor se reiniciará. ¿Actualizar ahora?')) return;
+    if (!window.confirm('Se cerrarán las sesiones de desarrollo y los chats abiertos y Nullraptor se reiniciará. ¿Actualizar ahora?')) return;
     setPidiendo(true);
     setError(null);
     try { await post('/api/actualizacion/ahora'); await recargar(); } catch (e) { setError(e.message); }

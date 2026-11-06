@@ -146,15 +146,16 @@ function SesionProyecto({ nombre }) {
   const { datos, recargar } = useDatos('/api/remoto', { cada: 2000 });
   const [fallo, setFallo] = useState(null);
   const [abriendo, setAbriendo] = useState(false);
+  const [ia, setIa] = useState('claude');
   const [perfil, setPerfil] = usePerfil(nombre);
   const { intentar, aviso } = usePasskey(setFallo);
   const sesiones = (datos?.sesiones ?? []).filter((s) => s.proyecto === nombre);
   const viva = sesiones.find((s) => s.estado !== 'terminada');
   const activas = (datos?.sesiones ?? []).filter((s) => s.estado !== 'terminada').length;
   // continuar: retoma la última conversación de Claude en este proyecto (p. ej. tras una actualización).
-  const abrir = (continuar = false) => intentar(async () => {
+  const abrir = (continuar = false, sesionCodex = null) => intentar(async () => {
     setAbriendo(true);
-    try { const s = await post('/api/remoto/abrir', { proyecto: nombre, cols: 120, filas: 36, continuar, perfil }); window.location.hash = enlaceTerminal(s); } finally { setAbriendo(false); recargar(); }
+    try { const s = await post('/api/remoto/abrir', { proyecto: nombre, cols: 120, filas: 36, continuar, ia: sesionCodex ? 'codex' : ia, sesionCodex, perfil: (sesionCodex || ia === 'codex') ? null : perfil }); window.location.hash = enlaceTerminal(s); } finally { setAbriendo(false); recargar(); }
   });
   const cerrar = (id) => intentar(async () => { await post(`/api/remoto/${id}/cerrar`); recargar(); });
   if (!datos) return null;
@@ -165,19 +166,26 @@ function SesionProyecto({ nombre }) {
       {sesiones.length > 0 ? (
         <div className="space-y-3">{sesiones.map((s) => <TarjetaSesion key={s.id} s={s} alCerrar={cerrar} />)}</div>
       ) : null}
+      {!viva && (datos.historialCodex ?? []).filter((s) => s.proyecto === nombre).map((s) => (
+        <div key={s.id} className="my-3 flex flex-wrap items-center gap-3 rounded border border-borde p-3 text-sm">
+          <span>Codex {s.relevo ? '· relevo' : ''} · {s.inicio} · {s.id.slice(0, 8)}</span>
+          <Boton disabled={abriendo || s.enCurso || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true, s.id)}>{s.enCurso ? 'Relevo en curso' : 'Continuar sesión'}</Boton>
+        </div>
+      ))}
       {!viva && (
         <div className={cx('flex flex-wrap items-center gap-3 rounded-2xl border border-borde bg-panel/80 p-4', sesiones.length > 0 && 'mt-3')}>
           <SquareTerminal className="size-5 text-raptor" />
           <p className="min-w-0 flex-1 basis-[calc(100%-2.75rem)] text-[13px] text-tenue sm:basis-0">
             {datos.terminal === false ? 'Desde la red de casa con solo el código no se abre la terminal.'
               : activas >= datos.maxTotal ? `Ya hay ${activas} sesiones abiertas (el máximo): cierra alguna.`
-                : 'Claude Code en este proyecto: en la terminal del panel y a la vez en claude.ai o la app. Pregunta antes de cada acción.'}
+                : 'Trabaja con Claude o Codex desde la terminal de este proyecto.'}
           </p>
-          <SelectorPerfil valor={perfil} alCambiar={setPerfil} className="w-full sm:max-w-sm"
-            nota={perfil === 'director' ? 'Coordina al equipo (Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño).' : null} />
+          <label className="text-sm">IA <select aria-label="IA de desarrollo" value={ia} onChange={(e) => setIa(e.target.value)} className="rounded bg-panel p-2"><option value="claude">Claude</option><option value="codex">Codex</option></select></label>
+          {ia === 'claude' && <SelectorPerfil valor={perfil} alCambiar={setPerfil} className="w-full sm:max-w-sm"
+            nota={perfil === 'director' ? 'Coordina al equipo (Producto, Arquitectura, Desarrollo, Calidad, Seguridad y Diseño).' : null} />}
           {/* En el móvil, los botones debajo del texto y a lo ancho (fáciles de pulsar). */}
           <div className="flex w-full gap-2 sm:w-auto">
-            <Boton className="flex-1 justify-center sm:flex-none" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true)} title="Retoma la última conversación de Claude en este proyecto">
+            <Boton className="flex-1 justify-center sm:flex-none" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(true)} title="Retoma la última conversación de la IA elegida en este proyecto">
               <span className="sm:hidden">Continuar</span><span className="hidden sm:inline">Continuar la anterior</span>
             </Boton>
             <Boton className="flex-1 justify-center sm:flex-none" variante="primario" disabled={abriendo || datos.terminal === false || activas >= datos.maxTotal} onClick={() => abrir(false)}>

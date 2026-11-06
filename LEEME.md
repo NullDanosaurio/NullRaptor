@@ -299,6 +299,32 @@ y el **65 %** fue releer contexto, con una mediana de 177 k tokens por llamada (
   `webapp-testing`, `mcp-builder`) copiadas a `config/skills/anthropic-*` con su `LICENSE.txt`. Las de documentos
   (docx, pdf, pptx, xlsx) no se copian: su licencia no permite redistribuirlas.
 
+## Desarrollar con Codex desde el panel (06/11/2026)
+
+En **Proyectos → proyecto → sesión**, elige **Claude** o **Codex** y pulsa **Abrir sesión**. También funciona con
+**Nullraptor**. La terminal, el redactor, los adjuntos, el tamaño y el acceso por passkey son los mismos. Escribe el
+encargo en la terminal: Codex puede modificar el proyecto, ejecutar pruebas y hacer commits. Claude sigue siendo
+la opción inicial y conserva Remote Control y el perfil Director; Codex usa su propia interfaz de permisos,
+`workspace-write` y `on-request`, sin perfil Director ni las reglas deny o los MCP inyectados de Claude.
+
+**Continuar la anterior** elige la última sesión de desarrollo de la IA seleccionada. Debajo aparecen las sesiones
+persistentes de Codex con fecha e identificador: **Continuar sesión** reabre esa conversación exacta, incluso tras
+terminar, interrumpirse o reiniciar el panel. El historial lee los metadatos de `$CODEX_HOME/sessions` (por defecto
+`$HOME/.codex/sessions`, en el volumen), sin exponer mensajes. Incluye las sesiones interactivas y los relevos
+registrados; excluye los chats de consulta (`exec`). **Chat** sigue siendo de solo lectura e independiente.
+
+El relevo ya no usa `--ephemeral`: guarda `thread_id` desde los eventos JSON en `<Proyecto>.estado.json` y en
+`$TRABAJO_DIR/.sesiones-codex/<id>.json`, conservando también los relevos anteriores. Cuando termine o quede
+interrumpido, puedes continuarlo desde el historial del proyecto. Mientras trabaja, el panel bloquea otro desarrollo
+en ese proyecto. Los relevos antiguos ejecutados con `--ephemeral` no se pueden recuperar.
+
+Al actualizar se conserva la IA y, cuando está disponible, el ID exacto de Codex; Claude mantiene su arranque limpio
+con Ruflo. La configuración se pasa por argumentos y nunca se escribe dentro del proyecto. Todas estas entradas de
+Codex usan `--no-daemon`; la imagen añade `procps` (`ps`). Necesitas la sesión de ChatGPT iniciada en Codex y el
+perfil seccomp del lanzador para ejecutar órdenes en su sandbox. No se desactiva el sandbox para abrir la terminal.
+
+Referencia de los comandos: [OpenAI Docs: Codex CLI](https://learn.chatgpt.com/docs/cli/reference).
+
 ## Relevo a Codex cuando Claude se queda sin tokens (04/11/2026)
 
 Si Claude agota el límite de uso (o el saldo) en mitad de un desarrollo, Codex sigue por él en segundo plano:
@@ -347,10 +373,10 @@ Todo lo que no se puede rehacer vive en `/estado`. `scripts/copia.mjs` hace una 
 (`panel/servidor.mjs`) + web React/Vite/Tailwind (`panel/src`, diseño a partir de componentes de 21st.dev Magic).
 Cinco pestañas:
 
-- **Resumen**: sesiones de Claude abiertas (con acceso a su terminal), proyectos y su flujo, buscador y últimos
+- **Resumen**: sesiones de desarrollo abiertas (con acceso a su terminal), proyectos y su flujo, buscador y últimos
   cambios de la bóveda, chats y MCP del día. La bóveda no tiene pestaña: sus notas (árbol, `[[enlaces]]` y
   retroenlaces; solo lectura) se abren en `#/boveda/<ruta>` desde el buscador, los cambios o un proyecto.
-- **Proyectos**: los del equipo y los que conoce la bóveda. En cada uno, abrir una **sesión de Claude Code** (abajo),
+- **Proyectos**: los del equipo y los que conoce la bóveda. En cada uno, abrir una **sesión de Claude Code o Codex** (abajo),
   chat, su nota de la bóveda, el flujo en vivo y los commits. **Traer**: crear uno nuevo (repositorio privado en
   GitHub con `GITHUB_TOKEN` + nota en `Proyectos/` + copia en el equipo), clonar uno por URL `https` o descargar uno
   que solo está en la bóveda (`panel/lib/proyectos.mjs`). Piden lo mismo que la terminal.

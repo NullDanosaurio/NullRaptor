@@ -1,8 +1,10 @@
-// Sesiones remotas: Claude Code interactivo con Remote Control (`claude --remote-control`) en un proyecto del equipo,
+// Sesiones remotas: Claude Code o Codex interactivo con Remote Control (`claude --remote-control`) en un proyecto del equipo,
 // dentro de una terminal real (pty.mjs). Se ve y se maneja desde la terminal del panel y, a la vez, desde
-// claude.ai/code o la app del móvil. Solo Claude Code, nunca una shell: cada acción pasa por sus permisos
+// claude.ai/code o la app del móvil (Claude). Se lanza una IA, nunca una shell: cada acción pasa por sus permisos
 // (modo manual: pregunta siempre) y unas reglas deny protegen cofre, credenciales, passkeys y registros.
 // Viven en memoria del panel y mueren con él. Probado con Claude Code 2.1.308.
+import { argsDesarrolloCodex, sesionesCodex, relevosCodex } from '../../scripts/sesiones-codex.mjs';
+import { binarioCodex, estadoRelevo } from '../../scripts/relevo.mjs';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -74,7 +76,7 @@ export function marcarConfianza(configDir, ruta) {
   return true;
 }
 
-const lanzarClaude = (args, opciones) => lanzarPty([CLAUDE, ...args], opciones);
+const lanzarClaude = (args, opciones) => lanzarPty([opciones.ia === 'codex' ? binarioCodex(AGENTE, opciones.env) : CLAUDE, ...args], opciones);
 const sse = (res, tipo, datos) => res.write(`event: ${tipo}\ndata: ${JSON.stringify(datos ?? null)}\n\n`);
 
 export class Remoto {
@@ -88,21 +90,49 @@ export class Remoto {
   activas() { return [...this.sesiones.values()].filter((s) => s.estado !== 'terminada'); }
 
   lista() {
-    return [...this.sesiones.values()].map(({ id, proyecto, perfil, url, entorno, inicio, estado, motivo, quien }) => ({ id, proyecto, perfil, url, entorno, inicio, estado, motivo, quien }));
+    const nuevas = [...this.sesiones.values()].filter((s) => s.ia === 'codex' && !s.sesionCodex);
+    if (nuevas.length) {
+      const historial = sesionesCodex(this.env);
+      for (const s of nuevas) s.sesionCodex = historial.find((h) => h.source === 'cli'
+        && h.cwd === rutaProyecto(this.trabajo, s.proyecto) && Date.parse(h.inicio) >= Date.parse(s.inicio))?.id ?? null;
+    }
+    return [...this.sesiones.values()].map(({ id, proyecto, ia, sesionCodex, perfil, url, entorno, inicio, estado, motivo, quien }) => ({ id, proyecto, ia, sesionCodex, perfil, url, entorno, inicio, estado, motivo, quien }));
+  }
+
+  historialCodex(nombre = null) {
+    const nativas = sesionesCodex(this.env);
+    const relevos = relevosCodex(this.trabajo);
+    const nombres = nombre ? [nombre] : [...new Set([
+      ...(() => { try { return fs.readdirSync(path.join(this.trabajo, 'proyectos')); } catch { return []; } })(), 'Nullraptor',
+    ])];
+    return nombres.flatMap((proyecto) => {
+      const ruta = rutaProyecto(this.trabajo, proyecto);
+      if (!ruta) return [];
+      const relevo = estadoRelevo(this.trabajo, proyecto);
+      return nativas.filter((s) => s.cwd === ruta && (s.source === 'cli' || s.id === relevo?.sesionCodex || relevos.some((r) => r.id === s.id && r.cwd === ruta)))
+        .map((s) => ({ ...s, proyecto, relevo: s.id === relevo?.sesionCodex || relevos.some((r) => r.id === s.id), enCurso: s.id === relevo?.sesionCodex && relevo.estado === 'en curso' }));
+    });
   }
 
   /** Abre Claude en $TRABAJO_DIR/proyectos/<nombre>. `perfil` (p. ej. 'director', de PERFILES) añade su texto con
    * --append-system-prompt. Lanza con `codigo` 400, 404, 409 o 429. */
-  abrir(nombre, { quien = 'este equipo', cols = 120, filas = 36, continuar = false, aviso = null, perfil = null } = {}) {
-    const textoPerfil = perfil === null || perfil === undefined || perfil === '' ? null : leerPerfil(AGENTE, perfil);
+  abrir(nombre, { quien = 'este equipo', cols = 120, filas = 36, continuar = false, aviso = null, perfil = null, ia = 'claude', sesionCodex = null } = {}) {
     const ruta = rutaProyecto(this.trabajo, nombre); // sin memoria: la bóveda no vale, solo proyectos
     if (!ruta) throw fallo('Proyecto no encontrado en este equipo.', 404);
+    if (!['claude', 'codex'].includes(ia) || (ia === 'codex' && perfil)) throw fallo('IA o perfil incompatible.', 400);
+    if (ia === 'codex' && continuar && !sesionCodex) {
+      sesionCodex = this.historialCodex(nombre)[0]?.id;
+      if (!sesionCodex) throw fallo('No hay sesiones de desarrollo de Codex para continuar.', 404);
+    }
+    if (sesionCodex && (ia !== 'codex' || !this.historialCodex(nombre).some((s) => s.id === sesionCodex))) throw fallo('Sesión de Codex no encontrada en este proyecto.', 404);
+    if (estadoRelevo(this.trabajo, nombre)?.estado === 'en curso') throw fallo('Codex está ejecutando un relevo. Espera a que termine antes de abrir otra sesión de desarrollo.', 409);
+    const textoPerfil = perfil === null || perfil === undefined || perfil === '' ? null : leerPerfil(AGENTE, perfil);
     if (this.activas().some((s) => s.proyecto === nombre)) throw fallo(`Ya hay una sesión remota abierta en ${nombre}.`, 409);
     if (this.activas().length >= this.maxTotal) throw fallo(`Máximo ${this.maxTotal} sesiones remotas: cierra alguna.`, 429);
     if (!tamanoValido(cols, filas)) [cols, filas] = [120, 36];
     for (const s of this.sesiones.values()) if (s.proyecto === nombre) this.sesiones.delete(s.id); // terminadas antiguas
 
-    marcarConfianza(this.configDir, ruta);
+    if (ia === 'claude') marcarConfianza(this.configDir, ruta);
     const env = entornoRemoto(this.env, { trabajo: this.trabajo, memoria: this.memoria, configDir: this.configDir });
     const ajustes = JSON.stringify(ajustesTerminal({ env, configDir: this.configDir, trabajo: this.trabajo }));
     // Adjuntos (imágenes del panel): fuera del proyecto, en una carpeta que Claude puede leer.
@@ -117,11 +147,13 @@ export class Remoto {
     if (textoPerfil) args.push('--append-system-prompt', textoPerfil);
     if (continuar) args.push('--continue');
     if (typeof aviso === 'string' && aviso.trim()) args.push('--', aviso.trim());
-    const hijo = this.lanzar(args, { cwd: ruta, env, cols, filas });
+    const finales = ia === 'codex' ? argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, sesion: sesionCodex, continuar,
+      instrucciones: fs.readFileSync(path.join(AGENTE, 'config', 'claude-global.md'), 'utf8') }) : args;
+    const hijo = this.lanzar(finales, { cwd: ruta, env, cols, filas, ia });
     const id = randomUUID();
-    const s = { id, proyecto: nombre, perfil: textoPerfil ? perfil : null, url: null, entorno: null, inicio: new Date().toISOString(), estado: 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };
+    const s = { id, proyecto: nombre, ia, sesionCodex, perfil: textoPerfil ? perfil : null, url: null, entorno: null, inicio: new Date().toISOString(), estado: ia === 'codex' ? 'conectada' : 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };
     s.apunte = this.registro?.sesion(id, nombre) ?? (() => {});
-    s.apunte('apertura', { proyecto: nombre, quien, perfil: s.perfil, args: args.slice(0, 4) }); // nunca el texto del perfil
+    s.apunte('apertura', { proyecto: nombre, quien, ia, sesionCodex, perfil: s.perfil, args: finales.slice(0, 4) }); // nunca el texto del perfil
     let acabar;
     s.fin = new Promise((r) => { acabar = r; });
     this.sesiones.set(id, s);
@@ -149,10 +181,10 @@ export class Remoto {
       for (const res of s.clientes) { sse(res, 'fin', { motivo: s.motivo }); res.end(); }
       s.clientes.clear();
     };
-    hijo.on('error', (e) => { terminar(`No se pudo lanzar Claude: ${e.message}`); acabar(); });
+    hijo.on('error', (e) => { terminar(`No se pudo lanzar ${ia}: ${e.message}`); acabar(); });
     hijo.on('exit', (code) => {
       const ultima = sinAnsi(s.pantalla).split(/\r?\n|\r/).map((l) => l.trim()).filter(Boolean).at(-1);
-      terminar(code ? (ultima ?? `Claude terminó con código ${code}.`) : 'Claude terminó la sesión.');
+      terminar(code ? (ultima ?? `${ia} terminó con código ${code}.`) : `${ia} terminó la sesión.`);
       s.apunte('cierre', { motivo: s.motivo, codigo: code });
       acabar();
     });

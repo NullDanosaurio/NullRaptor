@@ -431,3 +431,16 @@
   externa funciona con Claude real en modo `-p` (allow ejecuta, deny bloquea, sin respuesta cae al flujo normal tras
   120 s). [?] Sin probar el diálogo interactivo en terminal; el prototipo `scripts/permiso.mjs` no está integrado.
   H4 queda aparte (PAN-5): prueba interactiva primero, después endpoint con autenticación y revisión de Óscar.
+
+## 06/11 — Codex de desarrollo en la terminal del panel
+- [U] Elegir Claude o Codex por proyecto, incluido Nullraptor; continuar conversaciones y relevos persistentes.
+- `Remoto` reutiliza PTY, rutas, SSE, adjuntos, permisos de acceso y límites. Claude sigue por defecto; Codex usa
+  `--no-daemon`, `workspace-write` y `on-request`. Instrucciones externas al proyecto, sin perfil Director.
+- Historial nativo por proyecto e ID; consultas `exec` excluidas. Los relevos usan `--json` sin `--ephemeral` y
+  guardan `thread_id` inmediatamente en estado e índice persistente; se pueden reabrir tras terminar o interrumpirse.
+- Reinicios: se guarda motor e ID de Codex. Los relevos activos bloquean otros desarrollos y cuentan para impedir
+  actualizaciones automáticas mientras trabajan. Imagen con `procps`; chat de consulta también usa `--no-daemon`.
+- Límites: Codex conserva su interfaz de aprobaciones; no recibe el perfil Director, las reglas deny ni los MCP
+  específicos de Claude. Historial basado en los metadatos JSONL de Codex 0.163.0; sesiones efímeras anteriores perdidas.
+- Verificación: suite completa y build del panel; prueba local de la interfaz real sin cuenta ni consumo de tokens.
+  Pendiente: navegador/móvil, conversación real con edición y reanudación tras recrear el contenedor con imagen nueva.

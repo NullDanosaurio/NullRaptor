@@ -21,7 +21,7 @@ function Actualizacion({ version }) {
   const { datos, recargar } = useDatos('/api/actualizacion', { cada: 60_000 });
   const [fallo, setFallo] = useState(null);
   const pedir = async () => {
-    if (!window.confirm('Se cerrarán las sesiones de Claude y los chats abiertos y Nullraptor se reiniciará. ¿Actualizar ahora?')) return;
+    if (!window.confirm('Se cerrarán las sesiones de desarrollo y los chats abiertos y Nullraptor se reiniciará. ¿Actualizar ahora?')) return;
     setFallo(null);
     try { await post('/api/actualizacion/ahora'); recargar(); } catch (e) { setFallo(e); }
   };
