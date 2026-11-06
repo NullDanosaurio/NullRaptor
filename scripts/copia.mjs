@@ -21,6 +21,12 @@ export const BASE = process.env.NULLRAPTOR_ESTADO ?? '/estado';
 /** Rutas (relativas al volumen) que no se pueden rehacer: memoria de Ruflo, estado del panel y notas. */
 export const ORIGENES = ['ruflo', 'sistema/apt-paquetes.txt', ...['actualizacion', 'adjuntos', 'chats', 'equipo', 'flujo', 'herramientas', 'memoria', 'registros', '.relevo'].map((c) => `trabajo/${c}`)];
 const EXCLUIR = ['node_modules', '.venv', '__pycache__', '.credentials.json', 'auth.json', 'passkeys.json', 'panel-codigo', '*.pem', '.env'];
+/** La frase llega por COPIA_FRASE o se pregunta en la terminal; sin terminal no se puede preguntar. */
+async function pedirFrase(pregunta) {
+  if (process.env.COPIA_FRASE) return process.env.COPIA_FRASE;
+  if (!process.stdin.isTTY) throw new Error('No hay terminal para pedir la frase: ejecútalo en una terminal interactiva o pásala en COPIA_FRASE.');
+  return pedirClave(pregunta);
+}
 const OAEP = { padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' };
 const SUFIJO = '.tar.gz.enc';
 
@@ -135,8 +141,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const destino = path.join(BASE, 'copias');
   try {
     if (orden === 'clave' && resto[0]) {
-      const f1 = await pedirClave('Frase de la clave privada (20+ caracteres): '), f2 = await pedirClave('Repite la frase: ');
-      if (f1 !== f2) throw new Error('Las frases no coinciden.');
+      const f1 = await pedirFrase('Frase de la clave privada (20+ caracteres): ');
+      if (!process.env.COPIA_FRASE && f1 !== await pedirFrase('Repite la frase: ')) throw new Error('Las frases no coinciden.');
       generarClaves({ privada: resto[0], publica: resto[1] ?? path.join(destino, 'clave-publica.pem'), frase: f1 });
       console.error(`Listo. Guarda ${resto[0]} y la frase fuera del volumen: sin ellas no se puede restaurar.`);
     } else if (orden === 'crear') {
@@ -146,7 +152,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       if (extra) { fs.mkdirSync(extra, { recursive: true }); for (const f of [r.archivo, r.archivo.replace(SUFIJO, '.json')]) fs.copyFileSync(f, path.join(extra, path.basename(f))); }
       console.log(JSON.stringify({ ...r, borradas: borradas.length, extra: extra ?? null, sinSubir: proyectosSinSubir(path.join(BASE, 'trabajo')) }, null, 2));
     } else if (orden === 'restaurar' && resto.length >= 3) {
-      const origenes = await restaurar({ copia: resto[0], destino: resto[1], privada: resto[2], frase: process.env.COPIA_FRASE ?? await pedirClave('Frase de la clave privada: ') });
+      const origenes = await restaurar({ copia: resto[0], destino: resto[1], privada: resto[2], frase: await pedirFrase('Frase de la clave privada: ') });
       console.log(`Restaurado en ${resto[1]}: ${origenes.join(', ')}`);
     } else if (orden === 'estado') {
       console.log(JSON.stringify(estado(destino)));
