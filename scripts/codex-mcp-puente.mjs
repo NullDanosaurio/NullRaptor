@@ -9,6 +9,12 @@ export function entornoMcp(config, base = process.env) {
   return { ...comunes, ...config.env };
 }
 
+/** Solo anuncia las capacidades que el puente implementa, sin prometer suscripciones ni otros métodos. */
+export function capacidadesPuente(remotas = {}) {
+  return Object.fromEntries(['tools', 'resources', 'prompts'].filter((clave) => remotas[clave])
+    .map((clave) => [clave, remotas[clave].listChanged ? { listChanged: true } : {}]));
+}
+
 export async function arrancarPuente(config) {
   if (config.command) {
     const hijo = spawn(config.command, config.args ?? [], { cwd: config.cwd, env: entornoMcp(config), stdio: ['pipe', 'pipe', 'inherit'] });
@@ -35,7 +41,7 @@ export async function arrancarPuente(config) {
     : new (await import('@modelcontextprotocol/sdk/client/streamableHttp.js')).StreamableHTTPClientTransport(url, { requestInit });
   await cliente.connect(remoto);
   const capacidades = cliente.getServerCapabilities();
-  const servidor = new Server({ name: 'nullraptor-codex', version: '1' }, { capabilities: capacidades });
+  const servidor = new Server({ name: 'nullraptor-codex', version: '1' }, { capabilities: capacidadesPuente(capacidades) });
   const metodos = [
     ['tools', 'ListToolsRequestSchema', 'listTools'], ['tools', 'CallToolRequestSchema', 'callTool'],
     ['resources', 'ListResourcesRequestSchema', 'listResources'], ['resources', 'ReadResourceRequestSchema', 'readResource'],

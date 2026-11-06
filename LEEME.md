@@ -215,6 +215,13 @@ stdio en Node (`scripts/herramientas.mjs` explica el formato; `config/claude-glo
   Claude va en modo manual y pregunta antes de cada orden. Llegan a las sesiones de Claude (Proyectos y el menú); el chat
   del panel y el flujo automático no cargan MCP.
 
+## Desarrollo con Codex
+
+En **Proyectos**, elige Codex y perfil Normal o Director IA. En el menú de terminal, **d** abre desarrollo con
+Codex. Comparte con Claude instrucciones, skills, MCP aprobados y tareas/memoria de Ruflo, también al reanudar y
+recibir un relevo. La preparación vive fuera de los proyectos y no modifica la cuenta ni `config.toml` personal.
+Configuración, permisos, comprobaciones y diferencias: [guía de Codex](docs/codex.md).
+
 ## Chat con Claude y Codex a la vez
 
 **Codex** (la CLI de OpenAI, con la suscripción de ChatGPT) va en la imagen con versión fijada (`@openai/codex` en
@@ -245,9 +252,10 @@ Tiempos en el i9: Kokoro ~2 s por cada 7 s de audio; Whisper ~2 s por frase.
 
 ## Director IA: un equipo de subagentes (03/11/2026)
 
-Perfil opcional (desactivado por defecto) que convierte la sesión de Claude Code en el **Director** de un estudio:
+Perfil opcional (desactivado por defecto) que convierte la sesión de Claude Code o Codex en el **Director** de un estudio:
 coordina seis subagentes y responde de la calidad. Se elige al abrir la sesión en **Proyectos** (selector «Perfil:
-Normal / Director IA»; se recuerda por proyecto en el navegador) o al crear un chat.
+Normal / Director IA»; se recuerda por proyecto en el navegador) o al crear un chat. La tabla describe Claude;
+en Codex los roles heredan el modelo de la sesión y Desarrollo implementa directamente.
 
 | Rol | Subagente | Modelo | Herramientas | Gasta de |
 |---|---|---|---|---|
@@ -264,11 +272,11 @@ Normal / Director IA»; se recuerda por proyecto en el navegador) o al crear un 
 - **Nada está hecho** sin `VEREDICTO: APROBADO` de Calidad (y de Seguridad si toca entradas, permisos, secretos,
   red o dependencias). Los subagentes no hablan con Daniel: devuelven sus preguntas al Director.
 - **Codex programa** desde Desarrollo con `scripts/codex-parche.mjs`: los archivos van por la entrada (sin pasar por
-  el contexto de Claude), Codex devuelve un diff y se aplica con `git apply`. Así se hace porque en el contenedor el
-  sandbox de Codex (bwrap) no puede crear namespaces y Codex no puede ejecutar nada. El script solo admite archivos
-  del proyecto y rechaza secretos (`.env`, claves, credenciales).
+  el contexto de Claude), Codex devuelve un diff y se aplica con `git apply`. Es el flujo de parches del equipo de
+  Claude; las sesiones de desarrollo de Codex ejecutan sus propias órdenes con sandbox. El script solo admite
+  archivos del proyecto y rechaza secretos (`.env`, claves, credenciales).
 - **En el chat** (solo lectura) el Director va en modo consultor: analiza y opina; el equipo trabaja en las sesiones.
-  Codex no tiene subagentes: con Codex no hay perfil.
+  El Director de desarrollo de Codex usa sus roles nativos; sus diferencias están en la guía de Codex.
 - **Añadir un rol:** crea `config/agentes/equipo-<rol>.md` con el frontmatter (`name`, `description`, `tools`,
   `model`) y las reglas comunes del equipo, nómbralo en `config/perfiles/director.md` y amplía la prueba de
   subagentes en `tests/ia.test.mjs`. **Añadir un perfil:** `config/perfiles/<id>.md` + `PERFILES` en `scripts/ia.mjs`

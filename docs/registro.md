@@ -444,3 +444,23 @@
   específicos de Claude. Historial basado en los metadatos JSONL de Codex 0.163.0; sesiones efímeras anteriores perdidas.
 - Verificación: suite completa y build del panel; prueba local de la interfaz real sin cuenta ni consumo de tokens.
   Pendiente: navegador/móvil, conversación real con edición y reanudación tras recrear el contenedor con imagen nueva.
+
+## 06/11 — Codex comparte el flujo de desarrollo de Claude
+- [U] Preparar Codex con las mismas tareas, memoria, instrucciones, skills y MCP aprobados; sin publicar imagen
+  ni reiniciar el contenedor durante el desarrollo.
+- Preparación común para panel, sesiones nuevas/reanudadas, relevo y terminal (`d` en el menú o `scripts/codex.mjs`).
+  Se conservan `CODEX_HOME`, la cuenta y `config.toml`; los overrides viven fuera de los proyectos.
+- MCP desde la misma fuente de autorizaciones: puentes stdio, HTTP y SSE. No pasan secretos en argumentos; se
+  conserva el entorno limitado y la comprobación de huella de herramientas propias. SDK MCP como dependencia
+  directa fijada; el servidor del panel conserva su ejecución sin dependencias.
+- Instrucciones adaptadas desde la política común: plan disponible en vez de TodoWrite, modelo elegido en vez
+  de opusplan, AGENTS.override.md > AGENTS.md > CLAUDE.md (fallback por carpeta). Skills globales con recursos y
+  licencias. Seis roles nativos, con Desarrollo directo y vetos de Calidad/Seguridad; Director disponible en Codex.
+- Los roles heredan el modelo; no se copian hooks, reglas deny ni Remote Control de Claude. Los latidos de Claude
+  no representan actividad interna de Codex. Puente remoto: herramientas, recursos y prompts; sin suscripciones,
+  completions ni logging. Permisos nativos de Codex y fallback secuencial si no hay subagentes.
+- Verificación: suite automatizada, CLI instalada sin usar la cuenta real, puentes locales y build del panel.
+  El ciclo aislado con Ruflo real comprueba tareas, memoria, pruebas y commit entre clientes y reconexiones.
+- App-server local de Codex 0.163.0: skills de usuario y roles reconocidos sin cuenta ni llamadas a modelos.
+- [?] Conversación real con modelo, navegador/móvil y recreación del contenedor con imagen nueva pendientes de
+  despliegue. Activación y detalles en `docs/codex.md`; no se ha hecho push ni publicación ni reinicio.

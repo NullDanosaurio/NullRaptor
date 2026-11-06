@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import TOML from '@iarna/toml';
 import { toml, argumentosConfig, ajustesMcpCodex } from '../scripts/codex-mcp.mjs';
-import { entornoMcp } from '../scripts/codex-mcp-puente.mjs';
+import { entornoMcp, capacidadesPuente } from '../scripts/codex-mcp-puente.mjs';
 
 const agente = fileURLToPath(new URL('..', import.meta.url));
 const puente = path.join(agente, 'scripts', 'codex-mcp-puente.mjs');
@@ -51,6 +51,13 @@ test('el entorno del MCP excluye credenciales heredadas y admite las configurada
     PATH: '/bin', HOME: '/casa', LANG: 'es_ES', TZ: 'UTC', TOKEN: 'autorizado',
   });
   assert.deepEqual(entornoMcp({}, {}), {});
+});
+
+test('el puente remoto anuncia únicamente las capacidades que reenvía', () => {
+  assert.deepEqual(capacidadesPuente({ tools: { listChanged: true }, resources: { subscribe: true },
+    prompts: {}, completions: {}, logging: {}, tasks: {} }), {
+    tools: { listChanged: true }, resources: {}, prompts: {},
+  });
 });
 
 test('el puente stdio transmite peticiones y respuestas al proceso con cwd y entorno aprobados', (t) => {
