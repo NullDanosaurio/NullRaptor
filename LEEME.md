@@ -323,6 +323,24 @@ y `compose.yaml` lo referencia. Ese cambio solo llega al recrear el contenedor c
 falta saltarse el sandbox, `RELEVO_SIN_SANDBOX=1` lanza Codex con `--dangerously-bypass-approvals-and-sandbox` (apagado
 por defecto). Los hooks y el panel llegan con la imagen nueva (como todo cambio en `/nullraptor`).
 
+## Copia de seguridad del volumen (06/11/2026)
+
+Todo lo que no se puede rehacer vive en `/estado`. `scripts/copia.mjs` hace una copia cifrada y el panel la repite cada día.
+
+- **Qué entra**: la memoria de Ruflo, los chats, los registros, el estado del flujo y de las herramientas, la bóveda
+  clonada y la carpeta `memory` de Claude de cada proyecto. **No entra**: credenciales, passkeys, el cofre, las
+  conversaciones de Claude ni los proyectos (son repositorios git; la copia avisa de los que tienen trabajo sin subir).
+- **Cifrado**: cada copia usa una clave AES-256-GCM al azar guardada con la clave pública RSA-4096. En el volumen solo
+  está la pública (`/estado/copias/clave-publica.pem`); la privada, con frase, la guardas tú **fuera** del volumen.
+- **Dónde**: `/estado/copias` (las 7 últimas) y, si el PC está montado, una segunda en `/pc/Nullraptor/copias`
+  (`NULLRAPTOR_COPIA_EXTRA` la cambia; vacío la quita). Una copia solo en el volumen no salva de perder el volumen.
+  Guarda la clave privada en otro sitio que no sea esa misma carpeta.
+- **Crear la clave (una vez)**, en una terminal interactiva: `node scripts/copia.mjs clave <ruta fuera de /estado>`.
+- **Cada día**: el panel revisa cada hora y copia si la última tiene 24 h o más. El Resumen avisa si falta la clave, si
+  la copia falla o va atrasada, y de los proyectos con commits o cambios sin subir.
+- **A mano**: `node scripts/copia.mjs crear` · `estado` · `restaurar <copia.tar.gz.enc> <destino> <privada>`.
+  Restaurar solo escribe en una carpeta vacía o nueva, y comprueba la autenticidad antes de extraer nada.
+
 ## Panel web: una sola interfaz
 
 `panel/` (añadido el 29/10/2026; reorganizado en la fase 4, 02/11/2026). Servidor Node sin dependencias

@@ -44,7 +44,16 @@ Con un proyecto de prueba (no uno real) y una tarea pequeña en `en-curso`:
 - [ ] Una sesión nueva ve las skills `anthropic-*` y puede consultar Context7 (`resolve-library-id`).
 - [ ] Herramientas propias aprobadas aparecen como MCP `herramienta-<id>`.
 
+## 6. Copia de seguridad
+
+- [ ] `node scripts/copia.mjs estado`: hay una copia de menos de 24 h en `/estado/copias` y otra en `/pc/Nullraptor/copias`.
+- [ ] Restauración real, en una terminal interactiva:
+      `node scripts/copia.mjs restaurar /estado/copias/<copia>.tar.gz.enc /tmp/prueba-restauracion <ruta-clave-privada>`
+      y comprobar que `/tmp/prueba-restauracion/ruflo/tasks/store.json` existe. Borrar la carpeta después.
+- [ ] La clave privada y su frase están guardadas fuera de `/estado` y fuera de `/pc/Nullraptor/copias`.
+- [ ] El Resumen avisa de los proyectos con commits sin subir (y deja de avisar tras hacer `push`).
+
 ## Si algo falla
 
 Anota el síntoma exacto (mensaje, pantalla, hora) y abre una tarea `[Nullraptor]` en Ruflo; no lo arregles sobre el
-volumen real sin tener antes la copia de seguridad (ver `scripts/copia.mjs`, cuando exista).
+volumen real sin tener antes la copia de seguridad (`node scripts/copia.mjs crear`).

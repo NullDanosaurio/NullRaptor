@@ -112,3 +112,27 @@ test('proyectosSinSubir: avisa de cambios sin confirmar y de commits sin subir',
     { proyecto: 'Sucio', sucios: 1, sinSubir: 0 },
   ]);
 });
+
+test('Copias (panel): sin clave avisa; con clave hace la copia la primera vez y no repite hasta que toca', async () => {
+  const { base, raiz } = entorno();
+  const { Copias } = await import('../panel/lib/copias.mjs');
+  fs.rmSync(path.join(base, 'copias', 'clave-publica.pem'));
+  let ahora = new Date('2026-11-06T03:00:00Z');
+  const c = new Copias({ base, extra: path.join(raiz, 'extra'), ahora: () => ahora });
+  assert.equal(c.estado().aviso, 'sin-clave');
+  assert.equal(await c.revisar(), false);
+
+  const { generarClaves: gen } = await import('../scripts/copia.mjs');
+  gen({ privada: path.join(raiz, 'fuera', 'otra.pem'), publica: path.join(base, 'copias', 'clave-publica.pem'), frase, base });
+  assert.equal(c.estado().aviso, 'atrasada', 'con clave pero sin copias ya hay que hacerla');
+  assert.equal(await c.revisar(), true);
+  assert.equal(c.estado().aviso, null);
+  assert.equal(c.estado().copias, 1);
+  assert.equal(copiasEn(path.join(raiz, 'extra')).length, 1, 'también copia fuera del volumen');
+  assert.equal(await c.revisar(), false, 'no repite el mismo día');
+  ahora = new Date('2026-11-07T04:00:00Z');
+  assert.equal(await c.revisar(), true);
+  assert.equal(c.estado().copias, 2);
+  ahora = new Date('2026-11-10T04:00:00Z');
+  assert.equal(c.estado().aviso, 'atrasada');
+});

@@ -135,6 +135,22 @@ export function proyectosSinSubir(trabajo) {
   return fuera;
 }
 
+/** Segunda copia fuera del volumen: la del volumen no salva de perder el volumen. Por defecto, el PC si está montado. */
+export const extraPorDefecto = (env = process.env) => (env.NULLRAPTOR_COPIA_EXTRA ?? (fs.existsSync('/pc/Nullraptor') ? '/pc/Nullraptor/copias' : '')) || null;
+
+/** Copia + rotación + segunda copia + aviso de proyectos sin subir. Lo usan la orden `crear` y la copia diaria del panel. */
+export async function ejecutarCopia({ base = BASE, conservar = 7, extra = null, ahora = new Date() } = {}) {
+  const destino = path.join(base, 'copias');
+  const r = await crearCopia({ base, destino, ahora });
+  const borradas = rotar(destino, conservar).length;
+  if (extra) {
+    fs.mkdirSync(extra, { recursive: true });
+    for (const f of [r.archivo, r.archivo.replace(SUFIJO, '.json')]) fs.copyFileSync(f, path.join(extra, path.basename(f)));
+    rotar(extra, conservar);
+  }
+  return { ...r, borradas, extra, sinSubir: proyectosSinSubir(path.join(base, 'trabajo')) };
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [orden, ...resto] = process.argv.slice(2);
   const opcion = (n) => { const i = resto.indexOf(n); return i >= 0 ? resto[i + 1] : undefined; };
@@ -146,11 +162,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       generarClaves({ privada: resto[0], publica: resto[1] ?? path.join(destino, 'clave-publica.pem'), frase: f1 });
       console.error(`Listo. Guarda ${resto[0]} y la frase fuera del volumen: sin ellas no se puede restaurar.`);
     } else if (orden === 'crear') {
-      const r = await crearCopia({});
-      const borradas = rotar(destino, Number(opcion('--conservar') ?? 7));
-      const extra = opcion('--extra');
-      if (extra) { fs.mkdirSync(extra, { recursive: true }); for (const f of [r.archivo, r.archivo.replace(SUFIJO, '.json')]) fs.copyFileSync(f, path.join(extra, path.basename(f))); }
-      console.log(JSON.stringify({ ...r, borradas: borradas.length, extra: extra ?? null, sinSubir: proyectosSinSubir(path.join(BASE, 'trabajo')) }, null, 2));
+      console.log(JSON.stringify(await ejecutarCopia({ conservar: Number(opcion('--conservar') ?? 7), extra: opcion('--extra') ?? extraPorDefecto() }), null, 2));
     } else if (orden === 'restaurar' && resto.length >= 3) {
       const origenes = await restaurar({ copia: resto[0], destino: resto[1], privada: resto[2], frase: await pedirFrase('Frase de la clave privada: ') });
       console.log(`Restaurado en ${resto[1]}: ${origenes.join(', ')}`);

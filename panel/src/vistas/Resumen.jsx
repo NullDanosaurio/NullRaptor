@@ -1,6 +1,6 @@
 // Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
 // chats, MCP del día, las tareas de la IA (Ruflo) y el relevo a Codex cuando Claude se queda sin tokens.
-import { ArrowUpRight, ArrowRightLeft, BookOpen, Gauge, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
+import { ArrowUpRight, ArrowRightLeft, BookOpen, DatabaseBackup, Gauge, ListChecks, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Search, Sparkles, SquareTerminal, X } from 'lucide-react';
 import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
@@ -138,6 +138,29 @@ function RelevoCodex({ relevos }) {
   );
 }
 
+const AVISO_COPIA = {
+  'sin-clave': 'Aún no hay copia de seguridad: falta crear la clave (node scripts/copia.mjs clave <ruta fuera del volumen>).',
+  error: 'La última copia de seguridad falló',
+  atrasada: 'La copia de seguridad va atrasada',
+};
+
+/** Copia de seguridad cifrada del volumen. Solo aparece si hay algo que decir: un fallo, atraso, falta de clave o proyectos sin subir. */
+function CopiaSeguridad({ copias }) {
+  if (!copias) return null;
+  const sinSubir = copias.sinSubir ?? [];
+  if (!copias.aviso && !sinSubir.length && !copias.corriendo) return null;
+  const texto = copias.corriendo ? 'Haciendo la copia de seguridad…' : AVISO_COPIA[copias.aviso];
+  return (
+    <div className={`mb-4 rounded-xl border px-3 py-2 text-[13px] ${copias.aviso ? 'border-aviso/25 bg-aviso/10 text-aviso' : 'border-borde bg-panel/80 text-texto'}`}>
+      {texto && <p className="flex items-center gap-2.5"><DatabaseBackup className="size-4 shrink-0" />{texto}{copias.error ? `: ${copias.error}` : ''}{copias.horas != null && copias.aviso === 'atrasada' ? ` (hace ${copias.horas} h)` : ''}</p>}
+      {sinSubir.length > 0 && (
+        <p className={`flex items-start gap-2.5 ${texto ? 'mt-1.5' : ''}`}><DatabaseBackup className="mt-0.5 size-4 shrink-0" />
+          <span>Sin subir a GitHub (la copia no incluye proyectos): {sinSubir.map((p) => `${p.proyecto} (${p.sinSubir == null ? 'sin remoto' : `${p.sinSubir} commits`}${p.sucios ? `, ${p.sucios} cambios` : ''})`).join(' · ')}</span></p>
+      )}
+    </div>
+  );
+}
+
 /** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
 function TareasIA({ tareas }) {
   const [filtro, setFiltro] = useState(null);
@@ -181,7 +204,7 @@ export default function Resumen() {
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
-  const { proyectos, boveda, mcp, chats, guardados, remoto = [], tareas = null, relevos = [] } = datos;
+  const { proyectos, boveda, mcp, chats, guardados, remoto = [], tareas = null, relevos = [], copias = null } = datos;
   const enCurso = proyectos.filter((p) => p.flujo?.bloqueo?.vivo);
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -191,6 +214,7 @@ export default function Resumen() {
         <Cabecera titulo={`${saludo()}, Dano`} subtitulo={<span className="capitalize">{fecha}</span>} />
         <Fallo error={error} className="mb-4" />
         <RelevoCodex relevos={relevos} />
+        <CopiaSeguridad copias={copias} />
         {remoto.length > 0 && (
           <div className="mb-4 rounded-xl border border-aviso/25 bg-aviso/10 px-3 py-2 text-[13px] text-aviso">
             <p className="flex items-center gap-2.5"><MonitorSmartphone className="size-4 shrink-0" />{remoto.length === 1 ? '1 sesión de Claude abierta' : `${remoto.length} sesiones de Claude abiertas`}</p>

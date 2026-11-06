@@ -389,3 +389,15 @@
   Anthropic con licencia Apache 2.0 en `config/skills/anthropic-*`. `instalarSkills` ahora gestiona los prefijos
   `nullraptor-` y `anthropic-`.
 - Descartadas docx, pdf, pptx y xlsx: licencia propietaria, no redistribuible en el repositorio.
+
+## 06/11/2026 — Verificación y copia de seguridad (VER, COP)
+- `npm run verificar` ahora comprueba también `gh`, Context7 (arranca con `npx`), la web del panel (levantado en
+  memoria con carpetas temporales) y la API de gasto. Lo que solo se prueba en el PC está en `docs/comprobacion-manual.md`.
+- Copia cifrada del volumen (`scripts/copia.mjs`, `panel/lib/copias.mjs`): clave pública en el volumen y privada fuera,
+  rotación de 7, segunda copia en el PC, restauración solo a carpeta vacía con la autenticidad comprobada antes de
+  extraer. Diaria desde el panel. Fuera de la copia, por decisión de Daniel (nunca copiar credenciales): credenciales,
+  passkeys y cofre; tras perder el volumen hay que volver a iniciar sesión.
+- Hallazgo: Modelos3D y Roleplay tenían commits sin subir; ahora el Resumen lo avisa.
+- Un `!` del prompt de Claude Code no tiene terminal: `copia.mjs` pide la frase solo en una terminal interactiva o por
+  `COPIA_FRASE`, y avisa en lugar de quedarse colgado.
+- [?] Sin probar: restaurar una copia real con la frase de Daniel y la tarjeta del Resumen en el navegador.

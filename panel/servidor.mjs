@@ -23,6 +23,7 @@ import { Equipo } from './lib/equipo.mjs';
 import { Proyectos } from './lib/proyectos.mjs';
 import { crearRutasEquipo } from './lib/rutas-equipo.mjs';
 import { crearRutasVoz } from './lib/rutas-voz.mjs';
+import { Copias } from './lib/copias.mjs';
 import { Gasto } from './lib/gasto.mjs';
 import { archivoTareasRuflo, leerTareasRuflo, resumenTareas } from './lib/tareas-ruflo.mjs';
 import { assetlinks, leerFirma, origenesApp } from './lib/app-android.mjs';
@@ -134,7 +135,7 @@ export function crearServidor({
   trabajo, memoria, acceso = null, registro = null, remoto = new Remoto({ trabajo, memoria, registro }),
   dominio = null, passkeys = null, sesiones = new Sesiones(), codigoLanzador = () => 'mal', actualizacion = null,
   env = process.env, prepararMcp = null, proyectos = new Proyectos({ trabajo, memoria, env }),
-  equipo = new Equipo({ trabajo, env }), voz = new Voz(), tareasRuflo = archivoTareasRuflo(env), gasto = new Gasto(),
+  equipo = new Equipo({ trabajo, env }), voz = new Voz(), tareasRuflo = archivoTareasRuflo(env), gasto = new Gasto(), copias = null,
 }) {
   if (dominio && !passkeys) throw new Error('Con PANEL_DOMINIO hacen falta las passkeys.');
   const permitido = (host) => (acceso ? hostRed(host) : hostPermitido(host)) || hostDominio(host, dominio);
@@ -170,6 +171,7 @@ export function crearServidor({
       remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
       tareas: resumenTareas(leerTareasRuflo(tareasRuflo)),
       relevos: listarRelevos(trabajo),
+      copias: copias?.estado() ?? null,
       hoy: new Date().toISOString().slice(0, 10),
     }),
     // Ajustes: versión de la imagen, cómo se entra, carpetas y servidores MCP.
@@ -312,8 +314,10 @@ if (esPrincipal) {
     try { remoto.abrir(proyecto, { quien: 'reanudada tras reiniciar', aviso: avisoReanudar(proyecto), perfil }); console.error(`[panel] Sesión reanudada en ${proyecto}.`); }
     catch (e) { console.warn(`[panel] No se pudo reanudar la sesión de ${proyecto}: ${e.message}`); }
   }
+  const copias = new Copias();
+  copias.iniciar();
   const codigoLanzador = codigo ? crearAcceso(codigo).probar : undefined;
-  crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador, actualizacion, prepararMcp }).listen(puerto, host, () => {
+  crearServidor({ trabajo, memoria, acceso, registro, remoto, dominio, passkeys, codigoLanzador, actualizacion, prepararMcp, copias }).listen(puerto, host, () => {
     console.error(`Panel de Nullraptor en http://localhost:${puerto}  (Ctrl+C para cerrar)`);
     if (red) console.error(`Modo red: abierto a la red de casa con código de acceso (en ${archivoCodigo}).`);
     if (dominio) console.error(`Tailscale: https://${dominio} con passkey${passkeys.hay() ? '' : ` (primera passkey con el código de ${archivoCodigo})`}.`);
