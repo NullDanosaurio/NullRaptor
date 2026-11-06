@@ -152,11 +152,12 @@ test('prepararIA añade los hooks del relevo (StopFailure y SessionStart) una so
   fs.writeFileSync(path.join(configDir, 'settings.json'), JSON.stringify({ hooks: { Stop: [ajeno], StopFailure: [ajeno], SessionStart: [ajeno] } }));
   for (let i = 0; i < 2; i++) prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
   const h = JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8')).hooks;
-  assert.deepEqual(h.Stop, [ajeno]);
+  assert.equal(h.Stop.length, 2); // el ajeno y el latido
+  assert.deepEqual(h.Stop[0], ajeno);
   assert.equal(h.StopFailure.length, 2);
   assert.deepEqual(h.StopFailure[0], ajeno);
   assert.equal(h.StopFailure[1].hooks[0].command, `node "${path.join(agente, 'scripts', 'relevo.mjs')}" senal`);
-  assert.equal(h.SessionStart.length, 2);
+  assert.equal(h.SessionStart.length, 3); // ajeno, relevo y latido
   assert.deepEqual(h.SessionStart[0], ajeno);
   assert.equal(h.SessionStart[1].hooks[0].command, `node "${path.join(agente, 'scripts', 'relevo.mjs')}" revision`);
 });

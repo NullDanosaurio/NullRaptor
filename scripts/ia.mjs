@@ -78,12 +78,32 @@ export function conRelevo(ajustes, agente) {
   return { ...base, hooks: nuevos };
 }
 
+const MARCA_LATIDO = 'latido.mjs';
+const HOOKS_LATIDO = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'SessionEnd'];
+
+/** Añade un latido por evento y conserva los hooks ajenos, incluso dentro de un grupo compartido. */
+export function conLatido(ajustes, agente) {
+  const base = ajustes && typeof ajustes === 'object' && !Array.isArray(ajustes) ? ajustes : {};
+  const hooks = base.hooks && typeof base.hooks === 'object' && !Array.isArray(base.hooks) ? base.hooks : {};
+  const nuevos = { ...hooks };
+  for (const evento of HOOKS_LATIDO) {
+    const ajenos = (Array.isArray(hooks[evento]) ? hooks[evento] : []).flatMap((grupo) => {
+      if (!Array.isArray(grupo?.hooks)) return [grupo];
+      const conservados = grupo.hooks.filter((h) => !String(h?.command).includes(MARCA_LATIDO));
+      if (conservados.length === grupo.hooks.length) return [grupo];
+      return conservados.length ? [{ ...grupo, hooks: conservados }] : [];
+    });
+    nuevos[evento] = [...ajenos, { hooks: [{ type: 'command', command: `node "${path.join(agente, 'scripts', MARCA_LATIDO)}"`, timeout: 5 }] }];
+  }
+  return { ...base, hooks: nuevos };
+}
+
 function aplicarAjustes(configDir, agente) {
   const archivo = path.join(configDir, 'settings.json');
   let actuales = {};
   try { actuales = JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { /* no hay o no es JSON: se empieza de cero */ }
   const temporal = `${archivo}.${process.pid}.tmp`;
-  fs.writeFileSync(temporal, `${JSON.stringify(conRelevo(conAhorro(actuales), agente), null, 2)}\n`);
+  fs.writeFileSync(temporal, `${JSON.stringify(conLatido(conRelevo(conAhorro(actuales), agente), agente), null, 2)}\n`);
   fs.renameSync(temporal, archivo);
 }
 
