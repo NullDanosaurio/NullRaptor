@@ -419,3 +419,15 @@
 - Codex: H2 lo escribió con `codex-parche.mjs` (a la segunda); H1 falló dos veces al aplicar el diff y lo hizo Iker.
 - Revisado por Calidad y Seguridad (aprobado). [?] Sin probar en el navegador ni en Windows.
 - Pendiente (PAN-4): mensajes importantes y aceptar permisos desde el panel, tras una prueba de viabilidad con Claude real.
+
+## 06/11 — Resumen en vivo (H3: avisos) y prueba de viabilidad de permisos
+- El Resumen enseña una tarjeta de avisos de solo lectura (`panel/lib/avisos.mjs`, campo `tareas.avisos` de
+  `GET /api/resumen`): «parada» (10 min sin latido), «terminada» (Stop o SessionEnd, si el proyecto no trabaja) y «espera»
+  (Notification). Máximo 10, los más recientes primero, textos de hasta 120 caracteres. No hizo falta tocar `latido.mjs`:
+  el evento ya distingue los casos.
+- Decisión: «espera» avisa aunque haya una tarea en curso, porque Claude está bloqueado esperando a Daniel.
+- Revisado por Calidad (aprobado, 184 pruebas). [?] Sin ver la tarjeta a 360 px en un navegador.
+- Prueba de viabilidad de aceptar permisos desde el panel (PAN-4): un hook `PermissionRequest` que espera una respuesta
+  externa funciona con Claude real en modo `-p` (allow ejecuta, deny bloquea, sin respuesta cae al flujo normal tras
+  120 s). [?] Sin probar el diálogo interactivo en terminal; el prototipo `scripts/permiso.mjs` no está integrado.
+  H4 queda aparte (PAN-5): prueba interactiva primero, después endpoint con autenticación y revisión de Óscar.
