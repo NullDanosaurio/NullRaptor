@@ -185,6 +185,26 @@ function Avance({ avance }) {
   );
 }
 
+/** Avisos recientes de las tareas de la IA, con su proyecto y hora. */
+function Avisos({ avisos }) {
+  if (!avisos?.length) return null;
+  const tono = { espera: 'aviso', parada: 'aviso', terminada: 'neutro' };
+  return (
+    <ul className="mb-4 space-y-2.5" aria-label="Avisos">
+      {avisos.map((a, i) => (
+        <li key={`${a.proyecto}-${a.tipo}-${a.en}-${i}`} className="min-w-0 px-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Insignia tono={tono[a.tipo]} className="shrink-0">{a.tipo}</Insignia>
+            <span className="min-w-0 break-words text-[13px] text-texto">{a.proyecto}</span>
+          </div>
+          <p className="mt-0.5 line-clamp-2 break-words text-[12px] text-tenue">{a.texto}</p>
+          <p className="mt-0.5 text-[11px] text-apagado">{haceCuanto(a.en)}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
 function TareasIA({ tareas }) {
   const [filtro, setFiltro] = useState(null);
@@ -200,6 +220,7 @@ function TareasIA({ tareas }) {
   return (
     <Tarjeta titulo="Tareas de la IA" icono={ListChecks} accion={<span className="text-[11px] text-apagado">{tareas.hechasHoy} hechas hoy</span>}>
       <Avance avance={tareas.avance} />
+      <Avisos avisos={tareas.avisos} />
       {tareas.totalAbiertas ? (
         <>
           <div className="mb-3 flex flex-wrap gap-1.5">
