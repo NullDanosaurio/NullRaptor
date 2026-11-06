@@ -161,7 +161,7 @@ function CopiaSeguridad({ copias }) {
   );
 }
 
-/** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
+/** Avance por proyecto: hechas/total de Ruflo y si la sesión trabaja, espera o está parada. */
 function Avance({ avance }) {
   const filas = Object.entries(avance ?? {}).sort(([, a], [, b]) => (a.estado === 'parada' ? 0 : 1) - (b.estado === 'parada' ? 0 : 1) || b.enCurso - a.enCurso);
   if (!filas.length) return null;
@@ -185,6 +185,7 @@ function Avance({ avance }) {
   );
 }
 
+/** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
 function TareasIA({ tareas }) {
   const [filtro, setFiltro] = useState(null);
   if (!tareas) return null;

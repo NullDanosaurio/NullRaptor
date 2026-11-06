@@ -106,3 +106,15 @@ test('conLatido es idempotente y conserva los hooks ajenos y los del relevo', ()
   }
   assert.equal(base.hooks.PreToolUse[0].hooks.length, 2);
 });
+
+test('registrarLatido recorta los campos y crea el archivo solo para el dueño', (t) => {
+  const trabajo = fs.mkdtempSync(path.join(os.tmpdir(), 'latido-'));
+  t.after(() => fs.rmSync(trabajo, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(trabajo, 'proyectos', 'P'), { recursive: true });
+  registrarLatido({ cwd: path.join(trabajo, 'proyectos', 'P'), hook_event_name: 'x'.repeat(500), session_id: 'y'.repeat(500) }, trabajo);
+  const ruta = path.join(trabajo, '.sesiones', 'P.json');
+  const datos = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+  assert.equal(datos.evento.length, 64);
+  assert.equal(datos.sesion.length, 64);
+  assert.equal(fs.statSync(ruta).mode & 0o077, 0, 'sin permisos para otros');
+});

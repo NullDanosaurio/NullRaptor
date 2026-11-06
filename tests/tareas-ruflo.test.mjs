@@ -47,3 +47,11 @@ test('avance por proyecto: 1/3 trabajando, cambia al completar, parada y esperan
   assert.deepEqual(conSesiones(resumenTareas([]), { Q: { hace: 700, parada: true } }, []).avance.Q, { hechas: 0, enCurso: 0, pendientes: 0, total: 0, estado: 'parada', hace: 700 });
   assert.equal(estadoProyecto({ enCurso: 0 }, undefined), 'esperando');
 });
+
+test('estadoProyecto: una sesión terminada con tarea en curso queda «esperando»', async () => {
+  const { estadoProyecto } = await import('../panel/lib/tareas-ruflo.mjs');
+  const av = { hechas: 0, enCurso: 1, pendientes: 0, total: 1 };
+  assert.equal(estadoProyecto(av, { terminada: false, parada: false }), 'trabajando');
+  assert.equal(estadoProyecto(av, { terminada: true, parada: false }), 'esperando');
+  assert.equal(estadoProyecto(av, { terminada: false, parada: true }), 'parada');
+});

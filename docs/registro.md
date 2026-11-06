@@ -409,3 +409,13 @@
 - [?] Sin comprobar: que el hook `StopFailure` se dispare con un límite real de Claude (solo se simuló la señal).
 - El Resumen enseña siempre la copia («al día, la última hace X h») y los proyectos sin subir se calculan al arrancar el
   panel y cada hora, no solo al hacer la copia (tras un reinicio salía vacío hasta la copia del día siguiente).
+
+## 06/11 — Resumen en vivo (v1: avance y sesiones paradas)
+- El Resumen enseña por proyecto la barra hechas/total de Ruflo y si la sesión trabaja, espera o está parada. Cada sesión
+  de Claude lanzada por Nullraptor deja un latido (`scripts/latido.mjs`, hooks inyectados en `scripts/ia.mjs`) en
+  `$TRABAJO_DIR/.sesiones/<Proyecto>.json`, fuera del proyecto; sin eventos durante 10 min cuenta como parada.
+- Límites: solo ve las sesiones abiertas con la configuración de Nullraptor y solo después de reabrirlas; un proyecto con
+  tareas y sin sesión nunca sale «parada»; con varias sesiones en un proyecto manda el último evento.
+- Codex: H2 lo escribió con `codex-parche.mjs` (a la segunda); H1 falló dos veces al aplicar el diff y lo hizo Iker.
+- Revisado por Calidad y Seguridad (aprobado). [?] Sin probar en el navegador ni en Windows.
+- Pendiente (PAN-4): mensajes importantes y aceptar permisos desde el panel, tras una prueba de viabilidad con Claude real.

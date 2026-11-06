@@ -12,14 +12,14 @@ export function registrarLatido(entrada, trabajo, ahora = new Date()) {
     const proyecto = proyectoDe(entrada?.cwd, trabajo);
     if (!proyecto) return;
     const datos = {
-      proyecto, evento: entrada.hook_event_name ?? null,
-      sesion: entrada.session_id ?? null, en: ahora.toISOString(),
+      proyecto, evento: String(entrada.hook_event_name ?? '').slice(0, 64) || null,
+      sesion: String(entrada.session_id ?? '').slice(0, 64) || null, en: ahora.toISOString(),
     };
     const dir = path.join(trabajo, '.sesiones');
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     const ruta = path.join(dir, `${proyecto}.json`);
     temporal = `${ruta}.${process.pid}.${randomUUID()}.tmp`;
-    fs.writeFileSync(temporal, `${JSON.stringify(datos)}\n`);
+    fs.writeFileSync(temporal, `${JSON.stringify(datos)}\n`, { mode: 0o600 });
     fs.renameSync(temporal, ruta);
   } catch { /* El latido es opcional y nunca imprime ni propaga errores. */ }
   finally {

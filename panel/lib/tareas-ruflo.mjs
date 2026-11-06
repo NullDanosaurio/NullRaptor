@@ -56,7 +56,7 @@ export function avanceTareas(tareas) {
 }
 
 /** «parada» si la sesión lleva demasiado sin eventos; si no, «trabajando» con una tarea en curso, y «esperando». */
-export const estadoProyecto = (av, sesion) => (sesion?.parada ? 'parada' : av.enCurso > 0 ? 'trabajando' : 'esperando');
+export const estadoProyecto = (av, sesion) => (sesion?.parada ? 'parada' : av.enCurso > 0 && !sesion?.terminada ? 'trabajando' : 'esperando');
 
 /** Resumen con `avance` por proyecto, su estado y los segundos desde el último latido (null sin sesión). Un proyecto
  * con sesión parada y sin tareas también aparece. */
