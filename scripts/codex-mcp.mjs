@@ -17,8 +17,9 @@ export function argumentosConfig(ajustes) {
 /** Un puente por servidor conserva los nombres MCP y lee la configuración privada al arrancar. */
 export function ajustesMcpCodex({ agente, mcp }) {
   const { mcpServers } = JSON.parse(fs.readFileSync(mcp, 'utf8'));
-  return Object.fromEntries(Object.keys(mcpServers).map((nombre) => [
-    `mcp_servers.${JSON.stringify(nombre)}`,
+  // Codex divide las claves -c por puntos sin interpretar comillas: los nombres van dentro de la tabla TOML.
+  return { mcp_servers: Object.fromEntries(Object.keys(mcpServers).map((nombre) => [
+    nombre,
     { command: process.execPath, args: [path.join(agente, 'scripts', 'codex-mcp-puente.mjs'), mcp, nombre], enabled: true, startup_timeout_sec: 60 },
-  ]));
+  ])) };
 }
