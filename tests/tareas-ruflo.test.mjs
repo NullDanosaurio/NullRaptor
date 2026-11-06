@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { archivoTareasRuflo, leerTareasRuflo, resumenTareas } from '../panel/lib/tareas-ruflo.mjs';
+import { archivoTareasRuflo, conSesiones, estadoProyecto, leerTareasRuflo, resumenTareas } from '../panel/lib/tareas-ruflo.mjs';
 
 test('tareas de Ruflo: proyecto por «[X]» o etiqueta, abiertas en orden, hechas hoy y cuenta por proyecto', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ruflo-'));
@@ -31,4 +31,19 @@ test('tareas de Ruflo: proyecto por «[X]» o etiqueta, abiertas en orden, hecha
   assert.deepEqual(leerTareasRuflo(path.join(dir, 'no-existe.json')), []);
   assert.equal(archivoTareasRuflo({ CLAUDE_FLOW_MEMORY_PATH: '/estado/ruflo/swarm' }), '/estado/ruflo/tasks/store.json');
   assert.equal(archivoTareasRuflo({ RUFLO_TAREAS: '/x.json' }), '/x.json');
+});
+
+test('avance por proyecto: 1/3 trabajando, cambia al completar, parada y esperando según el latido', () => {
+  const t = (id, estado) => ({ id, proyecto: 'P', texto: id, estado, creada: '2026-11-04T10:00:00Z', cerrada: null });
+  const tareas = [t('a', 'hecha'), t('b', 'en curso'), t('c', 'pendiente'), { ...t('d', 'cancelada') }];
+  let r = conSesiones(resumenTareas(tareas), {}, tareas);
+  assert.deepEqual(r.avance.P, { hechas: 1, enCurso: 1, pendientes: 1, total: 3, estado: 'trabajando', hace: null });
+  const tras = tareas.map((x) => (x.id === 'b' ? { ...x, estado: 'hecha' } : x));
+  r = conSesiones(resumenTareas(tras), { P: { hace: 30, parada: false } }, tras);
+  assert.equal(r.avance.P.hechas, 2);
+  assert.equal(r.avance.P.estado, 'esperando');
+  assert.equal(r.avance.P.hace, 30);
+  assert.equal(conSesiones(resumenTareas(tareas), { P: { hace: 900, parada: true } }, tareas).avance.P.estado, 'parada');
+  assert.deepEqual(conSesiones(resumenTareas([]), { Q: { hace: 700, parada: true } }, []).avance.Q, { hechas: 0, enCurso: 0, pendientes: 0, total: 0, estado: 'parada', hace: 700 });
+  assert.equal(estadoProyecto({ enCurso: 0 }, undefined), 'esperando');
 });

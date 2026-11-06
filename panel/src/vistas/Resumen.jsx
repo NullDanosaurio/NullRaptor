@@ -162,6 +162,29 @@ function CopiaSeguridad({ copias }) {
 }
 
 /** Tareas que la IA lleva en Ruflo: en curso y pendientes, con su proyecto. */
+function Avance({ avance }) {
+  const filas = Object.entries(avance ?? {}).sort(([, a], [, b]) => (a.estado === 'parada' ? 0 : 1) - (b.estado === 'parada' ? 0 : 1) || b.enCurso - a.enCurso);
+  if (!filas.length) return null;
+  const tono = { trabajando: 'raptor', esperando: 'neutro', parada: 'aviso' };
+  return (
+    <ul className="mb-4 space-y-2.5" aria-label="Avance por proyecto">
+      {filas.map(([p, a]) => (
+        <li key={p} className="flex items-center gap-3 px-2">
+          <span className="w-28 shrink-0 truncate text-[13px] text-texto">{p}</span>
+          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-elevado" role="progressbar" aria-valuemin={0} aria-valuemax={a.total} aria-valuenow={a.hechas}>
+            <div className="h-full rounded-full bg-raptor transition-all" style={{ width: `${a.total ? Math.round((a.hechas / a.total) * 100) : 0}%` }} />
+          </div>
+          <span className="w-9 shrink-0 text-right text-[12px] tabular-nums text-tenue">{a.hechas}/{a.total}</span>
+          <Insignia tono={tono[a.estado]} className="shrink-0">
+            {a.estado === 'trabajando' && <Punto tono="raptor" vivo />}
+            {a.estado === 'parada' ? `parada${a.hace != null ? ` hace ${Math.max(1, Math.round(a.hace / 60))} min` : ''}` : a.estado}
+          </Insignia>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TareasIA({ tareas }) {
   const [filtro, setFiltro] = useState(null);
   if (!tareas) return null;
@@ -175,6 +198,7 @@ function TareasIA({ tareas }) {
   );
   return (
     <Tarjeta titulo="Tareas de la IA" icono={ListChecks} accion={<span className="text-[11px] text-apagado">{tareas.hechasHoy} hechas hoy</span>}>
+      <Avance avance={tareas.avance} />
       {tareas.totalAbiertas ? (
         <>
           <div className="mb-3 flex flex-wrap gap-1.5">

@@ -42,3 +42,31 @@ export function resumenTareas(tareas, { max = 12, hoy = new Date() } = {}) {
   }
   return { abiertas: abiertas.slice(0, max), totalAbiertas: abiertas.length, hechasHoy: hechasHoy.length, porProyecto };
 }
+
+/** Avance por proyecto con TODAS sus tareas (hechas de cualquier día; sin canceladas ni fallidas). */
+export function avanceTareas(tareas) {
+  const avance = {};
+  for (const t of tareas) {
+    const clave = { hecha: 'hechas', 'en curso': 'enCurso', pendiente: 'pendientes' }[t.estado];
+    if (!clave) continue;
+    const a = (avance[t.proyecto ?? 'Sin proyecto'] ??= { hechas: 0, enCurso: 0, pendientes: 0, total: 0 });
+    a[clave] += 1; a.total += 1;
+  }
+  return avance;
+}
+
+/** «parada» si la sesión lleva demasiado sin eventos; si no, «trabajando» con una tarea en curso, y «esperando». */
+export const estadoProyecto = (av, sesion) => (sesion?.parada ? 'parada' : av.enCurso > 0 ? 'trabajando' : 'esperando');
+
+/** Resumen con `avance` por proyecto, su estado y los segundos desde el último latido (null sin sesión). Un proyecto
+ * con sesión parada y sin tareas también aparece. */
+export function conSesiones(resumen, sesiones = {}, tareas = []) {
+  const base = avanceTareas(tareas);
+  for (const [p, s] of Object.entries(sesiones)) if (s.parada && !base[p]) base[p] = { hechas: 0, enCurso: 0, pendientes: 0, total: 0 };
+  const avance = {};
+  for (const [p, a] of Object.entries(base)) {
+    const s = Object.hasOwn(sesiones, p) ? sesiones[p] : null;
+    avance[p] = { ...a, estado: estadoProyecto(a, s), hace: s ? Math.round(s.hace) : null };
+  }
+  return { ...resumen, avance };
+}

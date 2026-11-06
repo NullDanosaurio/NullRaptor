@@ -25,7 +25,8 @@ import { crearRutasEquipo } from './lib/rutas-equipo.mjs';
 import { crearRutasVoz } from './lib/rutas-voz.mjs';
 import { Copias } from './lib/copias.mjs';
 import { Gasto } from './lib/gasto.mjs';
-import { archivoTareasRuflo, leerTareasRuflo, resumenTareas } from './lib/tareas-ruflo.mjs';
+import { leerSesiones } from './lib/sesiones.mjs';
+import { archivoTareasRuflo, conSesiones, leerTareasRuflo, resumenTareas } from './lib/tareas-ruflo.mjs';
 import { assetlinks, leerFirma, origenesApp } from './lib/app-android.mjs';
 import { Voz } from './lib/voz.mjs';
 import { crearRutasHerramientas } from './lib/rutas-herramientas.mjs';
@@ -169,7 +170,7 @@ export function crearServidor({
       chats: chats.lista(),
       guardados: chats.guardados().slice(0, 5),
       remoto: remoto.lista().filter((s) => s.estado !== 'terminada'),
-      tareas: resumenTareas(leerTareasRuflo(tareasRuflo)),
+      tareas: ((todas) => conSesiones(resumenTareas(todas), leerSesiones(trabajo), todas))(leerTareasRuflo(tareasRuflo)),
       relevos: listarRelevos(trabajo),
       copias: copias?.estado() ?? null,
       hoy: new Date().toISOString().slice(0, 10),
