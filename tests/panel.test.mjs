@@ -115,6 +115,11 @@ test('API del panel', async (t) => {
   fs.writeFileSync(path.join(trabajo, '.relevo', 'Demo.codex.md'), 'Hice A');
   assert.deepEqual((await pedir(port, 'GET', '/api/resumen')).datos.relevos.map((r) => [r.proyecto, r.estado]), [['Demo', 'terminado']]);
   assert.equal((await pedir(port, 'GET', '/api/relevo?proyecto=Demo')).datos.resumen, 'Hice A');
+  // Avisos del Resumen: una sesión con Notification reciente pide respuesta.
+  fs.mkdirSync(path.join(trabajo, '.sesiones'), { recursive: true });
+  fs.writeFileSync(path.join(trabajo, '.sesiones', 'Demo.json'), JSON.stringify({ proyecto: 'Demo', evento: 'Notification', sesion: 's', en: new Date().toISOString() }));
+  const avisos = (await pedir(port, 'GET', '/api/resumen')).datos.tareas.avisos;
+  assert.deepEqual(avisos.map((x) => [x.proyecto, x.tipo]), [['Demo', 'espera']]);
   assert.equal((await pedir(port, 'GET', '/api/relevo?proyecto=..%2Fx')).estado, 404);
   const demo = resumen.datos.proyectos.find((p) => p.nombre === 'Demo');
   assert.equal(demo.local, true);
