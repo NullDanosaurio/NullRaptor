@@ -98,7 +98,9 @@ export function binarioCodex(agente = AGENTE, env = process.env) {
 /** Argumentos de `codex exec` para el relevo. La salida final y el resumen van en la carpeta .relevo (fuera del proyecto). */
 export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false }) {
   const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox']
-    : ['--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', dirRelevo];
+    // El sandbox de Codex deja `.git` en solo lectura y sin él no puede hacer commits: se le da escritura solo sobre el del proyecto.
+    : ['--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', dirRelevo,
+      ...(fs.existsSync(path.join(cwd, '.git')) && fs.statSync(path.join(cwd, '.git')).isDirectory() ? ['--add-dir', path.join(cwd, '.git')] : [])];
   return ['exec', ...sandbox, '--ephemeral', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
 

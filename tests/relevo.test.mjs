@@ -67,6 +67,13 @@ const senalDe = (t, proyecto = 'Demo') => {
   return anotarSenal({ error: 'rate_limit', cwd }, t) && JSON.parse(fs.readFileSync(path.join(t, '.relevo', `${proyecto}.senal.json`), 'utf8'));
 };
 
+test('argsCodex: si el proyecto tiene .git, Codex puede escribir en él (para hacer commits)', () => {
+  const p = fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-git-'));
+  fs.mkdirSync(path.join(p, '.git'));
+  assert.deepEqual(argsCodex({ cwd: p, dirRelevo: '/d', salida: '/s' }).filter((_, i, a) => a[i - 1] === '--add-dir'), ['/d', path.join(p, '.git')]);
+  assert.equal(argsCodex({ cwd: '/no/existe', dirRelevo: '/d', salida: '/s' }).filter((x) => x === '--add-dir').length, 1);
+});
+
 test('argsCodex: sandbox workspace-write con la carpeta .relevo; sin sandbox solo si se pide', () => {
   const a = argsCodex({ cwd: '/p', dirRelevo: '/t/.relevo', salida: '/t/.relevo/D.final.md' });
   assert.deepEqual(a.slice(0, 7), ['exec', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', '/t/.relevo']);

@@ -401,3 +401,11 @@
 - Un `!` del prompt de Claude Code no tiene terminal: `copia.mjs` pide la frase solo en una terminal interactiva o por
   `COPIA_FRASE`, y avisa en lugar de quedarse colgado.
 - [?] Sin probar: restaurar una copia real con la frase de Daniel y la tarjeta del Resumen en el navegador.
+
+## 06/11 — Relevo a Codex probado de verdad y tarjeta de copia siempre visible
+- Prueba real (proyecto desechable, `relevo.mjs senal` → `ejecutar`): Codex con la cuenta de ChatGPT creó código y pruebas
+  y dejó el resumen en `.relevo/`. Hallazgo: su sandbox deja `.git` en solo lectura y no podía hacer el commit. Ahora
+  `argsCodex` añade `--add-dir <proyecto>/.git` (solo si es una carpeta) y Codex hace el commit él mismo.
+- [?] Sin comprobar: que el hook `StopFailure` se dispare con un límite real de Claude (solo se simuló la señal).
+- El Resumen enseña siempre la copia («al día, la última hace X h») y los proyectos sin subir se calculan al arrancar el
+  panel y cada hora, no solo al hacer la copia (tras un reinicio salía vacío hasta la copia del día siguiente).

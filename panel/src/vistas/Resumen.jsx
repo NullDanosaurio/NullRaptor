@@ -148,8 +148,8 @@ const AVISO_COPIA = {
 function CopiaSeguridad({ copias }) {
   if (!copias) return null;
   const sinSubir = copias.sinSubir ?? [];
-  if (!copias.aviso && !sinSubir.length && !copias.corriendo) return null;
-  const texto = copias.corriendo ? 'Haciendo la copia de seguridad…' : AVISO_COPIA[copias.aviso];
+  const hace = copias.horas == null ? '' : copias.horas < 1 ? 'hace menos de 1 h' : `hace ${Math.round(copias.horas)} h`;
+  const texto = copias.corriendo ? 'Haciendo la copia de seguridad…' : copias.aviso ? AVISO_COPIA[copias.aviso] : `Copia de seguridad al día: la última, ${hace}.`;
   return (
     <div className={`mb-4 rounded-xl border px-3 py-2 text-[13px] ${copias.aviso ? 'border-aviso/25 bg-aviso/10 text-aviso' : 'border-borde bg-panel/80 text-texto'}`}>
       {texto && <p className="flex items-center gap-2.5"><DatabaseBackup className="size-4 shrink-0" />{texto}{copias.error ? `: ${copias.error}` : ''}{copias.horas != null && copias.aviso === 'atrasada' ? ` (hace ${copias.horas} h)` : ''}</p>}

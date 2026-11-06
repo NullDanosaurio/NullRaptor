@@ -2,7 +2,7 @@
 // plano. Sin clave pública (Daniel aún no la ha creado) no hace nada y el Resumen lo dice.
 import fs from 'node:fs';
 import path from 'node:path';
-import { BASE, ejecutarCopia, estado, extraPorDefecto } from '../../scripts/copia.mjs';
+import { BASE, ejecutarCopia, estado, extraPorDefecto, proyectosSinSubir } from '../../scripts/copia.mjs';
 
 export class Copias {
   constructor({ base = BASE, extra = extraPorDefecto(), cadaHoras = 24, conservar = 7, ahora = () => new Date() } = {}) {
@@ -21,8 +21,14 @@ export class Copias {
     return { clave, copias: e.copias, fecha: e.fecha ?? null, horas: e.horas, corriendo: this.corriendo, error: this.error, extra: this.extra, sinSubir: this.sinSubir, aviso };
   }
 
+  /** Vuelve a mirar qué proyectos tienen commits sin subir (tras un reinicio no hay copia reciente que lo calcule). */
+  refrescarSinSubir() {
+    try { this.sinSubir = proyectosSinSubir(path.join(this.base, 'trabajo')); } catch { /* se queda con lo anterior */ }
+  }
+
   /** Hace la copia si hay clave y toca (la primera, o pasadas `cadaHoras`). Nunca lanza. */
   async revisar() {
+    this.refrescarSinSubir();
     const e = this.estado();
     if (this.corriendo || !e.clave || (e.horas !== null && e.horas < this.cadaHoras)) return false;
     this.corriendo = true;
@@ -38,7 +44,8 @@ export class Copias {
   iniciar() {
     const hora = setInterval(() => this.revisar(), 3_600_000);
     const primera = setTimeout(() => this.revisar(), 60_000); // deja arrancar el panel antes de comprimir
-    hora.unref?.(); primera.unref?.();
-    return () => { clearInterval(hora); clearTimeout(primera); };
+    const pronto = setTimeout(() => this.refrescarSinSubir(), 5_000);
+    hora.unref?.(); primera.unref?.(); pronto.unref?.();
+    return () => { clearInterval(hora); clearTimeout(primera); clearTimeout(pronto); };
   }
 }

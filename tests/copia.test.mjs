@@ -136,3 +136,19 @@ test('Copias (panel): sin clave avisa; con clave hace la copia la primera vez y 
   ahora = new Date('2026-11-10T04:00:00Z');
   assert.equal(c.estado().aviso, 'atrasada');
 });
+
+test('Copias (panel): refrescarSinSubir avisa de commits sin subir aunque no toque hacer la copia', async () => {
+  const { base, raiz } = entorno();
+  const { Copias } = await import('../panel/lib/copias.mjs');
+  const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=a@b', '-c', 'user.name=t', ...a], { cwd, stdio: 'ignore' });
+  const proyecto = path.join(base, 'trabajo', 'proyectos', 'Solo');
+  fs.mkdirSync(proyecto, { recursive: true });
+  git(proyecto, 'init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(proyecto, 'a.txt'), 'a');
+  git(proyecto, 'add', '.');
+  git(proyecto, 'commit', '-q', '-m', 'uno');
+  const c = new Copias({ base, extra: path.join(raiz, 'extra') });
+  assert.deepEqual(c.estado().sinSubir, [], 'recién arrancado no sabe nada');
+  c.refrescarSinSubir();
+  assert.deepEqual(c.estado().sinSubir, [{ proyecto: 'Solo', sucios: 0, sinSubir: null }]);
+});
