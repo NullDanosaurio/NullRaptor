@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { configHerramientas } from './herramientas.mjs';
 import { aConfigMcp, leerEstado } from './mcp.mjs';
+import { prepararCodex } from './codex-config.mjs';
 
 export const ARCHIVO_MCP = '.mcp-agente.json';
 /** Perfiles que se pueden pedir al abrir una sesión o un chat. Lista cerrada: nunca una ruta que venga del cliente. */
@@ -181,5 +182,7 @@ export function prepararIA({ agente, env, memoria, trabajo }) {
     instalarSkills(agente, configDir);
     aplicarAjustes(configDir, agente);
   }
-  return escribirMcp({ agente, env, memoria, trabajo });
+  const mcp = escribirMcp({ agente, env, memoria, trabajo });
+  prepararCodex({ agente, env, trabajo, mcp });
+  return mcp;
 }
