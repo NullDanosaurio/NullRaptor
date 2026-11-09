@@ -206,6 +206,8 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
     hijo.on('close', (code) => { if (pendiente.trim()) procesar(pendiente); pendiente = ''; fin(code ?? -1); });
   });
   fs.closeSync(log);
+  // Lo que escribe el binario de Codex (-o) y el resumen salen 0644: privados como el resto del relevo (sin seguir enlaces).
+  for (const f of [rutaDe(trabajo, proyecto, 'final.md'), resumen]) if (esRegular(f)) { try { fs.chmodSync(f, 0o600); } catch { /* ajeno */ } }
   const avisos = avisosBoveda(bovedaAntes, instantaneaBoveda(env.BOVEDA_DIR), proyecto);
   if (avisos.length) {
     // Fuera del alcance de Codex (no es un archivo suyo): nunca se añade a codex.md, que podría ser un enlace.

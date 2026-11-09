@@ -107,3 +107,9 @@ test('una subcarpeta 555 con contenido de solo lectura en .relevo/<P>/ no impide
   assert.equal(fs.readFileSync(path.join(m.dir, '..', 'visto.txt'), 'utf8').trim(), '');
   assert.ok(!fs.existsSync(sub));
 });
+
+test('el resumen y la salida final de Codex quedan en 0600 tras el relevo', async (t) => {
+  const m = montaje(t, { cuerpoFalso: 'echo r > "$DIR/$P/codex.md"; while [ "$1" ]; do [ "$1" = "-o" ] && echo f > "$2"; shift; done' });
+  await ejecutar('Demo', { trabajo: m.trabajo, env: m.env, agente: m.trabajo });
+  for (const f of [path.join(m.dir, 'Demo', 'codex.md'), path.join(m.dir, 'Demo.final.md')]) assert.equal(fs.statSync(f).mode & 0o777, 0o600, f);
+});
