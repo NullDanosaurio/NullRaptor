@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { argsSandboxCodex, rutasProtegidas } from '../scripts/codex-sandbox.mjs';
+import { fileURLToPath } from 'node:url';
+import { prepararSesionCodex } from '../scripts/codex-sesion.mjs';
 import { ajustesTerminal } from '../panel/lib/remoto.mjs';
 
 const tabla = (args) => {
@@ -92,4 +94,18 @@ test('el perfil quita tokens y claves del entorno de los comandos de Codex', { s
   const env = { PATH: process.env.PATH, HOME: process.env.HOME, GITHUB_TOKEN: 'a', NULLRAPTOR_PUENTE_TOKEN: 'b', CLAUDE_CODE_OAUTH_TOKEN: 'c', CLAUDE_CODE_MESSAGING_TOKEN: 'd', GIT_CONFIG_COUNT: '1', OTRA: 'visible' };
   const r = spawnSync('codex', ['sandbox', ...args, '--', 'sh', '-c', 'env | grep -cE "TOKEN|GIT_CONFIG"; echo $OTRA'], { encoding: 'utf8', env, timeout: 30000 });
   assert.equal(r.stdout.trim(), '0\nvisible');
+});
+
+test('sin CLAUDE_CONFIG_DIR se oculta $HOME/.claude y prepararSesionCodex crea las rutas de secretos', (t) => {
+  const m = montaje();
+  t.after(() => fs.rmSync(m.base, { recursive: true, force: true }));
+  const env = { ...m.env };
+  delete env.CLAUDE_CONFIG_DIR;
+  assert.equal(tabla(argsSandboxCodex({ ruta: m.proyecto, env, trabajo: m.trabajo }))[m.claude], 'none');
+  fs.rmSync(path.join(m.trabajo, 'registros'), { recursive: true });
+  fs.rmSync(path.join(m.trabajo, '.mcp-agente.json'));
+  prepararSesionCodex({ agente: fileURLToPath(new URL('..', import.meta.url)), env, memoria: null, trabajo: m.trabajo });
+  assert.ok(fs.statSync(path.join(m.trabajo, 'registros')).isDirectory());
+  assert.ok(fs.existsSync(path.join(m.trabajo, '.mcp-agente.json')));
+  assert.equal(tabla(argsSandboxCodex({ ruta: m.proyecto, env, trabajo: m.trabajo }))[path.join(m.trabajo, 'registros')], 'none');
 });

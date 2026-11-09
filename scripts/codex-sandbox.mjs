@@ -33,7 +33,7 @@ export const SECRETOS_HOME = ['.config/gh', '.copilot', '.ruflo', '.bash_history
  * - memoria: bóveda (solo Proyectos/ escribible);
  * - ruta: proyecto (escribible); escribibles: más rutas escribibles (adjuntos, carpeta del relevo, /tmp...).
  * - env/configDir/trabajo: de dónde salen los secretos a ocultar. */
-export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env = process.env, configDir = env.CLAUDE_CONFIG_DIR, trabajo, existe = fs.existsSync }) {
+export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env = process.env, configDir = env.CLAUDE_CONFIG_DIR ?? path.join(env.HOME ?? os.homedir(), '.claude'), trabajo, existe = fs.existsSync }) {
   const permisos = new Map([[':root', 'read']]);
   const poner = (p, modo) => { if (p) permisos.set(path.resolve(p), modo); };
   for (const p of [ruta, ...escribibles, os.tmpdir(), '/tmp']) poner(p, 'write');
@@ -48,7 +48,7 @@ export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env =
   }
   const secretos = [];
   if (trabajo) {
-    const { carpetas, archivos } = rutasProtegidas({ env, configDir: configDir ?? path.join(env.HOME ?? os.homedir(), '.claude'), trabajo });
+    const { carpetas, archivos } = rutasProtegidas({ env, configDir, trabajo });
     secretos.push(...carpetas, ...archivos, path.join(trabajo, '.mcp-agente.json'));
   }
   if (configDir) secretos.push(configDir); // ~/.claude entero: credenciales y sesiones de Claude
