@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { AUTOAPROBADAS } from '../scripts/codex-mcp.mjs';
+
+const puente = path.join(fileURLToPath(new URL('..', import.meta.url)), 'scripts', 'codex-mcp-puente.mjs');
+
+// Servidor MCP falso: apunta en un archivo todo lo que recibe y responde a tools/list y tools/call.
+const FALSO = `const fs=require('fs');const log=process.argv[2];let b='';process.stdin.on('data',d=>{b+=d;const l=b.split('\\n');b=l.pop();for(const x of l){if(!x.trim())continue;fs.appendFileSync(log,x+'\\n');const m=JSON.parse(x);
+if(m.method==='tools/list')console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{tools:${JSON.stringify([...AUTOAPROBADAS.ruflo, 'terminal_execute', 'http_fetch', 'browser_open']).replace(/"/g, "'")}.map(name=>({name,inputSchema:{type:'object'}}))}}));
+else if(m.method==='tools/call')console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{content:[{type:'text',text:'ejecutado '+m.params.name}]}}));
+else if(m.id!==undefined)console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{}}));}});`;
+
+async function sesion(t, nombre, mensajes) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-filtro-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const registro = path.join(dir, 'recibido.log');
+  fs.writeFileSync(path.join(dir, 'falso.cjs'), FALSO);
+  const mcp = path.join(dir, 'mcp.json');
+  fs.writeFileSync(mcp, JSON.stringify({ mcpServers: { [nombre]: { command: process.execPath, args: [path.join(dir, 'falso.cjs'), registro] } } }));
+  const hijo = spawn(process.execPath, [puente, mcp, nombre], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let out = '';
+  let err = '';
+  hijo.stdout.on('data', (d) => { out += d; });
+  hijo.stderr.on('data', (d) => { err += d; });
+  hijo.stdin.write(mensajes.map((m) => `${JSON.stringify(m)}\n`).join(''));
+  await new Promise((r) => setTimeout(r, 800));
+  hijo.stdin.end();
+  await new Promise((r) => hijo.on('close', r));
+  const respuestas = out.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const recibido = fs.existsSync(registro) ? fs.readFileSync(registro, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  return { respuestas, recibido, err };
+}
+
+const llamada = (id, name) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: {} } });
+const lista = { jsonrpc: '2.0', id: 1, method: 'tools/list' };
+
+test('puente de ruflo: tools/list solo trae las permitidas; las peligrosas se rechazan sin llegar al servidor; una permitida funciona', async (t) => {
+  const { respuestas, recibido, err } = await sesion(t, 'ruflo', [lista, llamada(2, 'terminal_execute'), llamada(3, 'http_fetch'), llamada(4, 'browser_open'), llamada(5, 'mcp__ruflo__terminal_execute'), llamada(6, 'task_list'), { jsonrpc: '2.0', id: 7, method: 'ping' }]);
+  const porId = (id) => respuestas.find((r) => r.id === id);
+  assert.deepEqual(porId(1).result.tools.map((x) => x.name), AUTOAPROBADAS.ruflo);
+  for (const id of [2, 3, 4, 5]) assert.match(porId(id).error.message, /no permitida/, `id ${id}`);
+  assert.match(porId(6).result.content[0].text, /ejecutado task_list/);
+  assert.deepEqual(porId(7).result, {}); // el resto de métodos se reenvía igual
+  assert.deepEqual(recibido.filter((m) => m.method === 'tools/call').map((m) => m.params.name), ['task_list']);
+  assert.match(err, /rechazada/);
+});
+
+test('un servidor sin lista (herramienta propia) sigue como antes: todo pasa', async (t) => {
+  const { respuestas, recibido } = await sesion(t, 'herramienta-x', [lista, llamada(2, 'terminal_execute')]);
+  assert.equal(respuestas.find((r) => r.id === 1).result.tools.length, AUTOAPROBADAS.ruflo.length + 3);
+  assert.match(respuestas.find((r) => r.id === 2).result.content[0].text, /terminal_execute/);
+  assert.equal(recibido.filter((m) => m.method === 'tools/call').length, 1);
+});

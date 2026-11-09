@@ -69,11 +69,13 @@ solo junto a `enabled_tools` con una lista cerrada: ruflo = `task_list`, `task_c
 `resolve-library-id`, `query-docs`. Las herramientas propias (`herramienta-<id>`) y otros servidores no se aprueban: fallan en
 exec y piden aprobación en la sesión interactiva; auto-aprobar una sería decisión de Daniel. Una prueba lo garantiza (nunca
 `approve` sin `enabled_tools`).
-**Estado de la verificación:** los nombres salen del `tools/list` real de los puentes y `codex mcp get ruflo` muestra la lista
-`enabled_tools`. Pero en 2 ejecuciones reales de `codex exec` con ese ajuste el modelo NO encontró ninguna herramienta de ruflo
-(ni `task_list`), mientras que Sara logró `task_list` con `approve` y sin `enabled_tools`. Sin determinar si `enabled_tools`
-oculta las herramientas al modelo en 0.163.0 (la herramienta de búsqueda las difiere) o si fue otro factor de mi montaje.
-Pendiente de bisecar; no está verificado con modelo.
+**Dos barreras independientes.** (1) `enabled_tools` de Codex: no anuncia al modelo lo que no está en la lista (verificado por
+Sara con Codex real: `ruflo/task_list` funciona y `terminal_execute` no se anuncia). (2) El filtro del puente
+(`scripts/codex-mcp-puente.mjs`, `crearFiltro`, misma fuente `AUTOAPROBADAS`): para ruflo y context7, `tools/list` solo trae las
+permitidas y `tools/call` de cualquier otra devuelve un error MCP «herramienta no permitida» sin llegar al servidor real (y
+deja un aviso en stderr). Los nombres se comparan exactos, sin prefijos. Comprobado con el puente real de Ruflo: 10
+herramientas, `terminal_execute` rechazado y `task_list` funciona. El resto de métodos y los demás servidores se reenvían
+igual que antes.
 
 Al empezar, también al reanudar, la IA consulta las tareas del proyecto y `en-curso`. Muestra la lista de tareas,
 usa el plan nativo si está disponible y guarda el estado en Ruflo. Si no hay herramienta de plan, mantiene una
