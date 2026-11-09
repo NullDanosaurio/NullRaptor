@@ -172,7 +172,7 @@ export function escribirMcp({ agente, env, memoria, trabajo }) {
 }
 
 /** Deja lista la configuración de la IA. Devuelve la ruta del archivo MCP. */
-export function prepararIA({ agente, env, memoria, trabajo }) {
+export function prepararIA({ agente, env, memoria, trabajo, codex = prepararCodex }) {
   const configDir = env.CLAUDE_CONFIG_DIR;
   if (configDir) {
     fs.mkdirSync(configDir, { recursive: true });
@@ -183,6 +183,7 @@ export function prepararIA({ agente, env, memoria, trabajo }) {
     aplicarAjustes(configDir, agente);
   }
   const mcp = escribirMcp({ agente, env, memoria, trabajo });
-  prepararCodex({ agente, env, trabajo, mcp });
+  // Un fallo de la capa de Codex nunca debe impedir arrancar Claude.
+  try { codex({ agente, env, trabajo, mcp }); } catch (e) { console.warn(`Aviso: no se pudo preparar Codex (${e.message}).`); }
   return mcp;
 }
