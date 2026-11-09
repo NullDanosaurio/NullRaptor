@@ -139,25 +139,30 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
     hijo.stdin.on('error', () => {});
     hijo.stdin.end(fs.readFileSync(briefing));
     let pendiente = '';
+    const escribir = (texto) => { try { fs.writeSync(log, texto); } catch { /* El log es auxiliar. */ } };
+    const procesar = (linea) => {
+      try {
+        const evento = JSON.parse(linea);
+        if (evento.type === 'thread.started' && /^[0-9a-f-]{36}$/i.test(evento.thread_id)) {
+          sesionCodex = evento.thread_id;
+          registrarRelevoCodex(trabajo, { id: sesionCodex, proyecto, cwd: senal.cwd, inicio });
+          estado({ estado: 'en curso' });
+        }
+      } catch { /* Registro ajeno a JSON. */ }
+    };
     hijo.stdout.on('data', (datos) => {
-      fs.writeSync(log, datos);
+      escribir(datos);
       pendiente += datos.toString();
       const lineas = pendiente.split('\n');
       pendiente = lineas.pop();
-      for (const linea of lineas) {
-        try {
-          const evento = JSON.parse(linea);
-          if (evento.type === 'thread.started' && /^[0-9a-f-]{36}$/i.test(evento.thread_id)) {
-            sesionCodex = evento.thread_id;
-            registrarRelevoCodex(trabajo, { id: sesionCodex, proyecto, cwd: senal.cwd, inicio });
-            estado({ estado: 'en curso' });
-          }
-        } catch { /* Registro ajeno a JSON. */ }
-      }
+      lineas.forEach(procesar);
     });
+    let terminado = false;
+    const fin = (c) => { if (terminado) return; terminado = true; clearTimeout(reloj); listo(c); };
     const reloj = setTimeout(() => hijo.kill('SIGTERM'), limite);
-    hijo.on('error', (e) => { clearTimeout(reloj); fs.writeSync(log, `No se pudo lanzar Codex: ${e.message}\n`); listo(-1); });
-    hijo.on('exit', (code) => { clearTimeout(reloj); listo(code ?? -1); });
+    hijo.on('error', (e) => { escribir(`No se pudo lanzar Codex: ${e.message}\n`); fin(-1); });
+    // «close» llega cuando stdout ya se ha vaciado; «exit» puede adelantarse a las últimas líneas.
+    hijo.on('close', (code) => { if (pendiente.trim()) procesar(pendiente); pendiente = ''; fin(code ?? -1); });
   });
   fs.closeSync(log);
   estado({ estado: codigo === 0 ? 'terminado' : 'error', fin: new Date().toISOString(), codigo });
