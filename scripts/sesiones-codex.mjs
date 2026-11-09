@@ -7,8 +7,46 @@ import { guardarPrivado } from './codex-config.mjs';
 export const idCodexValido = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 export const casaCodex = (env) => env.CODEX_HOME ?? path.join(env.HOME ?? os.homedir(), '.codex');
 
+const MAX_PRIMERA_LINEA = 4 * 1024 * 1024;
+
+/** Primera línea del archivo, leída por bloques de 64 KB hasta el primer salto de línea (con tope). */
+function primeraLinea(fd) {
+  const b = Buffer.alloc(64 * 1024);
+  const trozos = [];
+  let total = 0;
+  for (let pos = 0; total < MAX_PRIMERA_LINEA; pos += b.length) {
+    const n = fs.readSync(fd, b, 0, b.length, pos);
+    if (!n) break;
+    const fin = b.subarray(0, n).indexOf(10);
+    trozos.push(Buffer.from(b.subarray(0, fin >= 0 ? fin : n)));
+    total += n;
+    if (fin >= 0) break;
+  }
+  return Buffer.concat(trozos).toString('utf8');
+}
+
+// Caché por ruta + mtime + tamaño: GET /api/remoto no reabre cada .jsonl en cada consulta.
+let cacheMeta = new Map();
+
+function leerMeta(archivo) {
+  const st = fs.statSync(archivo);
+  const previo = cacheMeta.get(archivo);
+  if (previo && previo.mtimeMs === st.mtimeMs && previo.size === st.size) return previo;
+  let meta = null;
+  let fd;
+  try {
+    fd = fs.openSync(archivo, 'r');
+    const dato = JSON.parse(primeraLinea(fd));
+    const m = dato.payload;
+    if (dato.type === 'session_meta' && idCodexValido(m?.id)) meta = { id: m.id, cwd: m.cwd, inicio: m.timestamp ?? dato.timestamp, source: m.source };
+  } catch { /* Un archivo incompleto no impide listar los demás. */ }
+  finally { if (fd !== undefined) fs.closeSync(fd); }
+  return { mtimeMs: st.mtimeMs, size: st.size, meta };
+}
+
 export function sesionesCodex(env = process.env) {
   const sesiones = [];
+  const vistos = new Map();
   const visitar = (dir, nivel = 0) => {
     if (nivel > 4) return;
     let entradas;
@@ -17,20 +55,16 @@ export function sesionesCodex(env = process.env) {
       const archivo = path.join(dir, e.name);
       if (e.isDirectory()) visitar(archivo, nivel + 1);
       else if (e.isFile() && e.name.endsWith('.jsonl')) {
-        let fd;
         try {
-          fd = fs.openSync(archivo, 'r');
-          const b = Buffer.alloc(64 * 1024);
-          const n = fs.readSync(fd, b, 0, b.length, 0);
-          const dato = JSON.parse(b.toString('utf8', 0, n).split('\n')[0]);
-          const m = dato.payload;
-          if (dato.type === 'session_meta' && idCodexValido(m?.id)) sesiones.push({ id: m.id, cwd: m.cwd, inicio: m.timestamp ?? dato.timestamp, source: m.source });
-        } catch { /* Un archivo incompleto no impide listar los demás. */ }
-        finally { if (fd !== undefined) fs.closeSync(fd); }
+          const entrada = leerMeta(archivo);
+          vistos.set(archivo, entrada);
+          if (entrada.meta) sesiones.push({ ...entrada.meta });
+        } catch { /* Desaparecido entre medias. */ }
       }
     }
   };
   visitar(path.join(casaCodex(env), 'sessions'));
+  cacheMeta = vistos; // olvida los archivos que ya no están
   return sesiones.sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)));
 }
 
