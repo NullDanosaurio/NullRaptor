@@ -24,6 +24,10 @@ export function rutasProtegidas({ env, configDir, trabajo }) {
 export const EXCLUIR_ENTORNO = ['*TOKEN*', '*KEY*', '*SECRET*', '*PASSWORD*', '*CLAVE*', '*CREDENCIAL*', 'GIT_CONFIG_*', 'GH_*', 'GITHUB_*'];
 export const argsEntornoCodex = () => ['-c', 'shell_environment_policy.inherit="all"', '-c', `shell_environment_policy.exclude=${JSON.stringify(EXCLUIR_ENTORNO)}`];
 
+/** Credenciales del usuario fuera del alcance de Codex (gh, Copilot, Ruflo, historial de la shell, certificados).
+ * Solo para Codex: las reglas deny de Claude no cambian. Ruflo llega a Codex por MCP, que lo lanza fuera del sandbox. */
+export const SECRETOS_HOME = ['.config/gh', '.copilot', '.ruflo', '.bash_history', '.pki'];
+
 /** Argumentos `-c` del perfil de Codex. Pura salvo por `existe` (inyectable): las rutas «none» y las de solo lectura
  * que no existen se omiten, porque el sandbox crearía marcadores vacíos en ellas.
  * - memoria: bóveda (solo Proyectos/ escribible);
@@ -48,6 +52,7 @@ export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env =
     secretos.push(...carpetas, ...archivos, path.join(trabajo, '.mcp-agente.json'));
   }
   if (configDir) secretos.push(configDir); // ~/.claude entero: credenciales y sesiones de Claude
+  secretos.push(...SECRETOS_HOME.map((r) => path.join(env.HOME ?? os.homedir(), r)));
   secretos.push(path.join(env.CODEX_HOME ?? path.join(env.HOME ?? os.homedir(), '.codex'), 'auth.json'));
   // Un «none» dentro de otro «none» hace fallar a bwrap: solo se deja el más externo.
   const ocultos = [...new Set(secretos.map((p) => path.resolve(p)))].filter(existe);
