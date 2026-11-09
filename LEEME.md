@@ -342,9 +342,11 @@ Si Claude agota el límite de uso (o el saldo) en mitad de un desarrollo, Codex 
 2. **Briefing**: se arma con el estado `proyecto-<X>/en-curso` de Ruflo (si responde), las tareas abiertas `[<X>]`,
    la rama, `git status` y los últimos commits, más las reglas del relevo (una tarea cada vez, pruebas, commit pequeño
    sin `Co-Authored-By`, sin push ni instalaciones, parar si hace falta una decisión de Daniel).
-3. **Codex**: `codex exec --sandbox workspace-write` en el proyecto, en un proceso aparte (el hook vuelve al instante),
-   con tope de 3 h. Una sola vez por proyecto mientras siga en curso. Todo queda en `$TRABAJO_DIR/.relevo/`
-   (nunca en el proyecto): `<X>.estado.json`, `.briefing.md`, `.log`, `.final.md` y el resumen `<X>.codex.md`.
+3. **Codex**: `codex exec` con un perfil de permisos por ruta (ver `docs/codex.md`) en el proyecto, en un proceso aparte
+   (el hook vuelve al instante), con tope de 3 h. Una sola vez por proyecto mientras siga en curso. Todo queda en
+   `$TRABAJO_DIR/.relevo/` (nunca en el proyecto): `<X>.estado.json`, `.briefing.md`, `.log`, `.final.md`, `.avisos.md`
+   y, en la única carpeta que Codex puede escribir, el resumen `<X>/codex.md` (el formato antiguo `<X>.codex.md` se
+   sigue leyendo). Nunca se siguen enlaces simbólicos dentro de esa carpeta.
 4. **Panel**: Resumen muestra un aviso por relevo (en curso, terminado o detenido) con su resumen y su registro
    (`/api/relevo?proyecto=<X>`).
 5. **Vuelta de Claude**: el hook `SessionStart` (`relevo.mjs revision`) le dice, una sola vez, que lea el resumen y el
