@@ -19,6 +19,11 @@ export function rutasProtegidas({ env, configDir, trabajo }) {
   };
 }
 
+/** Variables que no llegan a los comandos de Codex (tokens, claves, git por entorno). Con ellas fuera, Codex no puede
+ * hacer push ni llamar a gh. Los MCP los lanza Codex con su propio entorno, no con esta política. */
+export const EXCLUIR_ENTORNO = ['*TOKEN*', '*KEY*', '*SECRET*', '*PASSWORD*', '*CLAVE*', '*CREDENCIAL*', 'GIT_CONFIG_*', 'GH_*', 'GITHUB_*'];
+export const argsEntornoCodex = () => ['-c', 'shell_environment_policy.inherit="all"', '-c', `shell_environment_policy.exclude=${JSON.stringify(EXCLUIR_ENTORNO)}`];
+
 /** Argumentos `-c` del perfil de Codex. Pura salvo por `existe` (inyectable): las rutas «none» y las de solo lectura
  * que no existen se omiten, porque el sandbox crearía marcadores vacíos en ellas.
  * - memoria: bóveda (solo Proyectos/ escribible);
@@ -48,5 +53,5 @@ export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env =
   const ocultos = [...new Set(secretos.map((p) => path.resolve(p)))].filter(existe);
   for (const p of ocultos) if (!ocultos.some((o) => o !== p && p.startsWith(`${o}${path.sep}`))) poner(p, 'none');
   const tabla = [...permisos].map(([p, m]) => `${q(p)}=${q(m)}`).join(',');
-  return ['-c', `default_permissions=${q(PERFIL)}`, '-c', `permissions.${PERFIL}.filesystem={${tabla}}`, '-c', `permissions.${PERFIL}.network.enabled=false`];
+  return ['-c', `default_permissions=${q(PERFIL)}`, '-c', `permissions.${PERFIL}.filesystem={${tabla}}`, '-c', `permissions.${PERFIL}.network.enabled=false`, ...argsEntornoCodex()];
 }

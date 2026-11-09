@@ -81,3 +81,11 @@ test('codex sandbox con el perfil: no lee secretos y sí escribe en el proyecto'
   assert.notEqual(fueraDeProyectos.status, 0);
   assert.equal(correr2(`echo x > "${m.boveda}/Proyectos/P.md"`).status, 0);
 });
+
+test('el perfil quita tokens y claves del entorno de los comandos de Codex', { skip: !hayCodex && 'codex sandbox no disponible' }, () => {
+  const args = argsSandboxCodex({ ruta: '/tmp', env: {}, trabajo: null });
+  assert.ok(args.includes('shell_environment_policy.inherit="all"'));
+  const env = { PATH: process.env.PATH, HOME: process.env.HOME, GITHUB_TOKEN: 'a', NULLRAPTOR_PUENTE_TOKEN: 'b', CLAUDE_CODE_OAUTH_TOKEN: 'c', CLAUDE_CODE_MESSAGING_TOKEN: 'd', GIT_CONFIG_COUNT: '1', OTRA: 'visible' };
+  const r = spawnSync('codex', ['sandbox', ...args, '--', 'sh', '-c', 'env | grep -cE "TOKEN|GIT_CONFIG"; echo $OTRA'], { encoding: 'utf8', env, timeout: 30000 });
+  assert.equal(r.stdout.trim(), '0\nvisible');
+});

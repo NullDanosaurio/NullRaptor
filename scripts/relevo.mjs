@@ -10,7 +10,7 @@ import { registrarRelevoCodex } from './sesiones-codex.mjs';
 import { prepararSesionCodex } from './codex-sesion.mjs';
 import { guardarPrivado } from './codex-config.mjs';
 import { avisosBoveda, instantaneaBoveda } from './relevo-boveda.mjs';
-import { argsSandboxCodex } from './codex-sandbox.mjs';
+import { argsEntornoCodex, argsSandboxCodex } from './codex-sandbox.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,7 +107,7 @@ export function binarioCodex(agente = AGENTE, env = process.env) {
 /** Argumentos de `codex exec` para el relevo. La salida final y el resumen van en la carpeta .relevo (fuera del proyecto). */
 export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false, configuracion = [], memoria = null, env = process.env, trabajo = null }) {
   // Sandbox por permisos de ruta (codex-sandbox.mjs): proyecto, .git y carpeta del relevo escribibles; sin red.
-  const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox']
+  const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox', ...argsEntornoCodex()]
     : argsSandboxCodex({ ruta: cwd, escribibles: [dirRelevo].filter(Boolean), memoria, env, trabajo });
   return ['--no-daemon', ...configuracion, 'exec', ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
