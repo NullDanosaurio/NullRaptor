@@ -8,6 +8,7 @@
 // Las señales y los registros van en $TRABAJO_DIR/.relevo/<Proyecto>.*, nunca dentro del proyecto.
 import { registrarRelevoCodex } from './sesiones-codex.mjs';
 import { prepararSesionCodex } from './codex-sesion.mjs';
+import { guardarPrivado } from './codex-config.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,15 +39,16 @@ export function anotarSenal(entrada, trabajo, ahora = new Date()) {
   const proyecto = proyectoDe(entrada.cwd, trabajo);
   if (!proyecto) return null;
   const dir = path.join(trabajo, CARPETA);
-  fs.mkdirSync(dir, { recursive: true });
   const ruta = path.join(dir, `${proyecto}.senal.json`);
-  fs.writeFileSync(ruta, `${JSON.stringify({ proyecto, cwd: path.resolve(entrada.cwd), error: entrada.error, sesion: entrada.session_id ?? null, en: ahora.toISOString() }, null, 2)}\n`);
+  escribirJson(ruta, { proyecto, cwd: path.resolve(entrada.cwd), error: entrada.error, sesion: entrada.session_id ?? null, en: ahora.toISOString() });
   return { proyecto, ruta };
 }
 
 const rutaDe = (trabajo, proyecto, ext) => path.join(trabajo, CARPETA, `${proyecto}.${ext}`);
 const leerJson = (ruta) => { try { return JSON.parse(fs.readFileSync(ruta, 'utf8')); } catch { return null; } };
-const escribirJson = (ruta, datos) => fs.writeFileSync(ruta, `${JSON.stringify(datos, null, 2)}\n`);
+// Todo lo del relevo es privado: carpeta 0700 y archivos 0600, con escritura atómica.
+const privada = (dir) => { fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); try { fs.chmodSync(dir, 0o700); } catch { /* Carpeta ajena: se deja. */ } };
+const escribirJson = (ruta, datos) => { privada(path.dirname(ruta)); guardarPrivado(ruta, `${JSON.stringify(datos, null, 2)}\n`); };
 const vivo = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 
 /** Estado del relevo de un proyecto: { estado: 'en curso' | 'terminado' | 'error', pid, inicio, fin, codigo } o null. */
@@ -126,8 +128,10 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   const briefing = rutaDe(trabajo, proyecto, 'briefing.md');
   const resumen = rutaDe(trabajo, proyecto, 'codex.md');
   const preparada = prepararSesionCodex({ agente, env, memoria: env.BOVEDA_DIR, trabajo });
-  fs.writeFileSync(briefing, briefingDe({ ...senal, resumen }, { trabajo, agente, env }));
-  const log = fs.openSync(rutaDe(trabajo, proyecto, 'log'), 'a');
+  privada(dir);
+  guardarPrivado(briefing, briefingDe({ ...senal, resumen }, { trabajo, agente, env }));
+  const log = fs.openSync(rutaDe(trabajo, proyecto, 'log'), 'a', 0o600);
+  try { fs.fchmodSync(log, 0o600); } catch { /* Sin soporte: se deja. */ }
   const inicio = new Date().toISOString();
   let sesionCodex = null;
   const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...datos });

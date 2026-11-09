@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { guardarPrivado } from './codex-config.mjs';
 
 export const idCodexValido = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 export const casaCodex = (env) => env.CODEX_HOME ?? path.join(env.HOME ?? os.homedir(), '.codex');
@@ -51,7 +52,8 @@ export function registrarRelevoCodex(trabajo, datos) {
   if (!idCodexValido(datos.id)) return;
   const dir = path.join(trabajo, '.sesiones-codex');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(dir, `${datos.id}.json`), JSON.stringify(datos), { mode: 0o600 });
+  try { fs.chmodSync(dir, 0o700); } catch { /* Carpeta ajena: se deja. */ }
+  guardarPrivado(path.join(dir, `${datos.id}.json`), JSON.stringify(datos));
 }
 
 export function relevosCodex(trabajo) {
