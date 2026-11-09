@@ -12,9 +12,9 @@ export function guardarPrivado(archivo, texto) {
 }
 
 /** `mcp` es el archivo privado generado por escribirMcp, compartido con Claude. */
-export function prepararCodex({ agente, trabajo, mcp, env = {}, perfil = null }) {
+export function prepararCodex({ agente, trabajo, mcp, env = {}, perfil = null, registroTareas = null }) {
   const carpeta = path.join(trabajo, '.codex-nullraptor');
-  const ajustes = ajustesMcpCodex({ agente, mcp });
+  const ajustes = ajustesMcpCodex({ agente, mcp, registroTareas });
   ajustes.project_doc_fallback_filenames = ['CLAUDE.md'];
   ajustes.developer_instructions = instruccionesCodex(agente);
   if (perfil) ajustes.developer_instructions += `\n${perfilCodex(perfil)}\n`;

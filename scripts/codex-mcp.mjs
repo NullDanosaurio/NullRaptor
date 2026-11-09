@@ -24,12 +24,12 @@ export const AUTOAPROBADAS = {
 };
 
 /** Un puente por servidor conserva los nombres MCP y lee la configuración privada al arrancar. */
-export function ajustesMcpCodex({ agente, mcp }) {
+export function ajustesMcpCodex({ agente, mcp, registroTareas = null }) {
   const { mcpServers } = JSON.parse(fs.readFileSync(mcp, 'utf8'));
   // Codex divide las claves -c por puntos sin interpretar comillas: los nombres van dentro de la tabla TOML.
   return { mcp_servers: Object.fromEntries(Object.keys(mcpServers).map((nombre) => [
     nombre,
-    { command: process.execPath, args: [path.join(agente, 'scripts', 'codex-mcp-puente.mjs'), mcp, nombre], enabled: true, startup_timeout_sec: 60,
+    { command: process.execPath, args: [path.join(agente, 'scripts', 'codex-mcp-puente.mjs'), mcp, nombre, ...(registroTareas && nombre === 'ruflo' ? [registroTareas] : [])], enabled: true, startup_timeout_sec: 60,
       ...(Object.hasOwn(AUTOAPROBADAS, nombre) ? { enabled_tools: AUTOAPROBADAS[nombre], default_tools_approval_mode: 'approve' } : {}) },
   ])) };
 }

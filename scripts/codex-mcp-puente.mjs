@@ -1,5 +1,6 @@
 // Puente externo para los MCP aprobados: stdio, HTTP y SSE. Las credenciales se leen solo al lanzar el servidor.
 import fs from 'node:fs';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { AUTOAPROBADAS } from './codex-mcp.mjs';
@@ -14,6 +15,21 @@ export function entornoMcp(config, base = process.env) {
 export function capacidadesPuente(remotas = {}) {
   return Object.fromEntries(['tools', 'resources', 'prompts'].filter((clave) => remotas[clave])
     .map((clave) => [clave, remotas[clave].listChanged ? { listChanged: true } : {}]));
+}
+
+/** Control detectivo: anota (solo taskId, herramienta, estado y hora) cada task_update/task_complete de Codex en un archivo que
+ * Codex no puede escribir (el puente corre fuera de su sandbox). Nunca descripciones ni argumentos libres. */
+export function anotarTarea(archivo, herramienta, args, ahora = new Date()) {
+  const id = args?.taskId;
+  if (typeof id !== 'string' || !/^[\w-]{1,80}$/.test(id)) return;
+  const estado = herramienta === 'task_complete' ? 'completed' : (typeof args.status === 'string' && /^[a-z_]{1,20}$/.test(args.status) ? args.status : undefined);
+  let tareas = [];
+  try { const j = JSON.parse(fs.readFileSync(archivo, 'utf8')); if (Array.isArray(j.tareas)) tareas = j.tareas; } catch { /* primera vez */ }
+  tareas.push({ taskId: id, herramienta, ...(estado ? { estado } : {}), en: ahora.toISOString() });
+  const temporal = `${archivo}.${process.pid}.tmp`;
+  fs.mkdirSync(path.dirname(archivo), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(temporal, `${JSON.stringify({ tareas: tareas.slice(-200) }, null, 2)}\n`, { mode: 0o600 });
+  fs.renameSync(temporal, archivo);
 }
 
 const MAX_RETENIDAS = 100; // llamadas que esperan a conocer los esquemas
@@ -40,7 +56,7 @@ export function reescribirLlamada(herramienta, args = {}) {
  * `enabled_tools` de Codex): `tools/list` solo trae las permitidas y `tools/call` de otra se rechaza SIN llegar al servidor real.
  * Los argumentos de cada llamada se validan contra el esquema real de la herramienta (claves desconocidas y `dbPath`
  * se rechazan; sin esquema, cae cerrado). Los nombres se comparan exactos (el servidor real no conoce prefijos mcp__x__). */
-export function crearFiltro(permitidas, nombre = 'mcp', aviso = (m) => console.error(m)) {
+export function crearFiltro(permitidas, nombre = 'mcp', aviso = (m) => console.error(m), { anotar = null } = {}) {
   const permitido = (t) => typeof t === 'string' && permitidas.includes(t);
   const listas = new Set(); // ids de tools/list pendientes
   const esquemas = new Map(); // herramienta -> claves de entrada permitidas
@@ -76,6 +92,7 @@ export function crearFiltro(permitidas, nombre = 'mcp', aviso = (m) => console.e
           return false;
         }
       }
+      if (m?.method === 'tools/call' && anotar && ['task_update', 'task_complete'].includes(m.params.name)) { try { anotar(m.params.name, m.params.arguments); } catch { /* el registro no frena la llamada */ } }
       if (m?.method === 'tools/call') m.params = { ...m.params, arguments: reescribirLlamada(m.params.name, m.params.arguments) };
       if (m?.method === 'tools/list' && m.id !== undefined) listas.add(m.id);
       if (m?.method === 'notifications/initialized') extra.push(JSON.stringify({ jsonrpc: '2.0', id: ID_PROPIO, method: 'tools/list' }));
@@ -110,12 +127,13 @@ function porLineas(flujo, alLinea, alFin) {
   flujo.on('end', () => { if (resto) alLinea(resto); alFin?.(); });
 }
 
-export async function arrancarPuente(config, nombre = '') {
+export async function arrancarPuente(config, nombre = '', registro = null) {
+  const anotar = registro ? (herramienta, args) => anotarTarea(registro, herramienta, args) : null;
   const permitidas = Object.hasOwn(AUTOAPROBADAS, nombre) ? AUTOAPROBADAS[nombre] : undefined; // sin claves heredadas (constructor...)
   if (config.command) {
     const hijo = spawn(config.command, config.args ?? [], { cwd: config.cwd, env: entornoMcp(config), stdio: ['pipe', 'pipe', 'inherit'] });
     if (permitidas) {
-      const filtro = crearFiltro(permitidas, nombre);
+      const filtro = crearFiltro(permitidas, nombre, undefined, { anotar });
       const retenidas = [];
       let reloj = null;
       const procesar = (l, final = false) => {
@@ -164,7 +182,7 @@ export async function arrancarPuente(config, nombre = '') {
   await cliente.connect(remoto);
   const capacidades = cliente.getServerCapabilities();
   const servidor = new Server({ name: 'nullraptor-codex', version: '1' }, { capabilities: capacidadesPuente(capacidades) });
-  const filtro = permitidas ? crearFiltro(permitidas, nombre) : null;
+  const filtro = permitidas ? crearFiltro(permitidas, nombre, undefined, { anotar }) : null;
   const metodos = [
     ['tools', 'ListToolsRequestSchema', 'listTools'], ['tools', 'CallToolRequestSchema', 'callTool'],
     ['resources', 'ListResourcesRequestSchema', 'listResources'], ['resources', 'ReadResourceRequestSchema', 'readResource'],
@@ -178,6 +196,7 @@ export async function arrancarPuente(config, nombre = '') {
       if (!filtro.listo()) filtro.aprender((await cliente.listTools()).tools);
       const motivo = filtro.validar(peticion.params?.name, peticion.params?.arguments);
       if (motivo) { console.error(`[puente ${nombre}] llamada rechazada: ${motivo}`); throw new Error(motivo); }
+      if (anotar && ['task_update', 'task_complete'].includes(peticion.params.name)) { try { anotar(peticion.params.name, peticion.params.arguments); } catch { /* ignorar */ } }
       return cliente.callTool({ ...peticion.params, arguments: reescribirLlamada(peticion.params.name, peticion.params.arguments) });
     });
     else servidor.setRequestHandler(tipos[esquema], (peticion) => cliente[metodo](peticion.params));
@@ -196,10 +215,10 @@ export async function arrancarPuente(config, nombre = '') {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   try {
-    const [archivo, nombre] = process.argv.slice(2);
+    const [archivo, nombre, registro] = process.argv.slice(2);
     const config = JSON.parse(fs.readFileSync(archivo, 'utf8')).mcpServers?.[nombre];
     if (!config) throw new Error('Servidor no aprobado.');
-    await arrancarPuente(config, nombre);
+    await arrancarPuente(config, nombre, registro);
   } catch {
     console.error('No se pudo conectar el MCP de Codex. Revisa su aprobación y configuración en el panel.');
     process.exitCode = 1;
