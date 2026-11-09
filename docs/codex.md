@@ -85,7 +85,8 @@ Panel, terminal y relevo comparten un perfil de permisos por ruta (`default_perm
   (credenciales de Claude) y `$CODEX_HOME/auth.json`. La lista es la misma que las reglas `deny` de Claude
   (`rutasProtegidas`). Codex lee su `auth.json` desde fuera del sandbox: solo se oculta a los comandos que ejecuta.
 - `.git/hooks` y `.git/config` en solo lectura (un hook sería código que corre fuera del sandbox). Efecto aceptado:
-  `git config` falla dentro de Codex. Solo se aplica si `.git` es una carpeta (los worktrees no).
+  `git config` falla dentro de Codex. Solo se aplica si `.git` es una carpeta. Limitación: en un worktree (`.git` es un
+  archivo) Codex no puede hacer commits bajo este perfil, porque su gitdir no se hace escribible.
 - Bóveda: legible y escribible solo en `Proyectos/`. El perfil no puede expresar un archivo suelto
   (`Proyectos/<Proyecto>.md`; bwrap falla), así que tras el relevo `relevo-boveda.mjs` añade al resumen y al estado un aviso
   si se tocó algo fuera de esa nota o si la bóveda no está en la rama `agente`.
@@ -93,7 +94,11 @@ Panel, terminal y relevo comparten un perfil de permisos por ruta (`default_perm
 
 Riesgos aceptados: la bóveda es escribible en todo `Proyectos/` (otras notas de proyecto); `/tmp` es escribible; los
 servidores MCP los lanza Codex fuera del sandbox; el relevo escribe en `.relevo/` (estado y log, no se protegen de
-Codex). Sin comprobar: sesión real de Codex con cuenta bajo este perfil (solo `codex sandbox`).
+Codex). El aviso de la bóveda compara `git status` antes y después: si Daniel ya tenía un archivo modificado y Codex lo
+vuelve a tocar, la línea es idéntica y no se avisa.
+Verificado con `codex exec` real (09/11/2026, repo de juguete con archivos falsos): Codex arranca con `auth.json` oculto,
+edita y hace commit, y no puede escribir en `.git/hooks` ni en `.git/config`. Sin comprobar con Codex real: el relevo
+completo, la bóveda real y los worktrees.
 
 El desarrollo interactivo usa `on-request`: las acciones permitidas dentro del sandbox pueden continuar sin
 confirmación. Las autorizaciones persistentes dependen de la sesión y del lanzador.
