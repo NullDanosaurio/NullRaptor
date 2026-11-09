@@ -74,11 +74,29 @@ Si la sesión no ofrece subagentes, aplica las revisiones en secuencia y declara
 
 ## Permisos y diferencias
 
-El desarrollo interactivo usa `workspace-write` y `on-request`: las acciones permitidas dentro del sandbox pueden
-continuar sin confirmación. Red o escrituras adicionales pueden requerir aprobación. Las autorizaciones
-persistentes dependen de la sesión y del lanzador; la integración no desactiva el sandbox ni impone un bypass.
-Se permite trabajar en adjuntos, el git del proyecto y la bóveda configurada. El relevo conserva su modo previo
-de sandbox y su carpeta de resumen; `RELEVO_SIN_SANDBOX` solo se aplica si Daniel ya lo configuró explícitamente.
+## Sandbox de Codex (`scripts/codex-sandbox.mjs`)
+
+Panel, terminal y relevo comparten un perfil de permisos por ruta (`default_permissions="nr"`), en lugar de
+`--sandbox workspace-write` (son incompatibles). Verificado con `codex sandbox` 0.163.0; la ruta más específica gana:
+
+- Raíz del sistema en solo lectura. Escribibles: el proyecto, su `.git`, los adjuntos, `/tmp` y, en el relevo,
+  `.relevo/`. Sin red (`permissions.nr.network.enabled=false`).
+- Ocultos (`none`): el cofre y `~/.nullraptor`, `registros/`, el archivo MCP con las claves de herramientas, `~/.claude`
+  (credenciales de Claude) y `$CODEX_HOME/auth.json`. La lista es la misma que las reglas `deny` de Claude
+  (`rutasProtegidas`). Codex lee su `auth.json` desde fuera del sandbox: solo se oculta a los comandos que ejecuta.
+- `.git/hooks` y `.git/config` en solo lectura (un hook sería código que corre fuera del sandbox). Efecto aceptado:
+  `git config` falla dentro de Codex. Solo se aplica si `.git` es una carpeta (los worktrees no).
+- Bóveda: legible y escribible solo en `Proyectos/`. El perfil no puede expresar un archivo suelto
+  (`Proyectos/<Proyecto>.md`; bwrap falla), así que tras el relevo `relevo-boveda.mjs` añade al resumen y al estado un aviso
+  si se tocó algo fuera de esa nota o si la bóveda no está en la rama `agente`.
+- `RELEVO_SIN_SANDBOX=1` desactiva todo lo anterior y deja un aviso en el log y en el estado del relevo.
+
+Riesgos aceptados: la bóveda es escribible en todo `Proyectos/` (otras notas de proyecto); `/tmp` es escribible; los
+servidores MCP los lanza Codex fuera del sandbox; el relevo escribe en `.relevo/` (estado y log, no se protegen de
+Codex). Sin comprobar: sesión real de Codex con cuenta bajo este perfil (solo `codex sandbox`).
+
+El desarrollo interactivo usa `on-request`: las acciones permitidas dentro del sandbox pueden continuar sin
+confirmación. Las autorizaciones persistentes dependen de la sesión y del lanzador.
 
 Los hooks, Remote Control y las reglas `deny` de Claude no se copian a Codex. La terminal de Codex se usa desde
 el panel y sus permisos son los de Codex. Los latidos y avisos basados en hooks de Claude no miden la actividad
