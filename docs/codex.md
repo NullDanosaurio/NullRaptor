@@ -156,3 +156,13 @@ de prueba en Ruflo y continuar la sesión por su ID. Se conserva la configuraci�
 Los cambios del repositorio solo llegan al contenedor en ejecución con una imagen nueva: subir los commits a
 `main`, construir/publicar la imagen y actualizar/reiniciar desde el PC. Este desarrollo no publica ni reinicia;
 esas acciones quedan pendientes de la autorización de Daniel.
+
+## ponytail (guía de estilo para los agentes que programan o diseñan)
+
+`config/externo/ponytail/` guarda solo el texto de la skill ponytail (MIT, https://github.com/DietrichGebert/ponytail, fijada al
+commit 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846; `ORIGEN.md` trae el sha256, que una prueba comprueba) y su licencia. No se instala
+el plugin ni sus hooks (escriben en `~/.claude`, importan transcripts y piden editar `settings.json`) y no está en `config/skills`
+para que no llegue a todas las sesiones. Los subagentes `equipo-desarrollo`, `equipo-arquitectura` y `equipo-producto` (al copiarse
+a `agents/`, `{{AGENTE}}` se sustituye por la ruta del agente) y el rol de desarrollo y las instrucciones generales de Codex leen
+`SKILL.md` al empezar y lo aplican en nivel full. Calidad, seguridad y diseño NO: su criterio de revisión no debe ablandarse.
+Sin comprobar: que Claude Code permita a un subagente leer esa ruta fuera del proyecto sin pedir permiso en modo manual.

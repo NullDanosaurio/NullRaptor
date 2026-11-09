@@ -140,7 +140,8 @@ export function instalarEquipo(agente, configDir) {
   const destino = path.join(configDir, 'agents');
   fs.mkdirSync(destino, { recursive: true });
   const nuestros = fs.readdirSync(origen).filter((n) => n.startsWith(PREFIJO_EQUIPO) && n.endsWith('.md'));
-  for (const n of nuestros) fs.copyFileSync(path.join(origen, n), path.join(destino, n));
+  // {{AGENTE}} se sustituye por la ruta del agente (p. ej. config/externo/ponytail/SKILL.md, legible por los subagentes).
+  for (const n of nuestros) fs.writeFileSync(path.join(destino, n), fs.readFileSync(path.join(origen, n), 'utf8').replaceAll('{{AGENTE}}', path.resolve(agente)));
   for (const n of fs.readdirSync(destino)) {
     if (n.startsWith(PREFIJO_EQUIPO) && n.endsWith('.md') && !nuestros.includes(n)) fs.rmSync(path.join(destino, n), { force: true });
   }

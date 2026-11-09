@@ -49,7 +49,7 @@ test('prepararIA instala el equipo del Director: copia equipo-*, retira los obso
   fs.writeFileSync(path.join(agents, 'equipo-notas.txt'), 'ajeno, no es .md');
   prepararIA({ agente, env: { CLAUDE_CONFIG_DIR: configDir }, memoria: null, trabajo: path.join(base, 'trabajo') });
   const roles = ['arquitectura', 'calidad', 'desarrollo', 'diseno', 'producto', 'seguridad'].map((r) => `equipo-${r}.md`);
-  for (const r of roles) assert.equal(fs.readFileSync(path.join(agents, r), 'utf8'), fs.readFileSync(path.join(agente, 'config', 'agentes', r), 'utf8'));
+  for (const r of roles) assert.equal(fs.readFileSync(path.join(agents, r), 'utf8'), fs.readFileSync(path.join(agente, 'config', 'agentes', r), 'utf8').replaceAll('{{AGENTE}}', path.resolve(agente)));
   assert.ok(!fs.existsSync(path.join(agents, 'equipo-viejo.md')));
   assert.equal(fs.readFileSync(path.join(agents, 'mio.md'), 'utf8'), 'ajeno');
   assert.ok(fs.existsSync(path.join(agents, 'equipo-notas.txt')));
