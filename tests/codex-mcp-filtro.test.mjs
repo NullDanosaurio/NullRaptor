@@ -11,11 +11,11 @@ const puente = path.join(fileURLToPath(new URL('..', import.meta.url)), 'scripts
 
 // Servidor MCP falso: apunta en un archivo todo lo que recibe y responde a tools/list y tools/call.
 const FALSO = `const fs=require('fs');const log=process.argv[2];let b='';process.stdin.on('data',d=>{b+=d;const l=b.split('\\n');b=l.pop();for(const x of l){if(!x.trim())continue;fs.appendFileSync(log,x+'\\n');const m=JSON.parse(x);
-if(m.method==='tools/list')console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{tools:${JSON.stringify([...AUTOAPROBADAS.ruflo, 'terminal_execute', 'http_fetch', 'browser_open']).replace(/"/g, "'")}.map(name=>({name,inputSchema:{type:'object'}}))}}));
+if(m.method==='tools/list')console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{tools:${JSON.stringify([...AUTOAPROBADAS.ruflo, 'terminal_execute', 'http_fetch', 'browser_open']).replace(/"/g, "'")}.map(name=>({name,inputSchema:{type:'object',properties:Object.fromEntries(['key','value','namespace','tags','upsert','dbPath','query','description','taskId','type','status'].map(k=>[k,{}]))}}))}}));
 else if(m.method==='tools/call')console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{content:[{type:'text',text:'ejecutado '+m.params.name}]}}));
 else if(m.id!==undefined)console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{}}));}});`;
 
-async function sesion(t, nombre, mensajes) {
+async function sesion(t, nombre, mensajes, { inicializar = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-filtro-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const registro = path.join(dir, 'recibido.log');
@@ -27,6 +27,7 @@ async function sesion(t, nombre, mensajes) {
   let err = '';
   hijo.stdout.on('data', (d) => { out += d; });
   hijo.stderr.on('data', (d) => { err += d; });
+  if (inicializar) mensajes = [{ jsonrpc: '2.0', method: 'notifications/initialized' }, ...mensajes];
   hijo.stdin.write(mensajes.map((m) => `${JSON.stringify(m)}\n`).join(''));
   await new Promise((r) => setTimeout(r, 800));
   hijo.stdin.end();
@@ -71,4 +72,34 @@ test('un servidor llamado como una propiedad heredada (constructor, toString) no
   // El puente de «constructor» no filtra (comportamiento de servidor sin lista): una herramienta cualquiera llega al servidor.
   const { respuestas } = await sesion(t, 'constructor', [lista, llamada(2, 'terminal_execute')]);
   assert.equal(respuestas.find((r) => r.id === 1).result.tools.length, AUTOAPROBADAS.ruflo.length + 3);
+});
+
+test('los argumentos se validan contra el esquema real: dbPath y claves desconocidas se rechazan sin llegar al servidor', async (t) => {
+  const con = (id, name, arguments_) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: arguments_ } });
+  const { respuestas, recibido } = await sesion(t, 'ruflo', [
+    con(2, 'memory_retrieve', { key: 'k', dbPath: '/etc/passwd' }),
+    con(3, 'memory_search', { query: 'x', dbpath: '/etc/passwd' }),
+    con(4, 'task_list', { oculto: 1 }),
+    con(5, 'memory_list', 'no-objeto'),
+    con(6, 'memory_retrieve', { key: 'k', namespace: 'n' }),
+  ]);
+  const porId = (id) => respuestas.find((r) => r.id === id);
+  assert.match(porId(2).error.message, /dbPath/);
+  assert.match(porId(3).error.message, /no permitido/);
+  assert.match(porId(4).error.message, /oculto/);
+  assert.match(porId(5).error.message, /no válidos/);
+  assert.match(porId(6).result.content[0].text, /ejecutado memory_retrieve/);
+  const llamadas = recibido.filter((m) => m.method === 'tools/call');
+  assert.deepEqual(llamadas.map((m) => m.params.name), ['memory_retrieve']);
+  assert.equal(llamadas[0].params.arguments.dbPath, undefined);
+  assert.ok(!respuestas.some((r) => r.id === 'nullraptor-esquemas')); // la consulta propia de esquemas no sale hacia Codex
+});
+
+test('sin esquema conocido (el servidor nunca lo da) la llamada cae cerrada', async (t) => {
+  const { crearFiltro } = await import('../scripts/codex-mcp-puente.mjs');
+  const f = crearFiltro(['task_list'], 'ruflo', () => {});
+  assert.match(f.validar('task_list', {}), /Esquema/);
+  f.aprender([{ name: 'task_list', inputSchema: { type: 'object', properties: {} } }]);
+  assert.equal(f.validar('task_list', {}), null);
+  assert.match(f.validar('task_list', { x: 1 }), /no permitido/);
 });
