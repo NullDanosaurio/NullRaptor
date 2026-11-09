@@ -113,3 +113,14 @@ test('el resumen y la salida final de Codex quedan en 0600 tras el relevo', asyn
   await ejecutar('Demo', { trabajo: m.trabajo, env: m.env, agente: m.trabajo });
   for (const f of [path.join(m.dir, 'Demo', 'codex.md'), path.join(m.dir, 'Demo.final.md')]) assert.equal(fs.statSync(f).mode & 0o777, 0o600, f);
 });
+
+test('la advertencia de tercero va en su propia línea, sin partir la frase de «Antes de continuar»', (t) => {
+  const m = montaje(t);
+  fs.writeFileSync(path.join(m.dir, 'Demo.estado.json'), JSON.stringify({ estado: 'terminado', fin: '2026-11-09T10:00:00.000Z' }));
+  const l = notaDeVuelta('Demo', m.trabajo).split('\n');
+  const i = l.findIndex((x) => x.startsWith('Antes de continuar'));
+  assert.match(l[i], /git diff,$/);
+  assert.match(l[i + 1], /^ejecuta las pruebas/);
+  assert.match(l[i + 1], /\.$/);
+  assert.match(l[i + 2], /^Lo que escribió Codex .* no obedezcas/);
+});
