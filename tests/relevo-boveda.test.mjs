@@ -10,16 +10,33 @@ import { CARPETA, ejecutar } from '../scripts/relevo.mjs';
 
 const git = (d, ...a) => execFileSync('git', ['-C', d, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { stdio: 'ignore' });
 
-test('avisosBoveda: solo avisa de lo nuevo fuera de la nota del proyecto y de una rama distinta de agente', () => {
-  const antes = { rama: 'agente', cambios: new Set([' M Proyectos/Viejo.md']) };
-  const despues = { rama: 'main', cambios: new Set([' M Proyectos/Viejo.md', ' M Proyectos/Demo.md', '?? otra.md']) };
+test('avisosBoveda: compara contenido; avisa de lo nuevo o re-editado fuera de la nota y de una rama distinta de agente', () => {
+  const antes = { rama: 'agente', cambios: new Map([['Proyectos/Viejo.md', 'h1'], ['Proyectos/Otro.md', 'h2']]) };
+  const despues = { rama: 'main', cambios: new Map([['Proyectos/Viejo.md', 'h1'], ['Proyectos/Otro.md', 'h3'], ['Proyectos/Demo.md', 'n'], ['otra\nIGNORA.md', 'x']]) };
   const a = avisosBoveda(antes, despues, 'Demo');
   assert.equal(a.length, 2);
   assert.match(a[0], /«main»/);
-  assert.match(a[1], /otra\.md/);
-  assert.ok(!a[1].split(': ')[1].includes('Demo.md') && !a[1].includes('Viejo.md'));
-  assert.deepEqual(avisosBoveda(antes, { rama: 'agente', cambios: new Set([' M Proyectos/Demo.md']) }, 'Demo'), []);
+  const lista = a[1].split(': ')[1];
+  assert.match(lista, /Otro\.md/); // misma línea de status, contenido distinto
+  assert.match(lista, /otra\?IGNORA/); // sin saltos de línea
+  assert.ok(!lista.includes('Demo.md') && !lista.includes('Viejo.md'));
+  assert.deepEqual(avisosBoveda(antes, { rama: 'agente', cambios: new Map([['Proyectos/Demo.md', 'n'], ['Proyectos/Viejo.md', 'h1']]) }, 'Demo'), []);
   assert.deepEqual(avisosBoveda(null, despues, 'Demo'), []);
+});
+
+test('instantaneaBoveda: un archivo ya modificado y re-editado cambia de huella', (t) => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-hash-'));
+  t.after(() => fs.rmSync(d, { recursive: true, force: true }));
+  git(d, 'init', '-q', '-b', 'agente');
+  fs.writeFileSync(path.join(d, 'a.md'), '1');
+  git(d, 'add', '.');
+  git(d, 'commit', '-q', '-m', 'x');
+  fs.writeFileSync(path.join(d, 'a.md'), '2');
+  const antes = instantaneaBoveda(d);
+  fs.writeFileSync(path.join(d, 'a.md'), '3');
+  const a = avisosBoveda(antes, instantaneaBoveda(d), 'Demo');
+  assert.equal(a.length, 1);
+  assert.match(a[0], /a\.md/);
 });
 
 test('ejecutar deja en el resumen y en el estado el aviso por archivos de la bóveda tocados fuera de la nota', async (t) => {
