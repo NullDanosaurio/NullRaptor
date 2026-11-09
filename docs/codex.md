@@ -60,6 +60,13 @@ en el proyecto abierto. Context7 y los servidores npm pueden necesitar red para 
 
 ## Tareas, planificación y equipo
 
+**Aviso (sin resolver):** en Codex 0.163.0 `codex exec` NO expone al modelo los MCP pasados con `-c mcp_servers=...`.
+Comprobado: `codex mcp list` y `codex doctor` los reconocen (3 stdio), el puente responde a `initialize`, `tools/list` y
+`tools/call task_list` con entorno vacío, pero en 4 ejecuciones reales (con y sin perfil de sandbox) el modelo solo vio
+`mcp__codex_apps__*` y ningún `ruflo`/`context7`; los registros de Codex no muestran arranque de esos servidores. Causa
+sin determinar (no se probó `required=true` ni la sesión interactiva). Hasta entonces, la continuidad con Ruflo en Codex
+no está verificada con un modelo real: el briefing del relevo incluye las tareas y `en-curso` como respaldo.
+
 Al empezar, también al reanudar, la IA consulta las tareas del proyecto y `en-curso`. Muestra la lista de tareas,
 usa el plan nativo si está disponible y guarda el estado en Ruflo. Si no hay herramienta de plan, mantiene una
 lista visible. Tras cada tarea: pruebas, commit pequeño y actualización de memoria; al terminar, tareas cerradas.
