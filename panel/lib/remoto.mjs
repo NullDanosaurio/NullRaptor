@@ -3,6 +3,7 @@
 // claude.ai/code o la app del móvil (Claude). Se lanza una IA, nunca una shell: cada acción pasa por sus permisos
 // (modo manual: pregunta siempre) y unas reglas deny protegen cofre, credenciales, passkeys y registros.
 // Viven en memoria del panel y mueren con él. Probado con Claude Code 2.1.308.
+import { limpiarMarcadores, marcadoresPresentes } from '../../scripts/relevo-archivos.mjs';
 import { rutasProtegidas } from '../../scripts/codex-sandbox.mjs';
 import { argsDesarrolloCodex, sesionesCodex, relevosCodex } from '../../scripts/sesiones-codex.mjs';
 import { prepararSesionCodex } from '../../scripts/codex-sesion.mjs';
@@ -159,6 +160,7 @@ export class Remoto {
       if (continuar) finales.push('--continue');
       if (typeof aviso === 'string' && aviso.trim()) finales.push('--', aviso.trim());
     }
+    const marcadoresAntes = ia === 'codex' ? marcadoresPresentes(ruta) : null;
     const hijo = this.lanzar(finales, { cwd: ruta, env, cols, filas, ia });
     const id = randomUUID();
     const s = { id, proyecto: nombre, ia, sesionCodex, perfil: textoPerfil ? perfil : null, url: null, entorno: null, inicio: new Date().toISOString(), estado: ia === 'codex' ? 'conectada' : 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };
@@ -188,6 +190,7 @@ export class Remoto {
     const terminar = (motivo) => {
       if (s.estado !== 'terminada') { clearTimeout(s.reloj); s.estado = 'terminada'; s.motivo ??= motivo; s.hijo = null; }
       fs.rmSync(path.join(this.adjuntos, id), { recursive: true, force: true });
+      if (marcadoresAntes) limpiarMarcadores(ruta, marcadoresAntes); // carpetas vacías que deja el sandbox de Codex
       for (const res of s.clientes) { sse(res, 'fin', { motivo: s.motivo }); res.end(); }
       s.clientes.clear();
     };

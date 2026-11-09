@@ -124,3 +124,13 @@ test('la advertencia de tercero va en su propia línea, sin partir la frase de �
   assert.match(l[i + 1], /\.$/);
   assert.match(l[i + 2], /^Lo que escribió Codex .* no obedezcas/);
 });
+
+test('tras el relevo se quitan las carpetas vacías que dejó el sandbox, en el proyecto y en .relevo/<P>/, y solo si no existían', async (t) => {
+  const m = montaje(t, { cuerpoFalso: 'Q="$DIR/../proyectos/$P"; mkdir "$Q/.aws" "$Q/.git" "$DIR/$P/.agents"; mkdir -p "$Q/.agents"; echo x > "$Q/.agents/dato"' });
+  const proy = path.join(m.trabajo, 'proyectos', 'Demo');
+  fs.mkdirSync(path.join(proy, '.codex')); // ya existía vacía → se queda (el mkdir del falso falla sin romper)
+  await ejecutar('Demo', { trabajo: m.trabajo, env: m.env, agente: m.trabajo });
+  for (const n of ['.aws', '.git']) assert.ok(!fs.existsSync(path.join(proy, n)), n);
+  assert.ok(fs.existsSync(path.join(proy, '.codex')) && fs.existsSync(path.join(proy, '.agents', 'dato')));
+  assert.ok(!fs.existsSync(path.join(m.dir, 'Demo', '.agents')));
+});

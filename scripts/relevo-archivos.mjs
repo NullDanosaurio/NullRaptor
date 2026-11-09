@@ -55,3 +55,17 @@ export function prepararCarpetaCodex(dir) {
 export function quitarSiNoRegular(ruta) {
   if (existeAlgo(ruta) && !esRegular(ruta)) fs.rmSync(ruta, { recursive: true, force: true });
 }
+
+// El sandbox de Codex deja carpetas vacías (marcadores del perfil) en la raíz del proyecto y en .relevo/<P>/.
+const MARCADORES = ['.agents', '.aws', '.codex', '.git'];
+
+/** Marcadores que ya existen en `dir` (para no borrar luego algo que estaba antes). */
+export const marcadoresPresentes = (dir) => new Set(MARCADORES.filter((n) => existeAlgo(path.join(dir, n))));
+
+/** Borra de `dir` solo los marcadores que no existían antes, son carpetas reales y están VACÍOS (rmdir, nunca recursivo). */
+export function limpiarMarcadores(dir, antes) {
+  for (const n of MARCADORES) {
+    if (antes.has(n)) continue;
+    try { if (fs.lstatSync(path.join(dir, n)).isDirectory()) fs.rmdirSync(path.join(dir, n)); } catch { /* no existe o no está vacío */ }
+  }
+}

@@ -9,7 +9,7 @@
 import { registrarRelevoCodex } from './sesiones-codex.mjs';
 import { prepararSesionCodex } from './codex-sesion.mjs';
 import { guardarPrivado } from './codex-config.mjs';
-import { esRegular, existeAlgo, leerSeguro, nombreProyectoValido, prepararCarpetaCodex, quitarSiNoRegular } from './relevo-archivos.mjs';
+import { esRegular, existeAlgo, leerSeguro, limpiarMarcadores, marcadoresPresentes, nombreProyectoValido, prepararCarpetaCodex, quitarSiNoRegular } from './relevo-archivos.mjs';
 import { avisosBoveda, instantaneaBoveda } from './relevo-boveda.mjs';
 import { argsEntornoCodex, argsSandboxCodex } from './codex-sandbox.mjs';
 import { execFileSync, spawn } from 'node:child_process';
@@ -173,6 +173,8 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   if (sinSandbox) { try { fs.writeSync(log, `AVISO: ${aviso}\n`); } catch { /* El log es auxiliar. */ } }
   estado({ estado: 'en curso' });
   const bovedaAntes = instantaneaBoveda(env.BOVEDA_DIR);
+  const marcadoresProyecto = marcadoresPresentes(senal.cwd);
+  const marcadoresRelevo = marcadoresPresentes(dirCodex);
   const args = argsCodex({ cwd: senal.cwd, dirRelevo: dirCodex, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox,
     configuracion: preparada.args, memoria: env.BOVEDA_DIR, env, trabajo });
   const codigo = await new Promise((listo) => {
@@ -206,6 +208,8 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
     hijo.on('close', (code) => { if (pendiente.trim()) procesar(pendiente); pendiente = ''; fin(code ?? -1); });
   });
   fs.closeSync(log);
+  limpiarMarcadores(senal.cwd, marcadoresProyecto);
+  limpiarMarcadores(dirCodex, marcadoresRelevo);
   // Lo que escribe el binario de Codex (-o) y el resumen salen 0644: privados como el resto del relevo (sin seguir enlaces).
   for (const f of [rutaDe(trabajo, proyecto, 'final.md'), resumen]) if (esRegular(f)) { try { fs.chmodSync(f, 0o600); } catch { /* ajeno */ } }
   const avisos = avisosBoveda(bovedaAntes, instantaneaBoveda(env.BOVEDA_DIR), proyecto);
