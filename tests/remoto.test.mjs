@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -136,6 +137,10 @@ test('archivos adjuntos: fuera del proyecto, legibles por Claude (--add-dir) y b
   // Mismo nombre: no se pisan.
   assert.equal(remoto.guardarAdjunto(id, 'captura.png', png, 'yo').ruta, path.join(adjuntos, id, '2-captura.png'));
   assert.equal(remoto.guardarAdjunto(id, 'notas.md', Buffer.from('# hola'), 'yo').clase, 'texto');
+  const enDisco = await remoto.guardarAdjuntoStream(id, 'por-bloques.png', Readable.from([png.subarray(0, 4), png.subarray(4)]), 'yo');
+  assert.deepEqual(fs.readFileSync(enDisco.ruta), png);
+  await assert.rejects(remoto.guardarAdjuntoStream(id, 'demasiado.png', Readable.from([Buffer.alloc(11)]), 'yo', 10), (err) => err.codigo === 413);
+  assert.ok(fs.readdirSync(path.join(adjuntos, id)).every((nombre) => !nombre.endsWith('.subiendo')));
   // Extensión rara, contenido que no casa, vacío o sin nombre: no.
   for (const [nombre, datos] of [['x.exe', png], ['x.png', Buffer.from('<svg>')], ['x.png', Buffer.alloc(0)], ['', png]]) {
     assert.throws(() => remoto.guardarAdjunto(id, nombre, datos), (err) => err.codigo === 400, nombre);

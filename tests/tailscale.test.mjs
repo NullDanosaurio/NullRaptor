@@ -162,7 +162,11 @@ test('este equipo usa la terminal sin passkey; la red de casa con solo el códig
   assert.equal((await subir(png, { ...local, 'x-nullraptor': '' })).estado, 403);
   assert.equal((await subir(Buffer.from('hola'), local)).estado, 400);
   assert.equal((await subir(Buffer.from('hola'), local, 'nota.txt')).estado, 201);
-  assert.equal((await subir(Buffer.alloc(21 * 1024 * 1024, 0x89), local)).estado, 413);
+  const grande = Buffer.alloc(21 * 1024 * 1024, 0x61);
+  png.copy(grande);
+  const subidaGrande = await subir(grande, local);
+  assert.equal(subidaGrande.estado, 201);
+  assert.equal(fs.statSync(subidaGrande.datos.ruta).size, grande.length);
 });
 
 test('registro de accesos: altas y fallos quedan en el volumen', async (t) => {

@@ -6,21 +6,6 @@
 import { MAX_ADJUNTO } from './adjuntos.mjs';
 const ID = '([0-9a-f-]{36})';
 
-/** Cuerpo binario (archivos adjuntos), con tope. */
-function leerBinario(req, max) {
-  return new Promise((resolve, reject) => {
-    const trozos = [];
-    let tam = 0;
-    req.on('data', (t) => {
-      tam += t.length;
-      if (tam > max) { reject(Object.assign(new Error('Archivo demasiado grande (máximo 20 MB).'), { codigo: 413 })); req.destroy(); return; }
-      trozos.push(t);
-    });
-    req.on('end', () => resolve(Buffer.concat(trozos)));
-    req.on('error', reject);
-  });
-}
-
 export function crearRutasRemoto({ maxAdjunto = MAX_ADJUNTO, remoto, passkeys, sesiones, registro, dominio, leerCuerpo, json }) {
   const reautenticar = { error: 'Confirma con tu passkey para seguir.', reautenticar: true };
 
@@ -66,7 +51,7 @@ export function crearRutasRemoto({ maxAdjunto = MAX_ADJUNTO, remoto, passkeys, s
         // El nombre llega en X-Nombre (codificado como URL): de él sale la extensión, que se comprueba con el contenido.
         let nombre = '';
         try { nombre = decodeURIComponent(String(req.headers['x-nombre'] ?? '')); } catch { /* nombre vacío: se rechaza */ }
-        return responder([201, remoto.guardarAdjunto(id, nombre, await leerBinario(req, maxAdjunto), quien)]);
+        return responder([201, await remoto.guardarAdjuntoStream(id, nombre, req, quien, maxAdjunto)]);
       }
       const cuerpo = await leerCuerpo(req);
       if (accion === 'entrada') { remoto.escribir(id, cuerpo.datos, quien); json(res, 202, { ok: true }); return true; }

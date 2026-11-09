@@ -1,7 +1,10 @@
 // Pruebas de los archivos que se pueden adjuntar a la terminal: extensión + contenido, y nombre saneado.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clasificar, EXTENSIONES, MAX_ADJUNTO } from '../panel/lib/adjuntos.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { clasificar, clasificarArchivo, EXTENSIONES, MAX_ADJUNTO } from '../panel/lib/adjuntos.mjs';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1]);
 const PDF = Buffer.from('%PDF-1.7\n…');
@@ -33,4 +36,15 @@ test('el nombre queda sin rutas ni caracteres raros', () => {
   assert.equal(clasificar('C:\\Users\\yo\\mi $(rm) archivo.md', Buffer.from('a')).nombre, 'mi-rm-archivo.md');
   assert.equal(clasificar('...txt', Buffer.from('a')).nombre, 'archivo.txt');
   assert.equal(clasificar(`${'a'.repeat(100)}.md`, Buffer.from('a')).nombre, `${'a'.repeat(60)}.md`);
+});
+
+test('clasificarArchivo valida texto por bloques y acepta el nuevo límite', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adjunto-grande-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const archivo = path.join(dir, 'grande.txt');
+  fs.writeFileSync(archivo, Buffer.alloc(21 * 1024 * 1024, 0x61));
+  assert.equal(MAX_ADJUNTO, 500 * 1024 * 1024);
+  assert.deepEqual(await clasificarArchivo('grande.txt', archivo, fs.statSync(archivo).size), { clase: 'texto', nombre: 'grande.txt' });
+  fs.appendFileSync(archivo, Buffer.from([0]));
+  assert.equal(await clasificarArchivo('grande.txt', archivo, fs.statSync(archivo).size), null);
 });

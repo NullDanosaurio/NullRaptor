@@ -1,6 +1,8 @@
 // Archivos que se pueden adjuntar a la terminal desde el panel: se decide por la extensión del nombre y se comprueba
 // el contenido (primeros bytes o UTF-8 válido); el tipo que diga el navegador no cuenta.
-export const MAX_ADJUNTO = 20 * 1024 * 1024;
+import fs from 'node:fs/promises';
+
+export const MAX_ADJUNTO = 500 * 1024 * 1024;
 
 const FIRMAS = {
   png: [0x89, 0x50, 0x4e, 0x47], jpg: [0xff, 0xd8, 0xff], gif: [0x47, 0x49, 0x46, 0x38], webp: [0x52, 0x49, 0x46, 0x46],
@@ -22,6 +24,44 @@ const empieza = (datos, firma) => firma.every((b, i) => datos[i] === b);
 function esTexto(datos) {
   if (datos.includes(0)) return false;
   try { new TextDecoder('utf-8', { fatal: true }).decode(datos); return true; } catch { return false; }
+}
+
+/** Comprueba un archivo temporal sin leerlo entero en memoria. */
+export async function clasificarArchivo(nombre, archivo, tamano) {
+  if (!Number.isSafeInteger(tamano) || tamano <= 0 || tamano > MAX_ADJUNTO) return null;
+  const solo = String(nombre ?? '').split(/[\\/]/).pop();
+  const punto = solo.lastIndexOf('.');
+  if (punto < 0) return null;
+  const ext = solo.slice(punto + 1).toLowerCase();
+  const base = sanear(solo.slice(0, punto));
+  let clase = null;
+  const f = await fs.open(archivo, 'r');
+  try {
+    const cabecera = Buffer.alloc(8);
+    const { bytesRead } = await f.read(cabecera, 0, cabecera.length, 0);
+    const datos = cabecera.subarray(0, bytesRead);
+    if (IMAGENES[ext]) clase = empieza(datos, FIRMAS[IMAGENES[ext]]) ? 'imagen' : null;
+    else if (ext === 'pdf') clase = empieza(datos, FIRMAS.pdf) ? 'pdf' : null;
+    else if (OFFICE.includes(ext)) clase = empieza(datos, FIRMAS.zip) ? 'office' : null;
+    else if (TEXTO.includes(ext)) {
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      const bloque = Buffer.alloc(64 * 1024);
+      let posicion = 0;
+      try {
+        while (posicion < tamano) {
+          const r = await f.read(bloque, 0, Math.min(bloque.length, tamano - posicion), posicion);
+          if (!r.bytesRead) return null;
+          const parte = bloque.subarray(0, r.bytesRead);
+          if (parte.includes(0)) return null;
+          decoder.decode(parte, { stream: posicion + r.bytesRead < tamano });
+          posicion += r.bytesRead;
+        }
+        decoder.decode();
+        clase = 'texto';
+      } catch { clase = null; }
+    }
+  } finally { await f.close(); }
+  return clase && { clase, nombre: `${base}.${IMAGENES[ext] ?? ext}` };
 }
 
 /** Nombre sin rutas ni caracteres raros (lo lee Claude en el mensaje): letras, números, punto, guion y guion bajo. */

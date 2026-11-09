@@ -473,3 +473,7 @@
   posición (ruflo.task_list completó en los tres casos). `flujo/lib/agentes.mjs`, `scripts/chat.mjs` y `codex-parche.mjs` ya
   ponían sus `-c` tras `exec`.
 - Sin comprobar: la reanudación con el relevo largo (3 h) y el efecto de `developer_instructions` en el comportamiento real.
+
+## 09/11 — Adjuntos grandes desde el móvil
+- El panel admite adjuntos de hasta 500 MB. El endpoint escribe el cuerpo por bloques a un temporal dentro de `adjuntos/`, valida firmas o UTF-8 desde disco y renombra el archivo solo después de validarlo; no acumula el cuerpo en memoria.
+- Verificado en la suite completa con un PDF de prueba funcional y un adjunto de texto de 21 MB validado por bloques. La prueba HTTP sube un PNG de 21 MB; no se ha medido una transferencia real de cientos de MB desde móvil.

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clasificar } from './adjuntos.mjs';
+import { clasificar, clasificarArchivo, MAX_ADJUNTO } from './adjuntos.mjs';
 import { cortarPty, lanzarPty, redimensionar, tamanoValido, ttyDe } from './pty.mjs';
 import { rutaProyecto } from './trabajo.mjs';
 import { ARCHIVO_MCP, leerPerfil } from '../../scripts/ia.mjs';
@@ -240,7 +240,7 @@ export class Remoto {
   guardarAdjunto(id, nombre, datos, quien) {
     const s = this.viva(id);
     const ok = clasificar(nombre, datos);
-    if (!ok) throw fallo('Ese archivo no se puede adjuntar: imágenes, PDF, Word/Excel/PowerPoint o texto y código, de hasta 20 MB.', 400);
+    if (!ok) throw fallo('Ese archivo no se puede adjuntar: imágenes, PDF, Word/Excel/PowerPoint o texto y código, de hasta 500 MB.', 400);
     const dir = path.join(this.adjuntos, id);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     s.adjuntos = (s.adjuntos ?? 0) + 1;
@@ -248,6 +248,36 @@ export class Remoto {
     fs.writeFileSync(ruta, datos, { mode: 0o600 });
     s.apunte('adjunto', { ruta, clase: ok.clase, bytes: datos.length, quien });
     return { ruta, clase: ok.clase };
+  }
+
+  /** Recibe el adjunto por bloques y lo valida en disco para no retener cientos de MB en memoria. */
+  async guardarAdjuntoStream(id, nombre, entrada, quien, maximo = MAX_ADJUNTO) {
+    const s = this.viva(id);
+    const dir = path.join(this.adjuntos, id);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const temporal = path.join(dir, `.${randomUUID()}.subiendo`);
+    let archivo;
+    let bytes = 0;
+    try {
+      archivo = await fs.promises.open(temporal, 'wx', 0o600);
+      for await (const bloque of entrada) {
+        bytes += bloque.length;
+        if (bytes > maximo) throw fallo('Archivo demasiado grande (máximo 500 MB).', 413);
+        await archivo.writeFile(bloque);
+      }
+      await archivo.close();
+      archivo = null;
+      const ok = await clasificarArchivo(nombre, temporal, bytes);
+      if (!ok) throw fallo('Ese archivo no se puede adjuntar: imágenes, PDF, Word/Excel/PowerPoint o texto y código, de hasta 500 MB.', 400);
+      s.adjuntos = (s.adjuntos ?? 0) + 1;
+      const ruta = path.join(dir, `${s.adjuntos}-${ok.nombre}`);
+      await fs.promises.rename(temporal, ruta);
+      s.apunte('adjunto', { ruta, clase: ok.clase, bytes, quien });
+      return { ruta, clase: ok.clase };
+    } finally {
+      await archivo?.close().catch(() => {});
+      await fs.promises.rm(temporal, { force: true });
+    }
   }
 
   async tamano(id, cols, filas) {
