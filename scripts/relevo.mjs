@@ -9,6 +9,7 @@
 import { registrarRelevoCodex } from './sesiones-codex.mjs';
 import { prepararSesionCodex } from './codex-sesion.mjs';
 import { guardarPrivado } from './codex-config.mjs';
+import { argsSandboxCodex } from './codex-sandbox.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -103,12 +104,11 @@ export function binarioCodex(agente = AGENTE, env = process.env) {
 }
 
 /** Argumentos de `codex exec` para el relevo. La salida final y el resumen van en la carpeta .relevo (fuera del proyecto). */
-export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false, configuracion = [], memoria = null }) {
+export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false, configuracion = [], memoria = null, env = process.env, trabajo = null }) {
+  // Sandbox por permisos de ruta (codex-sandbox.mjs): proyecto, .git y carpeta del relevo escribibles; sin red.
   const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox']
-    // El sandbox de Codex deja `.git` en solo lectura y sin él no puede hacer commits: se le da escritura solo sobre el del proyecto.
-    : ['--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', dirRelevo,
-      ...(fs.existsSync(path.join(cwd, '.git')) && fs.statSync(path.join(cwd, '.git')).isDirectory() ? ['--add-dir', path.join(cwd, '.git')] : [])];
-  return ['--no-daemon', ...configuracion, 'exec', ...sandbox, ...(memoria ? ['--add-dir', memoria] : []), '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
+    : argsSandboxCodex({ ruta: cwd, escribibles: [dirRelevo, memoria].filter(Boolean), env, trabajo });
+  return ['--no-daemon', ...configuracion, 'exec', ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
 
 /** Lanza el relevo en segundo plano (proceso aparte, que sobrevive al hook). Una sola vez por proyecto mientras
@@ -139,7 +139,7 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...datos });
   estado({ estado: 'en curso' });
   const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox: env.RELEVO_SIN_SANDBOX === '1',
-    configuracion: preparada.args, memoria: env.BOVEDA_DIR });
+    configuracion: preparada.args, memoria: env.BOVEDA_DIR, env, trabajo });
   const codigo = await new Promise((listo) => {
     const hijo = arrancar(binarioCodex(agente, env), args, { cwd: senal.cwd, stdio: ['pipe', 'pipe', log], env });
     hijo.stdin.on('error', () => {});

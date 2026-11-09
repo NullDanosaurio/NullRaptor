@@ -16,7 +16,7 @@ export function abrirCodex(ruta, { env = process.env, adicionales = [], arrancar
   const preparada = prepararSesionCodex({ agente, trabajo, memoria: limpia.BOVEDA_DIR, env: limpia });
   const adjuntos = path.join(trabajo, 'adjuntos');
   fs.mkdirSync(adjuntos, { recursive: true });
-  const args = argsDesarrolloCodex({ ruta: path.resolve(ruta), adjuntos, memoria: limpia.BOVEDA_DIR, configuracion: preparada.args });
+  const args = argsDesarrolloCodex({ ruta: path.resolve(ruta), adjuntos, memoria: limpia.BOVEDA_DIR, env: limpia, trabajo, configDir: limpia.CLAUDE_CONFIG_DIR, configuracion: preparada.args });
   const hijo = arrancar(binarioCodex(agente, limpia), [...args, ...adicionales], { cwd: path.resolve(ruta), stdio: 'inherit', env: limpia });
   const reenviar = (senal) => hijo.kill(senal);
   for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(senal, reenviar);

@@ -3,6 +3,7 @@
 // claude.ai/code o la app del móvil (Claude). Se lanza una IA, nunca una shell: cada acción pasa por sus permisos
 // (modo manual: pregunta siempre) y unas reglas deny protegen cofre, credenciales, passkeys y registros.
 // Viven en memoria del panel y mueren con él. Probado con Claude Code 2.1.308.
+import { rutasProtegidas } from '../../scripts/codex-sandbox.mjs';
 import { argsDesarrolloCodex, sesionesCodex, relevosCodex } from '../../scripts/sesiones-codex.mjs';
 import { prepararSesionCodex } from '../../scripts/codex-sesion.mjs';
 import { binarioCodex, estadoRelevo } from '../../scripts/relevo.mjs';
@@ -50,9 +51,8 @@ export function entornoRemoto(base, { trabajo, memoria, configDir }) {
 /** Reglas deny de la terminal (se suman a la configuración del usuario y mandan sobre sus allow). */
 export function ajustesTerminal({ env, configDir, trabajo }) {
   const abs = (p) => `/${path.resolve(p)}`; // «//ruta» = ruta absoluta en los permisos de Claude Code
-  const cofre = path.dirname(path.resolve(env.CREDENCIALES ?? path.join(os.homedir(), '.nullraptor', 'credenciales.cifrado')));
-  const nullraptor = path.join(env.HOME ?? os.homedir(), '.nullraptor');
-  const protegidos = [`${abs(cofre)}/**`, `${abs(nullraptor)}/**`, abs(path.join(configDir, '.credentials.json')), abs(path.join(configDir, '.claude.json')), `${abs(path.join(trabajo, 'registros'))}/**`];
+  const { carpetas, archivos } = rutasProtegidas({ env, configDir, trabajo });
+  const protegidos = [...carpetas.map((c) => `${abs(c)}/**`), ...archivos.map(abs)];
   return {
     permissions: {
       deny: [
@@ -149,7 +149,7 @@ export class Remoto {
       // El MCP ya se rehízo arriba (si hay preparador): prepararSesionCodex no lo repite.
       const preparada = prepararSesionCodex({ agente: AGENTE, env, memoria: this.memoria, trabajo: this.trabajo, perfil: textoPerfil,
         mcpListo: Boolean(this.prepararMcp) && fs.existsSync(mcp) });
-      finales = argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, memoria: this.memoria, sesion: sesionCodex, continuar, aviso, configuracion: preparada.args });
+      finales = argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, memoria: this.memoria, sesion: sesionCodex, continuar, aviso, env, trabajo: this.trabajo, configDir: this.configDir, configuracion: preparada.args });
     } else {
       const ajustes = JSON.stringify(ajustesTerminal({ env, configDir: this.configDir, trabajo: this.trabajo }));
       finales = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes, '--add-dir', this.adjuntos];

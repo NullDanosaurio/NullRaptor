@@ -35,7 +35,8 @@ test('Codex abre la terminal con MCP, skills y Director adaptados; Claude sigue 
   assert.equal(h.opciones.ia, 'codex');
   assert.equal(h.opciones.env.AGENTE_CLAVE, undefined);
   assert.ok(h.args.includes('--no-daemon'));
-  assert.equal(h.args[h.args.indexOf('--sandbox') + 1], 'workspace-write');
+  assert.ok(!h.args.includes('--sandbox'));
+  assert.ok(h.args.includes('default_permissions="nr"'));
   assert.equal(h.args[h.args.indexOf('--ask-for-approval') + 1], 'on-request');
   remoto.escribir(s.id, 'Modifica el proyecto\r');
   assert.equal(h.stdin.read(), 'Modifica el proyecto\r');

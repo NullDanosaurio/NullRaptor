@@ -72,16 +72,16 @@ const senalDe = (t, proyecto = 'Demo') => {
   return anotarSenal({ error: 'rate_limit', cwd }, t) && JSON.parse(fs.readFileSync(path.join(t, '.relevo', `${proyecto}.senal.json`), 'utf8'));
 };
 
-test('argsCodex: si el proyecto tiene .git, Codex puede escribir en él (para hacer commits)', () => {
+test('argsCodex: perfil de permisos con proyecto, .git y .relevo escribibles; sin sandbox solo si se pide', () => {
   const p = fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-git-'));
   fs.mkdirSync(path.join(p, '.git'));
-  assert.deepEqual(argsCodex({ cwd: p, dirRelevo: '/d', salida: '/s' }).filter((_, i, a) => a[i - 1] === '--add-dir'), ['/d', path.join(p, '.git')]);
-  assert.equal(argsCodex({ cwd: '/no/existe', dirRelevo: '/d', salida: '/s' }).filter((x) => x === '--add-dir').length, 1);
-});
-
-test('argsCodex: sandbox workspace-write con la carpeta .relevo; sin sandbox solo si se pide', () => {
-  const a = argsCodex({ cwd: '/p', dirRelevo: '/t/.relevo', salida: '/t/.relevo/D.final.md' });
-  assert.deepEqual(a.slice(0, 8), ['--no-daemon', 'exec', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=false', '--add-dir', '/t/.relevo']);
+  const a = argsCodex({ cwd: p, dirRelevo: '/t/.relevo', salida: '/t/.relevo/D.final.md' });
+  assert.deepEqual(a.slice(0, 2), ['--no-daemon', 'exec']);
+  assert.ok(!a.includes('--sandbox') && !a.includes('--add-dir'));
+  const fsys = a.find((x) => x.startsWith('permissions.nr.filesystem='));
+  assert.match(fsys, new RegExp(`"${p}/\\.git"="write"`));
+  assert.match(fsys, /"\/t\/\.relevo"="write"/);
+  assert.ok(a.includes('permissions.nr.network.enabled=false'));
   assert.equal(a.at(-1), '-');
   assert.ok(a.includes('--json'));
   assert.ok(!a.includes('--ephemeral'));
@@ -119,7 +119,7 @@ test('ejecutar corre Codex con el briefing por la entrada y deja el estado final
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo.codex.md').replace(/\./g, '\\.')} un resumen`));
   const args = fs.readFileSync(path.join(t, 'args.txt'), 'utf8');
   assert.match(args, /^--no-daemon -c mcp_servers=/);
-  assert.match(args, /exec --sandbox workspace-write /);
+  assert.match(args, /exec -c default_permissions="nr" /);
   assert.match(args, /project_doc_fallback_filenames=.*CLAUDE.md/);
   assert.match(args, /developer_instructions=/);
   assert.ok(fs.existsSync(path.join(env.HOME, '.agents', 'skills', 'nullraptor-pc', 'SKILL.md')));
