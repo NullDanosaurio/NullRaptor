@@ -60,12 +60,20 @@ en el proyecto abierto. Context7 y los servidores npm pueden necesitar red para 
 
 ## Tareas, planificación y equipo
 
-**Aviso (sin resolver):** en Codex 0.163.0 `codex exec` NO expone al modelo los MCP pasados con `-c mcp_servers=...`.
-Comprobado: `codex mcp list` y `codex doctor` los reconocen (3 stdio), el puente responde a `initialize`, `tools/list` y
-`tools/call task_list` con entorno vacío, pero en 4 ejecuciones reales (con y sin perfil de sandbox) el modelo solo vio
-`mcp__codex_apps__*` y ningún `ruflo`/`context7`; los registros de Codex no muestran arranque de esos servidores. Causa
-sin determinar (no se probó `required=true` ni la sesión interactiva). Hasta entonces, la continuidad con Ruflo en Codex
-no está verificada con un modelo real: el briefing del relevo incluye las tareas y `en-curso` como respaldo.
+**MCP bajo `codex exec` (relevo).** Codex sí ofrece ruflo y context7, pero `exec` corre con aprobación `never` y toda
+llamada MCP falla con «MCP tool call requires approval, but approval policy is never» (causa hallada por Sara). Como los MCP
+los lanza Codex fuera del sandbox y Ruflo trae herramientas como `terminal_execute`, `http_fetch`, `agent_spawn` o `hooks_*`,
+NO se aprueba ningún servidor entero: `scripts/codex-mcp.mjs` (`AUTOAPROBADAS`) pone `default_tools_approval_mode="approve"`
+solo junto a `enabled_tools` con una lista cerrada: ruflo = `task_list`, `task_create`, `task_update`, `task_complete`,
+`task_status`, `task_summary`, `memory_store`, `memory_retrieve`, `memory_search`, `memory_list`; context7 =
+`resolve-library-id`, `query-docs`. Las herramientas propias (`herramienta-<id>`) y otros servidores no se aprueban: fallan en
+exec y piden aprobación en la sesión interactiva; auto-aprobar una sería decisión de Daniel. Una prueba lo garantiza (nunca
+`approve` sin `enabled_tools`).
+**Estado de la verificación:** los nombres salen del `tools/list` real de los puentes y `codex mcp get ruflo` muestra la lista
+`enabled_tools`. Pero en 2 ejecuciones reales de `codex exec` con ese ajuste el modelo NO encontró ninguna herramienta de ruflo
+(ni `task_list`), mientras que Sara logró `task_list` con `approve` y sin `enabled_tools`. Sin determinar si `enabled_tools`
+oculta las herramientas al modelo en 0.163.0 (la herramienta de búsqueda las difiere) o si fue otro factor de mi montaje.
+Pendiente de bisecar; no está verificado con modelo.
 
 Al empezar, también al reanudar, la IA consulta las tareas del proyecto y `en-curso`. Muestra la lista de tareas,
 usa el plan nativo si está disponible y guarda el estado en Ruflo. Si no hay herramienta de plan, mantiene una
