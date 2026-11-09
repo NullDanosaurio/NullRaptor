@@ -62,6 +62,12 @@ export const estadoRelevo = (trabajo, proyecto) => {
   return e?.estado === 'en curso' && !vivo(e.pid) ? { ...e, estado: 'error', error: 'interrumpido' } : e;
 };
 
+const ESTADOS = ['en curso', 'terminado', 'error'];
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+// El estado puede haberlo tocado Codex o un fallo: solo entra en el texto que lee Claude lo que se reconoce.
+const estadoSeguro = (v) => ESTADOS.includes(v) ? v : 'estado desconocido';
+const fechaSegura = (v) => typeof v === 'string' && ISO.test(v) && !Number.isNaN(Date.parse(v)) ? v : 'fecha desconocida';
+
 /** Nota para Claude al abrir una sesión en un proyecto con relevo sin revisar (o en curso). Marca el relevo como
  * avisado para no repetirla. Devuelve el texto, o null si no hay nada que decir. */
 export function notaDeVuelta(proyecto, trabajo, ahora = new Date()) {
@@ -69,11 +75,11 @@ export function notaDeVuelta(proyecto, trabajo, ahora = new Date()) {
   if (!e || e.revisado) return null;
   const resumen = rutaDe(trabajo, proyecto, 'codex.md');
   if (e.estado === 'en curso') {
-    return `Relevo en curso: Codex está trabajando ahora en «${proyecto}» porque Claude se quedó sin tokens (desde ${e.inicio}). No edites el mismo código a la vez; mira git log y ${resumen} cuando termine.`;
+    return `Relevo en curso: Codex está trabajando ahora en «${proyecto}» porque Claude se quedó sin tokens (desde ${fechaSegura(e.inicio)}). No edites el mismo código a la vez; mira git log y ${resumen} cuando termine.`;
   }
   escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { ...e, revisado: ahora.toISOString() });
   return [
-    `Relevo de Codex en «${proyecto}»: Claude se quedó sin tokens y Codex siguió el desarrollo (${e.estado}, ${e.fin ?? e.inicio}).`,
+    `Relevo de Codex en «${proyecto}»: Claude se quedó sin tokens y Codex siguió el desarrollo (${estadoSeguro(e.estado)}, ${fechaSegura(e.fin ?? e.inicio)}).`,
     `Antes de continuar: lee su resumen (${resumen}) y su registro (${rutaDe(trabajo, proyecto, 'log')}), revisa sus commits con git log y git diff,`,
     'ejecuta las pruebas del proyecto y corrige o aprueba lo hecho. Después sigue la lista de tareas de Ruflo y dile a Daniel qué hizo Codex.',
   ].join('\n');
