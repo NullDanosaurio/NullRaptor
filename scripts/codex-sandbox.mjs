@@ -28,7 +28,11 @@ export function argsSandboxCodex({ ruta, escribibles = [], env = process.env, co
   const poner = (p, modo) => { if (p) permisos.set(path.resolve(p), modo); };
   for (const p of [ruta, ...escribibles, os.tmpdir(), '/tmp']) poner(p, 'write');
   const git = path.join(ruta, '.git');
-  if (existe(git) && fs.statSync(git).isDirectory()) poner(git, 'write'); // los worktrees (.git archivo) no se tocan
+  if (existe(git) && fs.statSync(git).isDirectory()) { // los worktrees (.git archivo) no se tocan
+    poner(git, 'write'); // sin esto no se crean objetos ni se hacen commits
+    // hooks y config en solo lectura: si no, Codex podría dejar código que se ejecuta fuera del sandbox (al hacer git).
+    for (const n of ['hooks', 'config']) if (existe(path.join(git, n))) poner(path.join(git, n), 'read');
+  }
   const secretos = [];
   if (trabajo) {
     const { carpetas, archivos } = rutasProtegidas({ env, configDir: configDir ?? path.join(env.HOME ?? os.homedir(), '.claude'), trabajo });

@@ -19,7 +19,8 @@ function montaje() {
   const claude = path.join(base, 'home', '.claude');
   const codex = path.join(base, 'home', '.codex');
   const cofre = path.join(base, 'home', '.nullraptor');
-  for (const d of [path.join(proyecto, '.git'), claude, codex, cofre, path.join(trabajo, 'registros')]) fs.mkdirSync(d, { recursive: true });
+  for (const d of [path.join(proyecto, '.git', 'hooks'), claude, codex, cofre, path.join(trabajo, 'registros')]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(proyecto, '.git', 'config'), '[core]\n');
   for (const f of [path.join(claude, '.credentials.json'), path.join(codex, 'auth.json'), path.join(trabajo, '.mcp-agente.json'), path.join(cofre, 'credenciales.cifrado')]) fs.writeFileSync(f, 'FALSO', { mode: 0o600 });
   const env = { HOME: path.join(base, 'home'), CODEX_HOME: codex, CREDENCIALES: path.join(cofre, 'credenciales.cifrado'), CLAUDE_CONFIG_DIR: claude };
   return { base, trabajo, proyecto, claude, codex, cofre, env };
@@ -35,6 +36,8 @@ test('argsSandboxCodex: proyecto y .git escribibles; secretos ocultos; raíz de 
   assert.equal(p[m.proyecto], 'write');
   assert.equal(p[path.join(m.proyecto, '.git')], 'write');
   assert.equal(p['/x/adjuntos'], 'write');
+  assert.equal(p[path.join(m.proyecto, '.git', 'hooks')], 'read');
+  assert.equal(p[path.join(m.proyecto, '.git', 'config')], 'read');
   for (const secreto of [m.cofre, m.claude, path.join(m.codex, 'auth.json'), path.join(m.trabajo, '.mcp-agente.json'), path.join(m.trabajo, 'registros')]) assert.equal(p[secreto], 'none', secreto);
   assert.ok(a.includes('permissions.nr.network.enabled=false'));
 });
@@ -59,4 +62,8 @@ test('codex sandbox con el perfil: no lee secretos y sí escribe en el proyecto'
   }
   const w = correr(`echo a > "${m.proyecto}/ok" && echo a > "${m.proyecto}/.git/obj"`);
   assert.equal(w.status, 0, w.stderr);
+  const g = path.join(m.proyecto, '.git');
+  for (const orden of [`echo x > "${g}/hooks/pre-commit"`, `echo x > "${g}/config"`, `echo x > "${g}/config.lock" && mv "${g}/config.lock" "${g}/config"`]) assert.notEqual(correr(orden).status, 0, orden);
+  assert.equal(fs.readFileSync(path.join(g, 'config'), 'utf8'), '[core]\n');
+  assert.deepEqual(fs.readdirSync(path.join(g, 'hooks')), []);
 });
