@@ -30,6 +30,6 @@ export function ajustesMcpCodex({ agente, mcp }) {
   return { mcp_servers: Object.fromEntries(Object.keys(mcpServers).map((nombre) => [
     nombre,
     { command: process.execPath, args: [path.join(agente, 'scripts', 'codex-mcp-puente.mjs'), mcp, nombre], enabled: true, startup_timeout_sec: 60,
-      ...(AUTOAPROBADAS[nombre] ? { enabled_tools: AUTOAPROBADAS[nombre], default_tools_approval_mode: 'approve' } : {}) },
+      ...(Object.hasOwn(AUTOAPROBADAS, nombre) ? { enabled_tools: AUTOAPROBADAS[nombre], default_tools_approval_mode: 'approve' } : {}) },
   ])) };
 }

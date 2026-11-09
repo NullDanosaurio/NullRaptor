@@ -64,7 +64,7 @@ function porLineas(flujo, alLinea, alFin) {
 }
 
 export async function arrancarPuente(config, nombre = '') {
-  const permitidas = AUTOAPROBADAS[nombre];
+  const permitidas = Object.hasOwn(AUTOAPROBADAS, nombre) ? AUTOAPROBADAS[nombre] : undefined; // sin claves heredadas (constructor...)
   if (config.command) {
     const hijo = spawn(config.command, config.args ?? [], { cwd: config.cwd, env: entornoMcp(config), stdio: ['pipe', 'pipe', 'inherit'] });
     if (permitidas) {

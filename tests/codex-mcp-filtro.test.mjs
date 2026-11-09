@@ -56,3 +56,19 @@ test('un servidor sin lista (herramienta propia) sigue como antes: todo pasa', a
   assert.match(respuestas.find((r) => r.id === 2).result.content[0].text, /terminal_execute/);
   assert.equal(recibido.filter((m) => m.method === 'tools/call').length, 1);
 });
+
+test('un servidor llamado como una propiedad heredada (constructor, toString) no recibe approve ni filtro propio', async (t) => {
+  const { ajustesMcpCodex } = await import('../scripts/codex-mcp.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-heredado-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const mcp = path.join(dir, 'mcp.json');
+  fs.writeFileSync(mcp, JSON.stringify({ mcpServers: { constructor: { command: 'x' }, toString: { command: 'x' }, __proto__x: { command: 'x' } } }));
+  const { mcp_servers: s } = ajustesMcpCodex({ agente: '/a', mcp });
+  for (const n of ['constructor', 'toString']) {
+    assert.equal(s[n].default_tools_approval_mode, undefined, n);
+    assert.equal(s[n].enabled_tools, undefined, n);
+  }
+  // El puente de «constructor» no filtra (comportamiento de servidor sin lista): una herramienta cualquiera llega al servidor.
+  const { respuestas } = await sesion(t, 'constructor', [lista, llamada(2, 'terminal_execute')]);
+  assert.equal(respuestas.find((r) => r.id === 1).result.tools.length, AUTOAPROBADAS.ruflo.length + 3);
+});
