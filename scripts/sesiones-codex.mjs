@@ -69,6 +69,8 @@ export function sesionesCodex(env = process.env) {
   return sesiones.sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)));
 }
 
+// Los -c van antes de `resume` a propósito: en la terminal interactiva (nueva, con `resume` antes o después de los -c) Codex 0.163.0
+// los aplica en cualquier posición (probado: ruflo.task_list completó en los tres casos). Con `exec` NO vale: ver argsCodex (relevo.mjs).
 export function argsDesarrolloCodex({ ruta, adjuntos, memoria = null, sesion = null, continuar = false, instrucciones = '', configuracion = [], aviso = null, env = process.env, trabajo = null, configDir = env.CLAUDE_CONFIG_DIR }) {
   // Sandbox por permisos de ruta (codex-sandbox.mjs): proyecto y .git escribibles, secretos ocultos.
   const args = ['--no-daemon', ...argsSandboxCodex({ ruta, escribibles: [adjuntos].filter(Boolean), memoria, env, configDir, trabajo }),

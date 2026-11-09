@@ -464,3 +464,12 @@
 - App-server local de Codex 0.163.0: skills de usuario y roles reconocidos sin cuenta ni llamadas a modelos.
 - [?] Conversación real con modelo, navegador/móvil y recreación del contenedor con imagen nueva pendientes de
   despliegue. Activación y detalles en `docs/codex.md`; no se ha hecho push ni publicación ni reinicio.
+
+## 09/11 — Los -c de `codex exec` iban antes del subcomando
+- Hallazgo (Sara, E2E del relevo): `argsCodex` ponía `-c` antes de `exec` y Codex 0.163.0 no los aplicaba al modelo: el relevo corría
+  sin MCP (ruflo), sin `developer_instructions`, sin roles ni `features.multi_agent`; solo el perfil de sandbox (tras `exec`) valía.
+  Corregido: `--no-daemon exec <configuración> <sandbox> ...`, con prueba guardiana (`tests/codex-argv.test.mjs`).
+- Comprobado con Codex real (pty): las sesiones interactivas del panel, nuevas o con `resume`, SÍ aplican los `-c` en cualquier
+  posición (ruflo.task_list completó en los tres casos). `flujo/lib/agentes.mjs`, `scripts/chat.mjs` y `codex-parche.mjs` ya
+  ponían sus `-c` tras `exec`.
+- Sin comprobar: la reanudación con el relevo largo (3 h) y el efecto de `developer_instructions` en el comportamiento real.

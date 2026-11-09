@@ -69,6 +69,14 @@ solo junto a `enabled_tools` con una lista cerrada: ruflo = `task_list`, `task_c
 `resolve-library-id`, `query-docs`. Las herramientas propias (`herramienta-<id>`) y otros servidores no se aprueban: fallan en
 exec y piden aprobación en la sesión interactiva; auto-aprobar una sería decisión de Daniel. Una prueba lo garantiza (nunca
 `approve` sin `enabled_tools`).
+**Posición de los `-c` (causa real de «el modelo no ve ruflo»).** En `codex exec` 0.163.0 los `-c` puestos ANTES de `exec` no
+llegan al modelo (probado con el argv real del relevo: ruflo no aparece; con los `-c` tras `exec`, `mcp_tool_call ruflo/task_list`
+completa). Hasta ese arreglo el relevo NO recibía MCP, instrucciones de desarrollo, roles ni `project_doc_fallback_filenames`: solo
+el perfil de sandbox, que ya iba tras `exec`. Ahora el argv es `--no-daemon exec <configuración> <sandbox> ...` y una prueba guardiana
+(`tests/codex-argv.test.mjs`) falla si algún `-c` precede a `exec`. NO afecta a las sesiones interactivas del panel (sin subcomando
+o con `resume`): en una terminal real, ruflo.task_list se llamó y completó con los `-c` antes de `resume`, después de `resume` y
+sin subcomando. El aviso anterior de «MCP sin resolver» atribuía el fallo a los MCP de `-c`; era esto.
+
 **Dos barreras independientes.** (1) `enabled_tools` de Codex: no anuncia al modelo lo que no está en la lista (verificado por
 Sara con Codex real: `ruflo/task_list` funciona y `terminal_execute` no se anuncia). (2) El filtro del puente
 (`scripts/codex-mcp-puente.mjs`, `crearFiltro`, misma fuente `AUTOAPROBADAS`): para ruflo y context7, `tools/list` solo trae las
