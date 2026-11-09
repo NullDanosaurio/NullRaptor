@@ -16,6 +16,7 @@ export function capacidadesPuente(remotas = {}) {
     .map((clave) => [clave, remotas[clave].listChanged ? { listChanged: true } : {}]));
 }
 
+const MAX_RETENIDAS = 100; // llamadas que esperan a conocer los esquemas
 const ID_PROPIO = 'nullraptor-esquemas';
 const OCULTO = /^db_?path$/i; // parámetro oculto de las herramientas de memoria de Ruflo (abre cualquier archivo como SQLite)
 
@@ -119,6 +120,12 @@ export async function arrancarPuente(config, nombre = '') {
       let reloj = null;
       const procesar = (l, final = false) => {
         const { enviar, responder, extra, retener } = filtro.entrada(l, { final });
+        if (retener && retenidas.length >= MAX_RETENIDAS) {
+          let id; try { id = JSON.parse(l).id; } catch { /* sin id */ }
+          console.error(`[puente ${nombre}] demasiadas llamadas en espera de esquemas: rechazada`);
+          if (id !== undefined) process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Demasiadas llamadas pendientes: rechazada por Nullraptor.' } })}\n`);
+          return;
+        }
         if (retener) { retenidas.push(l); reloj ??= setTimeout(() => { reloj = null; retenidas.splice(0).forEach((x) => procesar(x, true)); }, 10_000); return; }
         for (const r of responder) process.stdout.write(`${JSON.stringify(r)}\n`);
         if (enviar) hijo.stdin.write(`${enviar}\n`);

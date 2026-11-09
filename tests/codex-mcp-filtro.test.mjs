@@ -124,3 +124,13 @@ test('lo que Codex escribe en Ruflo queda en codex-*: memory_store sin upsert y 
   assert.equal(args(7).description, '[Demo] [codex] ya marcada');
   assert.deepEqual(args(8), { key: 'en-curso', namespace: 'proyecto-Demo' }); // leer todo sigue permitido
 });
+
+test('las llamadas que esperan a los esquemas tienen tope (100): las siguientes se rechazan', async (t) => {
+  // Sin «initialized» el puente nunca pide los esquemas: todas las llamadas quedan retenidas.
+  const mensajes = Array.from({ length: 105 }, (_, i) => llamada(i + 10, 'task_list'));
+  const { respuestas, recibido } = await sesion(t, 'ruflo', mensajes, { inicializar: false });
+  const rechazadas = respuestas.filter((r) => /Demasiadas/.test(r.error?.message ?? ''));
+  assert.equal(rechazadas.length, 5);
+  assert.deepEqual(rechazadas.map((r) => r.id), [110, 111, 112, 113, 114]);
+  assert.equal(recibido.filter((m) => m.method === 'tools/call').length, 0); // ninguna llegó al servidor sin validar
+});
