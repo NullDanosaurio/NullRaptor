@@ -14,6 +14,8 @@ tareas y memoria de Ruflo. No se añaden archivos de IA a los repositorios de lo
 - El chat de consulta y `codex-parche.mjs` conservan sus flujos específicos; no son sesiones de desarrollo.
   Ejecutar `codex` directamente no aplica esta capa de Nullraptor.
 
+El historial de desarrollo lista solo las sesiones de Codex con `source: 'cli'` más los relevos registrados.
+
 La autenticación y el historial siguen en `CODEX_HOME`, o en `$HOME/.codex` si no está definido. No se modifican
 `config.toml` ni los datos de acceso de la cuenta. Las versiones de ambos clientes siguen fijadas en package.json.
 

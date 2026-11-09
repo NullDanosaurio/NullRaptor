@@ -20,6 +20,10 @@ test('proyectoDe: solo dentro de $TRABAJO_DIR/proyectos/<Proyecto>', () => {
   assert.equal(proyectoDe(path.join(t, 'proyectos', 'Demo'), t), 'Demo');
   assert.equal(proyectoDe(path.join(t, 'proyectos', 'Demo', 'src', 'x'), t), 'Demo');
   for (const fuera of [path.join(t, 'proyectos'), path.join(t, 'otra'), path.join(t, 'proyectos', '..', 'x'), '/tmp']) assert.equal(proyectoDe(fuera, t), null);
+  assert.equal(proyectoDe(path.join(t, 'nullraptor'), t), 'Nullraptor');
+  assert.equal(proyectoDe(path.join(t, 'nullraptor', 'scripts'), t), 'Nullraptor');
+  assert.equal(proyectoDe(path.join(t, 'nullraptor', '.worktrees', 'x'), t), 'Nullraptor');
+  assert.equal(proyectoDe(path.join(t, 'nullraptor-otro'), t), null);
   assert.equal(proyectoDe(undefined, t), null);
   assert.equal(proyectoDe(path.join(t, 'proyectos', 'Demo'), undefined), null);
 });

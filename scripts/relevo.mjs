@@ -27,7 +27,9 @@ export const esLimite = (entrada) => ERRORES_LIMITE.includes(entrada?.error);
 /** Nombre del proyecto si `cwd` está dentro de $TRABAJO_DIR/proyectos/<Proyecto>; si no, null (no se releva). */
 export function proyectoDe(cwd, trabajo) {
   if (!cwd || !trabajo) return null;
-  if (path.resolve(cwd) === path.join(trabajo, 'nullraptor')) return 'Nullraptor';
+  // Nullraptor también en sus subdirectorios y worktrees.
+  const dentro = path.relative(path.join(trabajo, 'nullraptor'), path.resolve(cwd));
+  if (dentro === '' || (!dentro.startsWith('..') && !path.isAbsolute(dentro))) return 'Nullraptor';
   const rel = path.relative(path.join(trabajo, 'proyectos'), path.resolve(cwd));
   const [nombre] = rel.split(path.sep);
   return !rel || rel.startsWith('..') || path.isAbsolute(rel) || !nombre ? null : nombre;

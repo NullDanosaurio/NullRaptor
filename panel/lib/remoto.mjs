@@ -135,10 +135,8 @@ export class Remoto {
 
     if (ia === 'claude') marcarConfianza(this.configDir, ruta);
     const env = entornoRemoto(this.env, { trabajo: this.trabajo, memoria: this.memoria, configDir: this.configDir });
-    const ajustes = JSON.stringify(ajustesTerminal({ env, configDir: this.configDir, trabajo: this.trabajo }));
-    // Adjuntos (imágenes del panel): fuera del proyecto, en una carpeta que Claude puede leer.
+    // Adjuntos (imágenes del panel): fuera del proyecto, en una carpeta que la IA puede leer.
     fs.mkdirSync(this.adjuntos, { recursive: true, mode: 0o700 });
-    const args = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes, '--add-dir', this.adjuntos];
     // MCP (Ruflo, los autorizados y las herramientas aprobadas) desde fuera del proyecto: scripts/ia.mjs lo prepara al
     // arrancar y se rehace aquí, para que una herramienta recién aprobada llegue a la sesión nueva.
     try { this.prepararMcp?.(); } catch (e) {
@@ -146,15 +144,21 @@ export class Remoto {
       console.warn(`[panel] MCP: ${e.message}`);
     }
     const mcp = path.join(this.trabajo, ARCHIVO_MCP);
-    if (fs.existsSync(mcp)) args.push('--mcp-config', mcp);
-    // Seguir la última conversación de este proyecto (Claude la guarda en el volumen) y, si lo hay, un primer mensaje.
-    if (textoPerfil) args.push('--append-system-prompt', textoPerfil);
-    if (continuar) args.push('--continue');
-    if (typeof aviso === 'string' && aviso.trim()) args.push('--', aviso.trim());
-    const preparada = ia === 'codex' ? prepararSesionCodex({ agente: AGENTE, env, memoria: this.memoria,
-      trabajo: this.trabajo, perfil: textoPerfil }) : null;
-    const finales = ia === 'codex' ? argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, memoria: this.memoria,
-      sesion: sesionCodex, continuar, aviso, configuracion: preparada.args }) : args;
+    let finales;
+    if (ia === 'codex') {
+      // El MCP ya se rehízo arriba (si hay preparador): prepararSesionCodex no lo repite.
+      const preparada = prepararSesionCodex({ agente: AGENTE, env, memoria: this.memoria, trabajo: this.trabajo, perfil: textoPerfil,
+        mcpListo: Boolean(this.prepararMcp) && fs.existsSync(mcp) });
+      finales = argsDesarrolloCodex({ ruta, adjuntos: this.adjuntos, memoria: this.memoria, sesion: sesionCodex, continuar, aviso, configuracion: preparada.args });
+    } else {
+      const ajustes = JSON.stringify(ajustesTerminal({ env, configDir: this.configDir, trabajo: this.trabajo }));
+      finales = ['--remote-control', `Nullraptor · ${nombre}`, '--permission-mode', 'manual', '--settings', ajustes, '--add-dir', this.adjuntos];
+      if (fs.existsSync(mcp)) finales.push('--mcp-config', mcp);
+      // Seguir la última conversación de este proyecto (Claude la guarda en el volumen) y, si lo hay, un primer mensaje.
+      if (textoPerfil) finales.push('--append-system-prompt', textoPerfil);
+      if (continuar) finales.push('--continue');
+      if (typeof aviso === 'string' && aviso.trim()) finales.push('--', aviso.trim());
+    }
     const hijo = this.lanzar(finales, { cwd: ruta, env, cols, filas, ia });
     const id = randomUUID();
     const s = { id, proyecto: nombre, ia, sesionCodex, perfil: textoPerfil ? perfil : null, url: null, entorno: null, inicio: new Date().toISOString(), estado: ia === 'codex' ? 'conectada' : 'conectando', motivo: null, quien, hijo, pantalla: '', clientes: new Set(), reloj: null };

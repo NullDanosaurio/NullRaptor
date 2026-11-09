@@ -1,9 +1,8 @@
 // Capa propia de Codex, persistente y externa a los proyectos. No modifica config.toml ni la autenticación.
 import fs from 'node:fs';
 import path from 'node:path';
-import { argumentosConfig, ajustesMcpCodex } from './codex-mcp.mjs';
+import { argumentosConfig, ajustesMcpCodex, toml } from './codex-mcp.mjs';
 import { contenidoRolCodex, instruccionesCodex, adaptarInstruccionesCodex, perfilCodex } from './codex-instrucciones.mjs';
-import { toml } from './codex-mcp.mjs';
 
 export function guardarPrivado(archivo, texto) {
   fs.mkdirSync(path.dirname(archivo), { recursive: true, mode: 0o700 });
