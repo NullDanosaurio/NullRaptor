@@ -137,10 +137,13 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   try { fs.fchmodSync(log, 0o600); } catch { /* Sin soporte: se deja. */ }
   const inicio = new Date().toISOString();
   let sesionCodex = null;
-  const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...datos });
+  const sinSandbox = env.RELEVO_SIN_SANDBOX === '1';
+  const aviso = 'RELEVO_SIN_SANDBOX=1: Codex corre SIN sandbox (acceso total al sistema y a la red).';
+  const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...(sinSandbox ? { aviso } : {}), ...datos });
+  if (sinSandbox) { try { fs.writeSync(log, `AVISO: ${aviso}\n`); } catch { /* El log es auxiliar. */ } }
   estado({ estado: 'en curso' });
   const bovedaAntes = instantaneaBoveda(env.BOVEDA_DIR);
-  const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox: env.RELEVO_SIN_SANDBOX === '1',
+  const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox,
     configuracion: preparada.args, memoria: env.BOVEDA_DIR, env, trabajo });
   const codigo = await new Promise((listo) => {
     const hijo = arrancar(binarioCodex(agente, env), args, { cwd: senal.cwd, stdio: ['pipe', 'pipe', log], env });

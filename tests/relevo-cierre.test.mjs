@@ -42,3 +42,20 @@ test('el relevo deja log, estado, briefing, señal e índice en 0600 y sus carpe
   assert.equal(modo(path.join(t, '.sesiones-codex', '33333333-3333-4333-8333-333333333333.json')), 0o600);
   assert.deepEqual(fs.readdirSync(path.join(t, '.sesiones-codex')).filter((n) => n.endsWith('.tmp')), []);
 });
+
+test('RELEVO_SIN_SANDBOX=1 deja un aviso visible en el log y en el estado; sin él no hay aviso', async () => {
+  for (const sin of ['1', '0']) {
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-sin-'));
+    fs.mkdirSync(path.join(t, 'proyectos', 'Demo'), { recursive: true });
+    anotarSenal({ error: 'rate_limit', cwd: path.join(t, 'proyectos', 'Demo') }, t);
+    fs.cpSync(path.join(fileURLToPath(new URL('..', import.meta.url)), 'config'), path.join(t, 'config'), { recursive: true });
+    const falso = path.join(t, 'codex-falso.sh');
+    fs.writeFileSync(falso, '#!/bin/sh\ncat > /dev/null\n', { mode: 0o755 });
+    const env = { ...process.env, HOME: path.join(t, 'casa'), BOVEDA_DIR: '', RELEVO_SIN_SANDBOX: sin, RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
+    await ejecutar('Demo', { trabajo: t, env, agente: t });
+    const log = fs.readFileSync(path.join(t, CARPETA, 'Demo.log'), 'utf8');
+    const estado = JSON.parse(fs.readFileSync(path.join(t, CARPETA, 'Demo.estado.json'), 'utf8'));
+    if (sin === '1') { assert.match(log, /AVISO.*SIN sandbox/); assert.match(estado.aviso, /SIN sandbox/); }
+    else { assert.ok(!/SIN sandbox/.test(log)); assert.equal(estado.aviso, undefined); }
+  }
+});
