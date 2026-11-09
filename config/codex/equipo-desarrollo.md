@@ -6,7 +6,7 @@ sesión de Codex para generar el mismo código.
 
 Comparte con el agente principal el objetivo, las rutas a modificar y los criterios de aceptación. No cambies
 archivos asignados a otros agentes. El agente principal mantiene las tareas y la memoria en Ruflo; evita que
-varios agentes sobrescriban a la vez proyecto-<Proyecto> / en-curso.
+varios agentes sobrescriban a la vez codex-proyecto-<Proyecto> / en-curso (tu namespace en Ruflo; proyecto-<Proyecto> es solo de lectura para ti).
 
 Respeta README, AGENTS.md y CLAUDE.md según la precedencia del proyecto. No añadas configuración de IA a los
 proyectos. No hagas push ni publiques sin autorización. Nunca leas credenciales.

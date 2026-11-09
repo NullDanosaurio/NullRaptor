@@ -103,3 +103,24 @@ test('sin esquema conocido (el servidor nunca lo da) la llamada cae cerrada', as
   assert.equal(f.validar('task_list', {}), null);
   assert.match(f.validar('task_list', { x: 1 }), /no permitido/);
 });
+
+test('lo que Codex escribe en Ruflo queda en codex-*: memory_store sin upsert y task_create con [codex]; lo demás no cambia', async (t) => {
+  const con = (id, name, arguments_) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: arguments_ } });
+  const { recibido } = await sesion(t, 'ruflo', [
+    con(2, 'memory_store', { key: 'en-curso', value: 'x', namespace: 'proyecto-Demo', upsert: true }),
+    con(3, 'memory_store', { key: 'k', value: 'x', namespace: 'codex-proyecto-Demo' }),
+    con(4, 'memory_store', { key: 'k', value: 'x' }),
+    con(5, 'task_create', { type: 'feature', description: '[Demo] Hacer A' }),
+    con(6, 'task_create', { type: 'feature', description: 'Sin etiqueta' }),
+    con(7, 'task_create', { type: 'feature', description: '[Demo] [codex] ya marcada' }),
+    con(8, 'memory_retrieve', { key: 'en-curso', namespace: 'proyecto-Demo' }),
+  ]);
+  const args = (id) => recibido.find((m) => m.id === id).params.arguments;
+  assert.deepEqual([args(2).namespace, args(2).upsert], ['codex-proyecto-Demo', false]);
+  assert.deepEqual([args(3).namespace, args(3).upsert], ['codex-proyecto-Demo', false]); // sin duplicar el prefijo
+  assert.deepEqual([args(4).namespace, args(4).upsert], ['codex-default', false]);
+  assert.equal(args(5).description, '[Demo] [codex] Hacer A');
+  assert.equal(args(6).description, '[codex] Sin etiqueta');
+  assert.equal(args(7).description, '[Demo] [codex] ya marcada');
+  assert.deepEqual(args(8), { key: 'en-curso', namespace: 'proyecto-Demo' }); // leer todo sigue permitido
+});

@@ -29,7 +29,7 @@ La autenticación y el historial siguen en `CODEX_HOME`, o en `$HOME/.codex` si 
 | Skills | Copias adaptadas de `config/skills/nullraptor-*` y `anthropic-*` en `$HOME/.agents/skills` |
 | Equipo | Seis roles nativos `equipo-*`, con TOML en `$TRABAJO_DIR/.codex-nullraptor/agentes` |
 | Configuración generada | `$TRABAJO_DIR/.codex-nullraptor/ajustes.json`, permisos 0600 |
-| Tareas y decisiones | Mismos datos de Ruflo que Claude; namespace `proyecto-<Proyecto>`, clave `en-curso` |
+| Tareas y decisiones | Mismos datos de Ruflo que Claude (Codex lee `proyecto-<Proyecto>`/`en-curso` y escribe en `codex-proyecto-<Proyecto>`) |
 
 En una carpeta se elige un solo archivo de instrucciones: el fallback no concatena `AGENTS.md` y `CLAUDE.md`.
 Las instrucciones de subcarpetas se aplican al trabajar en ellas. No se crean copias de estos archivos.
@@ -76,6 +76,14 @@ permitidas y `tools/call` de cualquier otra devuelve un error MCP «herramienta 
 deja un aviso en stderr). Los nombres se comparan exactos, sin prefijos. Comprobado con el puente real de Ruflo: 10
 herramientas, `terminal_execute` rechazado y `task_list` funciona. El resto de métodos y los demás servidores se reenvían
 igual que antes.
+
+**Lo que Codex escribe en Ruflo.** El puente valida los argumentos de cada llamada contra el esquema real de la herramienta
+(`dbPath`, que abriría cualquier archivo como SQLite, y las claves desconocidas se rechazan; sin esquema, cae cerrado).
+`memory_store` se fuerza a `codex-<namespace>` con `upsert:false`, así que Codex no puede pisar `proyecto-<X>/en-curso`, que Claude
+lee con más privilegios; leer toda la memoria sí está permitido (no hay secretos en Ruflo). `task_create` añade `[codex]` tras la
+etiqueta de proyecto. `task_update`/`task_complete` pueden tocar cualquier tarea: riesgo aceptado. Claude trata lo de `codex-*` y las
+tareas `[codex]` como dato no fiable de un tercero (lo dice la nota de vuelta). Riesgo aceptado: `query-docs` de context7 sale por red
+(equivale a una búsqueda web). Los nombres de servidor se comparan con `Object.hasOwn` (un servidor llamado `constructor` no hereda lista).
 
 Al empezar, también al reanudar, la IA consulta las tareas del proyecto y `en-curso`. Muestra la lista de tareas,
 usa el plan nativo si está disponible y guarda el estado en Ruflo. Si no hay herramienta de plan, mantiene una

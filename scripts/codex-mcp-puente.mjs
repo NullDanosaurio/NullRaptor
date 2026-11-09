@@ -19,6 +19,22 @@ export function capacidadesPuente(remotas = {}) {
 const ID_PROPIO = 'nullraptor-esquemas';
 const OCULTO = /^db_?path$/i; // parámetro oculto de las herramientas de memoria de Ruflo (abre cualquier archivo como SQLite)
 
+/** Lo que Codex escribe en Ruflo queda marcado: la memoria va siempre a `codex-<namespace>` sin sobrescribir (upsert=false) para
+ * que no pise `proyecto-<X>/en-curso`, que Claude lee con más privilegios, y sus tareas llevan la etiqueta [codex] (detrás de la
+ * etiqueta de proyecto, para que el filtro por [<Proyecto>] siga funcionando). Devuelve los argumentos reescritos. */
+export function reescribirLlamada(herramienta, args = {}) {
+  const a = { ...args };
+  if (herramienta === 'memory_store') {
+    const ns = typeof a.namespace === 'string' && a.namespace ? a.namespace : 'default';
+    a.namespace = ns.startsWith('codex-') ? ns : `codex-${ns}`;
+    a.upsert = false;
+  } else if (herramienta === 'task_create' && typeof a.description === 'string' && !/\[codex\]/i.test(a.description.slice(0, 80))) {
+    const m = /^(\[[^\]]*\])\s*([\s\S]*)$/.exec(a.description);
+    a.description = m ? `${m[1]} [codex] ${m[2]}` : `[codex] ${a.description}`;
+  }
+  return a;
+}
+
 /** Filtro por construcción de las herramientas de un servidor con lista cerrada (AUTOAPROBADAS, misma fuente que
  * `enabled_tools` de Codex): `tools/list` solo trae las permitidas y `tools/call` de otra se rechaza SIN llegar al servidor real.
  * Los argumentos de cada llamada se validan contra el esquema real de la herramienta (claves desconocidas y `dbPath`
@@ -59,6 +75,7 @@ export function crearFiltro(permitidas, nombre = 'mcp', aviso = (m) => console.e
           return false;
         }
       }
+      if (m?.method === 'tools/call') m.params = { ...m.params, arguments: reescribirLlamada(m.params.name, m.params.arguments) };
       if (m?.method === 'tools/list' && m.id !== undefined) listas.add(m.id);
       if (m?.method === 'notifications/initialized') extra.push(JSON.stringify({ jsonrpc: '2.0', id: ID_PROPIO, method: 'tools/list' }));
       return true;
@@ -154,7 +171,7 @@ export async function arrancarPuente(config, nombre = '') {
       if (!filtro.listo()) filtro.aprender((await cliente.listTools()).tools);
       const motivo = filtro.validar(peticion.params?.name, peticion.params?.arguments);
       if (motivo) { console.error(`[puente ${nombre}] llamada rechazada: ${motivo}`); throw new Error(motivo); }
-      return cliente.callTool(peticion.params);
+      return cliente.callTool({ ...peticion.params, arguments: reescribirLlamada(peticion.params.name, peticion.params.arguments) });
     });
     else servidor.setRequestHandler(tipos[esquema], (peticion) => cliente[metodo](peticion.params));
   }

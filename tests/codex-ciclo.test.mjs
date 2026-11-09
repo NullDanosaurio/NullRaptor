@@ -119,12 +119,15 @@ test('sumar conserva cantidades negativas y fraccionarias', () => {
   ejecutar('git', ['commit', '-m', 'Implementa suma con pruebas de cantidades']);
   const commit = ejecutar('git', ['rev-parse', 'HEAD']);
   await llamar(codex, 'task_complete', { taskId: tarea.taskId, result: { commit, pruebas: 'node --test: correcto' } });
+  // Codex solo escribe en codex-*: el puente reescribe el namespace y fuerza upsert=false.
+  const claveCodex = { namespace: `codex-${namespace}`, key: 'en-curso' };
   await llamar(codex, 'memory_store', { ...clave, upsert: true, value: {
     objetivo: 'Implementar suma', rama: 'main', taskId: tarea.taskId, hecho: ['Código', 'Pruebas', 'Commit'], falta: [], commit,
   } });
   await cerrar(codex);
   claude = await abrir(false);
-  assert.equal((await llamar(claude, 'memory_retrieve', clave)).value.commit, commit);
+  assert.equal((await llamar(claude, 'memory_retrieve', claveCodex)).value.commit, commit);
+  assert.equal((await llamar(claude, 'memory_retrieve', clave)).value.commit, undefined); // lo de Claude no se pisó
   const final = await llamar(claude, 'task_status', { taskId: tarea.taskId });
   assert.equal(final.status, 'completed');
   assert.equal(final.result.commit, commit);

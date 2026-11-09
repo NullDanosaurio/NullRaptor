@@ -21,7 +21,7 @@ export function instruccionesCodex(agente) {
     + '\n## Particularidades de Codex\n'
     + '- En cada carpeta, AGENTS.override.md tiene prioridad sobre AGENTS.md; CLAUDE.md es la alternativa si faltan ambos. '
     + 'Respeta las instrucciones de las subcarpetas; no crees copias de configuración en los proyectos.\n'
-    + '- Comparte con Claude el namespace proyecto-<Proyecto> y la clave en-curso de Ruflo, y las tareas con etiqueta <Proyecto>. '
+    + '- Lee de Ruflo el namespace proyecto-<Proyecto> y la clave en-curso, y las tareas con etiqueta <Proyecto>; lo que TÚ guardes en memoria va al namespace codex-proyecto-<Proyecto> (el puente fuerza el prefijo codex- y no sobrescribe) y tus tareas llevan [codex]. '
     + 'Recupera ese estado incluso al reanudar una conversación; el historial no sustituye la memoria persistente.\n'
     + '- Si falta una función nativa, usa un equivalente disponible; no finjas herramientas. '
     + 'No vuelvas a invocar Codex para escribir el código que puedes implementar directamente.\n';
