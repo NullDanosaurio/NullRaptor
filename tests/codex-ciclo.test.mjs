@@ -19,7 +19,7 @@ test('Claude y Codex recuperan tarea, pruebas, commit y memoria tras cerrar sus 
   const casa = path.join(carpeta, 'casa');
   const proyecto = path.join(trabajo, 'proyectos', 'ProyectoPrueba');
   for (const dir of [path.join(agente, 'scripts'), path.join(agente, 'config'), casa, proyecto]) fs.mkdirSync(dir, { recursive: true });
-  for (const nombre of ['ruflo-mcp.mjs', 'codex-mcp-puente.mjs']) {
+  for (const nombre of ['ruflo-mcp.mjs', 'codex-mcp-puente.mjs', 'codex-mcp.mjs']) {
     fs.copyFileSync(path.join(raiz, 'scripts', nombre), path.join(agente, 'scripts', nombre));
   }
   fs.symlinkSync(path.join(raiz, 'node_modules'), path.join(agente, 'node_modules'), 'dir');
