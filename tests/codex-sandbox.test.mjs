@@ -29,7 +29,9 @@ function montaje() {
   for (const d of ['.config/gh', '.copilot', '.ruflo', '.pki']) fs.writeFileSync(path.join(base, 'home', d, 'dato'), 'FALSO');
   fs.writeFileSync(path.join(base, 'home', '.bash_history'), 'FALSO');
   for (const f of [path.join(claude, '.credentials.json'), path.join(codex, 'auth.json'), path.join(trabajo, '.mcp-agente.json'), path.join(cofre, 'credenciales.cifrado')]) fs.writeFileSync(f, 'FALSO', { mode: 0o600 });
-  const env = { HOME: path.join(base, 'home'), CODEX_HOME: codex, CREDENCIALES: path.join(cofre, 'credenciales.cifrado'), CLAUDE_CONFIG_DIR: claude };
+  fs.mkdirSync(path.join(base, 'ruflo', 'swarm'), { recursive: true });
+  fs.writeFileSync(path.join(base, 'ruflo', 'memory.db'), 'FALSO');
+  const env = { CLAUDE_FLOW_MEMORY_PATH: path.join(base, 'ruflo', 'swarm'), HOME: path.join(base, 'home'), CODEX_HOME: codex, CREDENCIALES: path.join(cofre, 'credenciales.cifrado'), CLAUDE_CONFIG_DIR: claude };
   return { boveda, base, trabajo, proyecto, claude, codex, cofre, env };
 }
 
@@ -48,6 +50,7 @@ test('argsSandboxCodex: proyecto y .git escribibles; secretos ocultos; raíz de 
   assert.equal(p[path.join(m.proyecto, '.git', 'hooks')], 'read');
   assert.equal(p[path.join(m.proyecto, '.git', 'config')], 'read');
   for (const secreto of [m.cofre, m.claude, path.join(m.codex, 'auth.json'), path.join(m.trabajo, '.mcp-agente.json'), path.join(m.trabajo, 'registros')]) assert.equal(p[secreto], 'none', secreto);
+  assert.equal(p[path.join(m.base, 'ruflo')], 'none');
   for (const r of ['.config/gh', '.copilot', '.ruflo', '.bash_history', '.pki']) assert.equal(p[path.join(m.env.HOME, r)], 'none', r);
   assert.ok(a.includes('permissions.nr.network.enabled=false'));
 });
@@ -67,7 +70,7 @@ test('codex sandbox con el perfil: no lee secretos y sí escribe en el proyecto'
   t.after(() => fs.rmSync(m.base, { recursive: true, force: true }));
   const args = argsSandboxCodex({ ruta: m.proyecto, memoria: m.boveda, env: m.env, trabajo: m.trabajo });
   const correr = (orden) => spawnSync('codex', ['sandbox', ...args, '--', 'sh', '-c', orden], { encoding: 'utf8', timeout: 30000 });
-  for (const f of [...['.config/gh/dato', '.copilot/dato', '.ruflo/dato', '.pki/dato', '.bash_history'].map((r) => path.join(m.env.HOME, r)), path.join(m.claude, '.credentials.json'), path.join(m.codex, 'auth.json'), path.join(m.trabajo, '.mcp-agente.json'), path.join(m.cofre, 'credenciales.cifrado')]) {
+  for (const f of [path.join(m.base, 'ruflo', 'memory.db'), ...['.config/gh/dato', '.copilot/dato', '.ruflo/dato', '.pki/dato', '.bash_history'].map((r) => path.join(m.env.HOME, r)), path.join(m.claude, '.credentials.json'), path.join(m.codex, 'auth.json'), path.join(m.trabajo, '.mcp-agente.json'), path.join(m.cofre, 'credenciales.cifrado')]) {
     assert.notEqual(correr(`cat '${f}' >/dev/null`).status, 0, f);
   }
   const w = correr(`echo a > "${m.proyecto}/ok" && echo a > "${m.proyecto}/.git/obj"`);

@@ -28,6 +28,10 @@ export const argsEntornoCodex = () => ['-c', 'shell_environment_policy.inherit="
  * Solo para Codex: las reglas deny de Claude no cambian. Ruflo llega a Codex por MCP, que lo lanza fuera del sandbox. */
 export const SECRETOS_HOME = ['.config/gh', '.copilot', '.ruflo', '.bash_history', '.pki'];
 
+/** Estado de Ruflo (memoria, tareas, sesiones): en el contenedor CLAUDE_FLOW_MEMORY_PATH es <estado>/swarm. Codex llega a Ruflo
+ * por MCP (fuera del sandbox), así que sus comandos no necesitan leerlo. */
+export const rutaRuflo = (env) => env.CLAUDE_FLOW_MEMORY_PATH && path.basename(env.CLAUDE_FLOW_MEMORY_PATH) === 'swarm' ? path.dirname(env.CLAUDE_FLOW_MEMORY_PATH) : null;
+
 /** Argumentos `-c` del perfil de Codex. Pura salvo por `existe` (inyectable): las rutas «none» y las de solo lectura
  * que no existen se omiten, porque el sandbox crearía marcadores vacíos en ellas.
  * - memoria: bóveda (solo Proyectos/ escribible);
@@ -52,6 +56,7 @@ export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env =
     secretos.push(...carpetas, ...archivos, path.join(trabajo, '.mcp-agente.json'));
   }
   if (configDir) secretos.push(configDir); // ~/.claude entero: credenciales y sesiones de Claude
+  if (rutaRuflo(env)) secretos.push(rutaRuflo(env));
   secretos.push(...SECRETOS_HOME.map((r) => path.join(env.HOME ?? os.homedir(), r)));
   secretos.push(path.join(env.CODEX_HOME ?? path.join(env.HOME ?? os.homedir(), '.codex'), 'auth.json'));
   // Un «none» dentro de otro «none» hace fallar a bwrap: solo se deja el más externo.
