@@ -71,7 +71,7 @@ export function sesionesCodex(env = process.env) {
 
 export function argsDesarrolloCodex({ ruta, adjuntos, memoria = null, sesion = null, continuar = false, instrucciones = '', configuracion = [], aviso = null, env = process.env, trabajo = null, configDir = env.CLAUDE_CONFIG_DIR }) {
   // Sandbox por permisos de ruta (codex-sandbox.mjs): proyecto y .git escribibles, secretos ocultos.
-  const args = ['--no-daemon', ...argsSandboxCodex({ ruta, escribibles: [adjuntos, memoria].filter(Boolean), env, configDir, trabajo }),
+  const args = ['--no-daemon', ...argsSandboxCodex({ ruta, escribibles: [adjuntos].filter(Boolean), memoria, env, configDir, trabajo }),
     '--ask-for-approval', 'on-request', '-C', ruta, ...configuracion];
   if (instrucciones) args.push('-c', `developer_instructions=${JSON.stringify(instrucciones)}`);
   if (sesion) args.push('resume', sesion);

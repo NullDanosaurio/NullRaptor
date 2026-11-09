@@ -21,12 +21,16 @@ export function rutasProtegidas({ env, configDir, trabajo }) {
 
 /** Argumentos `-c` del perfil de Codex. Pura salvo por `existe` (inyectable): las rutas «none» y las de solo lectura
  * que no existen se omiten, porque el sandbox crearía marcadores vacíos en ellas.
+ * - memoria: bóveda (solo Proyectos/ escribible);
  * - ruta: proyecto (escribible); escribibles: más rutas escribibles (adjuntos, carpeta del relevo, /tmp...).
  * - env/configDir/trabajo: de dónde salen los secretos a ocultar. */
-export function argsSandboxCodex({ ruta, escribibles = [], env = process.env, configDir = env.CLAUDE_CONFIG_DIR, trabajo, existe = fs.existsSync }) {
+export function argsSandboxCodex({ ruta, escribibles = [], memoria = null, env = process.env, configDir = env.CLAUDE_CONFIG_DIR, trabajo, existe = fs.existsSync }) {
   const permisos = new Map([[':root', 'read']]);
   const poner = (p, modo) => { if (p) permisos.set(path.resolve(p), modo); };
   for (const p of [ruta, ...escribibles, os.tmpdir(), '/tmp']) poner(p, 'write');
+  // Bóveda: legible, y escribible solo en Proyectos/ (el perfil no puede expresar un archivo suelto: con
+  // Proyectos/<Proyecto>.md bwrap falla). relevo-boveda.mjs avisa de lo tocado fuera de la nota del proyecto.
+  if (memoria && existe(path.join(memoria, 'Proyectos'))) poner(path.join(memoria, 'Proyectos'), 'write');
   const git = path.join(ruta, '.git');
   if (existe(git) && fs.statSync(git).isDirectory()) { // los worktrees (.git archivo) no se tocan
     poner(git, 'write'); // sin esto no se crean objetos ni se hacen commits

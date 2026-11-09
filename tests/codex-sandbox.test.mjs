@@ -19,23 +19,27 @@ function montaje() {
   const claude = path.join(base, 'home', '.claude');
   const codex = path.join(base, 'home', '.codex');
   const cofre = path.join(base, 'home', '.nullraptor');
+  const boveda = path.join(base, 'boveda');
+  fs.mkdirSync(path.join(boveda, 'Proyectos'), { recursive: true });
   for (const d of [path.join(proyecto, '.git', 'hooks'), claude, codex, cofre, path.join(trabajo, 'registros')]) fs.mkdirSync(d, { recursive: true });
   fs.writeFileSync(path.join(proyecto, '.git', 'config'), '[core]\n');
   for (const f of [path.join(claude, '.credentials.json'), path.join(codex, 'auth.json'), path.join(trabajo, '.mcp-agente.json'), path.join(cofre, 'credenciales.cifrado')]) fs.writeFileSync(f, 'FALSO', { mode: 0o600 });
   const env = { HOME: path.join(base, 'home'), CODEX_HOME: codex, CREDENCIALES: path.join(cofre, 'credenciales.cifrado'), CLAUDE_CONFIG_DIR: claude };
-  return { base, trabajo, proyecto, claude, codex, cofre, env };
+  return { boveda, base, trabajo, proyecto, claude, codex, cofre, env };
 }
 
 test('argsSandboxCodex: proyecto y .git escribibles; secretos ocultos; raíz de solo lectura', (t) => {
   const m = montaje();
   t.after(() => fs.rmSync(m.base, { recursive: true, force: true }));
-  const a = argsSandboxCodex({ ruta: m.proyecto, escribibles: ['/x/adjuntos'], env: m.env, trabajo: m.trabajo });
+  const a = argsSandboxCodex({ ruta: m.proyecto, escribibles: ['/x/adjuntos'], memoria: m.boveda, env: m.env, trabajo: m.trabajo });
   assert.deepEqual(a.slice(0, 2), ['-c', 'default_permissions="nr"']);
   const p = tabla(a);
   assert.equal(p[':root'], 'read');
   assert.equal(p[m.proyecto], 'write');
   assert.equal(p[path.join(m.proyecto, '.git')], 'write');
   assert.equal(p['/x/adjuntos'], 'write');
+  assert.equal(p[path.join(m.boveda, 'Proyectos')], 'write');
+  assert.equal(p[m.boveda], undefined); // el resto de la bóveda queda en solo lectura
   assert.equal(p[path.join(m.proyecto, '.git', 'hooks')], 'read');
   assert.equal(p[path.join(m.proyecto, '.git', 'config')], 'read');
   for (const secreto of [m.cofre, m.claude, path.join(m.codex, 'auth.json'), path.join(m.trabajo, '.mcp-agente.json'), path.join(m.trabajo, 'registros')]) assert.equal(p[secreto], 'none', secreto);
@@ -55,7 +59,7 @@ const hayCodex = spawnSync('codex', ['--version']).status === 0 && spawnSync('co
 test('codex sandbox con el perfil: no lee secretos y sí escribe en el proyecto', { skip: !hayCodex && 'codex sandbox no disponible' }, (t) => {
   const m = montaje();
   t.after(() => fs.rmSync(m.base, { recursive: true, force: true }));
-  const args = argsSandboxCodex({ ruta: m.proyecto, env: m.env, trabajo: m.trabajo });
+  const args = argsSandboxCodex({ ruta: m.proyecto, memoria: m.boveda, env: m.env, trabajo: m.trabajo });
   const correr = (orden) => spawnSync('codex', ['sandbox', ...args, '--', 'sh', '-c', orden], { encoding: 'utf8', timeout: 30000 });
   for (const f of [path.join(m.claude, '.credentials.json'), path.join(m.codex, 'auth.json'), path.join(m.trabajo, '.mcp-agente.json'), path.join(m.cofre, 'credenciales.cifrado')]) {
     assert.notEqual(correr(`cat '${f}' >/dev/null`).status, 0, f);
@@ -66,4 +70,14 @@ test('codex sandbox con el perfil: no lee secretos y sí escribe en el proyecto'
   for (const orden of [`echo x > "${g}/hooks/pre-commit"`, `echo x > "${g}/config"`, `echo x > "${g}/config.lock" && mv "${g}/config.lock" "${g}/config"`]) assert.notEqual(correr(orden).status, 0, orden);
   assert.equal(fs.readFileSync(path.join(g, 'config'), 'utf8'), '[core]\n');
   assert.deepEqual(fs.readdirSync(path.join(g, 'hooks')), []);
+  // La bóveda de la prueba va fuera de /tmp (que es escribible a propósito).
+  const fuera = fs.mkdtempSync(path.join(os.homedir(), '.prueba-boveda-'));
+  t.after(() => fs.rmSync(fuera, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(fuera, 'Proyectos'));
+  m.boveda = fuera;
+  const args2 = argsSandboxCodex({ ruta: m.proyecto, memoria: fuera, env: m.env, trabajo: m.trabajo });
+  const correr2 = (orden) => spawnSync('codex', ['sandbox', ...args2, '--', 'sh', '-c', orden], { encoding: 'utf8', timeout: 30000 });
+  const fueraDeProyectos = correr2(`echo x > "${m.boveda}/otra.md"`);
+  assert.notEqual(fueraDeProyectos.status, 0);
+  assert.equal(correr2(`echo x > "${m.boveda}/Proyectos/P.md"`).status, 0);
 });

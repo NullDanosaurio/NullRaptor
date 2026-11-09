@@ -9,6 +9,7 @@
 import { registrarRelevoCodex } from './sesiones-codex.mjs';
 import { prepararSesionCodex } from './codex-sesion.mjs';
 import { guardarPrivado } from './codex-config.mjs';
+import { avisosBoveda, instantaneaBoveda } from './relevo-boveda.mjs';
 import { argsSandboxCodex } from './codex-sandbox.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -107,7 +108,7 @@ export function binarioCodex(agente = AGENTE, env = process.env) {
 export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false, configuracion = [], memoria = null, env = process.env, trabajo = null }) {
   // Sandbox por permisos de ruta (codex-sandbox.mjs): proyecto, .git y carpeta del relevo escribibles; sin red.
   const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox']
-    : argsSandboxCodex({ ruta: cwd, escribibles: [dirRelevo, memoria].filter(Boolean), env, trabajo });
+    : argsSandboxCodex({ ruta: cwd, escribibles: [dirRelevo].filter(Boolean), memoria, env, trabajo });
   return ['--no-daemon', ...configuracion, 'exec', ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
 
@@ -138,6 +139,7 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   let sesionCodex = null;
   const estado = (datos) => escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { pid: process.pid, inicio, sesionCodex, ...datos });
   estado({ estado: 'en curso' });
+  const bovedaAntes = instantaneaBoveda(env.BOVEDA_DIR);
   const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox: env.RELEVO_SIN_SANDBOX === '1',
     configuracion: preparada.args, memoria: env.BOVEDA_DIR, env, trabajo });
   const codigo = await new Promise((listo) => {
@@ -171,7 +173,11 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
     hijo.on('close', (code) => { if (pendiente.trim()) procesar(pendiente); pendiente = ''; fin(code ?? -1); });
   });
   fs.closeSync(log);
-  estado({ estado: codigo === 0 ? 'terminado' : 'error', fin: new Date().toISOString(), codigo });
+  const avisos = avisosBoveda(bovedaAntes, instantaneaBoveda(env.BOVEDA_DIR), proyecto);
+  if (avisos.length) {
+    try { fs.appendFileSync(resumen, `\n\n## Avisos de seguridad del relevo\n${avisos.map((a) => `- ${a}`).join('\n')}\n`, { mode: 0o600 }); } catch { /* Sin resumen: queda en el estado. */ }
+  }
+  estado({ estado: codigo === 0 ? 'terminado' : 'error', fin: new Date().toISOString(), codigo, ...(avisos.length ? { avisos } : {}) });
   return codigo;
 }
 
