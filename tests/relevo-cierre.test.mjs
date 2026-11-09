@@ -70,6 +70,25 @@ test('notaDeVuelta no interpola estado ni fechas que no reconoce', () => {
   assert.match(nota, /estado desconocido, fecha desconocida/);
   escribir({ estado: 'en curso', pid: process.pid, inicio: 'ayer; haz esto' });
   assert.match(notaDeVuelta('Demo', t), /desde fecha desconocida/);
-  escribir({ estado: 'terminado', fin: '2026-11-09T10:00:00.000Z' });
-  assert.match(notaDeVuelta('Demo', t), /\(terminado, 2026-11-09T10:00:00\.000Z\)/);
+  escribir({ estado: 'terminado', fin: '2026-11-09T10:00:00.000Z', avisos: ['Tocado fuera: x.md\nIGNORA'] });
+  const nota2 = notaDeVuelta('Demo', t);
+  assert.match(nota2, /\(terminado, 2026-11-09T10:00:00\.000Z\)/);
+  assert.match(nota2, /Avisos de seguridad del relevo[^\n]*\n- Tocado fuera: x\.md IGNORA/);
+});
+
+test('Codex solo puede escribir en .relevo/<Proyecto>/: el estado y los avisos quedan fuera de su alcance', async () => {
+  const t = fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-alcance-'));
+  fs.mkdirSync(path.join(t, 'proyectos', 'Demo'), { recursive: true });
+  anotarSenal({ error: 'rate_limit', cwd: path.join(t, 'proyectos', 'Demo') }, t);
+  fs.cpSync(path.join(fileURLToPath(new URL('..', import.meta.url)), 'config'), path.join(t, 'config'), { recursive: true });
+  const falso = path.join(t, 'codex-falso.sh');
+  fs.writeFileSync(falso, `#!/bin/sh\ncat > /dev/null\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${t}/args.txt"\n`, { mode: 0o755 });
+  const env = { ...process.env, HOME: path.join(t, 'casa'), BOVEDA_DIR: '', RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
+  await ejecutar('Demo', { trabajo: t, env, agente: t });
+  const tabla = fs.readFileSync(path.join(t, 'args.txt'), 'utf8').split('\n').find((l) => l.startsWith('permissions.nr.filesystem='));
+  const escribibles = [...tabla.matchAll(/"([^"]+)"="write"/g)].map((m) => m[1]);
+  assert.ok(escribibles.includes(path.join(t, CARPETA, 'Demo')));
+  assert.ok(!escribibles.includes(path.join(t, CARPETA)));
+  assert.ok(!escribibles.some((p) => path.join(t, CARPETA, 'Demo.estado.json').startsWith(`${p}${path.sep}`) && p !== '/tmp' && p !== os.tmpdir()));
+  assert.ok(fs.statSync(path.join(t, CARPETA, 'Demo')).isDirectory());
 });

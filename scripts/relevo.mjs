@@ -48,7 +48,10 @@ export function anotarSenal(entrada, trabajo, ahora = new Date()) {
   return { proyecto, ruta };
 }
 
-const rutaDe = (trabajo, proyecto, ext) => path.join(trabajo, CARPETA, `${proyecto}.${ext}`);
+// Lo que Codex escribe (resumen y salida final) va en .relevo/<Proyecto>/, la única parte de .relevo que el sandbox le
+// deja escribir; el estado, los avisos, la señal, el briefing y el log quedan fuera de su alcance.
+const DE_CODEX = ['codex.md', 'final.md'];
+const rutaDe = (trabajo, proyecto, ext) => DE_CODEX.includes(ext) ? path.join(trabajo, CARPETA, proyecto, ext) : path.join(trabajo, CARPETA, `${proyecto}.${ext}`);
 const leerJson = (ruta) => { try { return JSON.parse(fs.readFileSync(ruta, 'utf8')); } catch { return null; } };
 // Todo lo del relevo es privado: carpeta 0700 y archivos 0600, con escritura atómica.
 const privada = (dir) => { fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); try { fs.chmodSync(dir, 0o700); } catch { /* Carpeta ajena: se deja. */ } };
@@ -78,10 +81,13 @@ export function notaDeVuelta(proyecto, trabajo, ahora = new Date()) {
     return `Relevo en curso: Codex está trabajando ahora en «${proyecto}» porque Claude se quedó sin tokens (desde ${fechaSegura(e.inicio)}). No edites el mismo código a la vez; mira git log y ${resumen} cuando termine.`;
   }
   escribirJson(rutaDe(trabajo, proyecto, 'estado.json'), { ...e, revisado: ahora.toISOString() });
+  const avisos = (Array.isArray(e.avisos) ? e.avisos : []).filter((a) => typeof a === 'string').slice(0, 5)
+    .map((a) => `- ${a.replace(/[^\P{C}]/gu, ' ').slice(0, 300)}`);
   return [
     `Relevo de Codex en «${proyecto}»: Claude se quedó sin tokens y Codex siguió el desarrollo (${estadoSeguro(e.estado)}, ${fechaSegura(e.fin ?? e.inicio)}).`,
     `Antes de continuar: lee su resumen (${resumen}) y su registro (${rutaDe(trabajo, proyecto, 'log')}), revisa sus commits con git log y git diff,`,
     'ejecuta las pruebas del proyecto y corrige o aprueba lo hecho. Después sigue la lista de tareas de Ruflo y dile a Daniel qué hizo Codex.',
+    ...(avisos.length ? ['Avisos de seguridad del relevo (revísalos antes de seguir):', ...avisos] : []),
   ].join('\n');
 }
 
@@ -138,6 +144,8 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   const resumen = rutaDe(trabajo, proyecto, 'codex.md');
   const preparada = prepararSesionCodex({ agente, env, memoria: env.BOVEDA_DIR, trabajo });
   privada(dir);
+  const dirCodex = path.join(dir, proyecto);
+  privada(dirCodex);
   guardarPrivado(briefing, briefingDe({ ...senal, resumen }, { trabajo, agente, env }));
   const log = fs.openSync(rutaDe(trabajo, proyecto, 'log'), 'a', 0o600);
   try { fs.fchmodSync(log, 0o600); } catch { /* Sin soporte: se deja. */ }
@@ -149,7 +157,7 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   if (sinSandbox) { try { fs.writeSync(log, `AVISO: ${aviso}\n`); } catch { /* El log es auxiliar. */ } }
   estado({ estado: 'en curso' });
   const bovedaAntes = instantaneaBoveda(env.BOVEDA_DIR);
-  const args = argsCodex({ cwd: senal.cwd, dirRelevo: dir, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox,
+  const args = argsCodex({ cwd: senal.cwd, dirRelevo: dirCodex, salida: rutaDe(trabajo, proyecto, 'final.md'), sinSandbox,
     configuracion: preparada.args, memoria: env.BOVEDA_DIR, env, trabajo });
   const codigo = await new Promise((listo) => {
     const hijo = arrancar(binarioCodex(agente, env), args, { cwd: senal.cwd, stdio: ['pipe', 'pipe', log], env });
@@ -204,7 +212,7 @@ export function leerEnCurso(proyecto, { agente = AGENTE, env = process.env, corr
 const git = (cwd, args) => { try { return execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 15_000, stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return ''; } };
 
 /** Briefing con el que Codex continúa el desarrollo donde lo dejó Claude. Todo lo que cita es dato, no órdenes. */
-export function armarBriefing({ proyecto, cwd, senal, tareas, enCurso, rama, estadoGit, commits, resumen = `.relevo/${proyecto}.codex.md` }) {
+export function armarBriefing({ proyecto, cwd, senal, tareas, enCurso, rama, estadoGit, commits, resumen = `.relevo/${proyecto}/codex.md` }) {
   const abiertas = tareas.filter((t) => t.proyecto === proyecto && (t.estado === 'en curso' || t.estado === 'pendiente'));
   const lista = abiertas.length ? abiertas.map((t) => `- [${t.estado}] ${t.id}: ${t.texto}`).join('\n') : '- (ninguna registrada en Ruflo)';
   return [

@@ -60,7 +60,7 @@ test('armarBriefing: tareas abiertas del proyecto, estado de Ruflo, git y reglas
   assert.match(b, /proyecto-Demo \/ en-curso\)\n\{"tarea":"X"\}/);
   assert.match(b, /rama feat\)\n M a\.js/);
   assert.match(b, /sin Co-Authored-By/);
-  assert.match(b, /\.relevo\/Demo\.codex\.md/);
+  assert.match(b, /\.relevo\/Demo\/codex\.md/);
   const vacio = armarBriefing({ proyecto: 'Demo', cwd: '/w', tareas: [], enCurso: null, rama: '', estadoGit: '', commits: '' });
   assert.match(vacio, /\(ninguna registrada en Ruflo\)/);
   assert.match(vacio, /\(no disponible\)/);
@@ -116,7 +116,7 @@ test('ejecutar corre Codex con el briefing por la entrada y deja el estado final
   const env = { ...process.env, HOME: path.join(t, 'casa'), BOVEDA_DIR: '', RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t, 'sin-tareas.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t, 'x') };
   assert.equal(await ejecutar('Demo', { trabajo: t, env, agente: t }), 0);
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), /relevas a Claude en el desarrollo de «Demo»/);
-  assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo.codex.md').replace(/\./g, '\\.')} un resumen`));
+  assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo', 'codex.md').replace(/\./g, '\\.')} un resumen`));
   const args = fs.readFileSync(path.join(t, 'args.txt'), 'utf8');
   assert.match(args, /^--no-daemon -c mcp_servers=/);
   assert.match(args, /exec -c default_permissions="nr" /);
@@ -144,7 +144,8 @@ test('listarRelevos y detalleRelevo: para el panel, con registro y resumen, sin 
   guardar('Viejo', { estado: 'terminado', inicio: '2026-11-01T10:00:00Z', fin: '2026-11-01T11:00:00Z', codigo: 0 });
   guardar('Hecho', { estado: 'terminado', inicio: '2026-11-04T08:00:00Z', fin: '2026-11-04T09:00:00Z', codigo: 0 });
   guardar('Vivo', { estado: 'en curso', pid: process.pid, inicio: '2026-11-04T11:00:00Z' });
-  fs.writeFileSync(path.join(dir, 'Hecho.codex.md'), 'Hice A');
+  fs.mkdirSync(path.join(dir, 'Hecho'));
+  fs.writeFileSync(path.join(dir, 'Hecho', 'codex.md'), 'Hice A');
   fs.writeFileSync(path.join(dir, 'Hecho.log'), Array.from({ length: 100 }, (_, i) => `l${i}`).join('\n'));
   assert.deepEqual(listarRelevos(t, ahora).map((r) => [r.proyecto, r.estado, r.resumen]), [['Vivo', 'en curso', false], ['Hecho', 'terminado', true]]);
   const d = detalleRelevo(t, 'Hecho', 5);
@@ -165,7 +166,7 @@ test('notaDeVuelta: avisa a Claude una sola vez de lo que hizo Codex, o de que s
   fs.writeFileSync(estado, JSON.stringify({ estado: 'terminado', inicio: '2026-11-04T10:00:00Z', fin: '2026-11-04T11:00:00Z', codigo: 0 }));
   const nota = notaDeVuelta('Demo', t, new Date('2026-11-04T12:00:00Z'));
   assert.match(nota, /Codex siguió el desarrollo \(terminado/);
-  assert.match(nota, /Demo\.codex\.md/);
+  assert.match(nota, /Demo\/codex\.md/);
   assert.match(nota, /ejecuta las pruebas/);
   assert.equal(JSON.parse(fs.readFileSync(estado, 'utf8')).revisado, '2026-11-04T12:00:00.000Z');
   assert.equal(notaDeVuelta('Demo', t), null);

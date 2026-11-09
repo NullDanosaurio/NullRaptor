@@ -57,7 +57,7 @@ test('ejecutar deja en el resumen y en el estado el aviso por archivos de la bó
   fs.writeFileSync(falso, `#!/bin/sh\ncat > /dev/null\necho n > "${boveda}/Proyectos/Demo.md"\necho x > "${boveda}/intrusa.md"\n`, { mode: 0o755 });
   const env = { ...process.env, HOME: path.join(t0, 'casa'), BOVEDA_DIR: boveda, RUFLO_CODEX_EXE: falso, RUFLO_TAREAS: path.join(t0, 'sin.json'), CLAUDE_FLOW_MEMORY_PATH: path.join(t0, 'x') };
   await ejecutar('Demo', { trabajo, env, agente: trabajo });
-  const resumen = fs.readFileSync(path.join(trabajo, CARPETA, 'Demo.codex.md'), 'utf8');
+  const resumen = fs.readFileSync(path.join(trabajo, CARPETA, 'Demo', 'codex.md'), 'utf8');
   assert.match(resumen, /Avisos de seguridad/);
   assert.match(resumen, /intrusa\.md/);
   assert.match(resumen, /«main»/);

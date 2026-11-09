@@ -80,9 +80,14 @@ Panel, terminal y relevo comparten un perfil de permisos por ruta (`default_perm
 `--sandbox workspace-write` (son incompatibles). Verificado con `codex sandbox` 0.163.0; la ruta más específica gana:
 
 - Raíz del sistema en solo lectura. Escribibles: el proyecto, su `.git`, los adjuntos, `/tmp` y, en el relevo,
-  `.relevo/`. Sin red (`permissions.nr.network.enabled=false`).
+  `.relevo/<Proyecto>/` (resumen y salida final; el estado, los avisos, la señal y el log del relevo los escribe solo
+  Nullraptor, fuera de su alcance). Sin red (`permissions.nr.network.enabled=false`).
+- A los comandos de Codex no llegan tokens ni claves (`shell_environment_policy.exclude`: `*TOKEN*`, `*KEY*`, `*SECRET*`,
+  `GIT_CONFIG_*`, `GH_*`...). Efecto: Codex no puede hacer push ni llamar a `gh`. Los MCP los lanza Codex con su propio entorno
+  (el puente de Ruflo responde con entorno vacío).
 - Ocultos (`none`): el cofre y `~/.nullraptor`, `registros/`, el archivo MCP con las claves de herramientas, `~/.claude`
-  (credenciales de Claude) y `$CODEX_HOME/auth.json`. La lista es la misma que las reglas `deny` de Claude
+  (credenciales de Claude, aunque `CLAUDE_CONFIG_DIR` no esté definido), `~/.config/gh`, `~/.copilot`, `~/.ruflo`,
+  `~/.bash_history`, `~/.pki` y `$CODEX_HOME/auth.json`. Solo se ocultan las rutas que existen al lanzar (`registros/` y el MCP se crean antes). La lista es la misma que las reglas `deny` de Claude
   (`rutasProtegidas`). Codex lee su `auth.json` desde fuera del sandbox: solo se oculta a los comandos que ejecuta.
 - `.git/hooks` y `.git/config` en solo lectura (un hook sería código que corre fuera del sandbox). Efecto aceptado:
   `git config` falla dentro de Codex. Solo se aplica si `.git` es una carpeta. Limitación: en un worktree (`.git` es un
@@ -93,8 +98,7 @@ Panel, terminal y relevo comparten un perfil de permisos por ruta (`default_perm
 - `RELEVO_SIN_SANDBOX=1` desactiva todo lo anterior y deja un aviso en el log y en el estado del relevo.
 
 Riesgos aceptados: la bóveda es escribible en todo `Proyectos/` (otras notas de proyecto); `/tmp` es escribible; los
-servidores MCP los lanza Codex fuera del sandbox; el relevo escribe en `.relevo/` (estado y log, no se protegen de
-Codex). El aviso de la bóveda compara `git status` antes y después: si Daniel ya tenía un archivo modificado y Codex lo
+servidores MCP los lanza Codex fuera del sandbox; el aviso de bóveda compara contenido pero solo ve archivos que git ve cambiados. El aviso de la bóveda compara `git status` antes y después: si Daniel ya tenía un archivo modificado y Codex lo
 vuelve a tocar, la línea es idéntica y no se avisa.
 Verificado con `codex exec` real (09/11/2026, repo de juguete con archivos falsos): Codex arranca con `auth.json` oculto,
 edita y hace commit, y no puede escribir en `.git/hooks` ni en `.git/config`. Sin comprobar con Codex real: el relevo
