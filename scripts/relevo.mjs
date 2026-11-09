@@ -134,7 +134,8 @@ export function argsCodex({ cwd, dirRelevo, salida, sinSandbox = false, configur
   // Sandbox por permisos de ruta (codex-sandbox.mjs): proyecto, .git y carpeta del relevo escribibles; sin red.
   const sandbox = sinSandbox ? ['--dangerously-bypass-approvals-and-sandbox', ...argsEntornoCodex()]
     : argsSandboxCodex({ ruta: cwd, escribibles: [dirRelevo].filter(Boolean), memoria, env, trabajo });
-  return ['--no-daemon', ...configuracion, 'exec', ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
+  // Los -c van DESPUÉS de «exec»: los anteriores al subcomando los ignora `codex exec` 0.163.0 (probado con ruflo/task_list).
+  return ['--no-daemon', 'exec', ...configuracion, ...sandbox, '--json', '--color', 'never', '-C', cwd, '-o', salida, '-'];
 }
 
 /** Lanza el relevo en segundo plano (proceso aparte, que sobrevive al hook). Una sola vez por proyecto mientras

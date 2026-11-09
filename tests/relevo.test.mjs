@@ -118,8 +118,9 @@ test('ejecutar corre Codex con el briefing por la entrada y deja el estado final
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), /relevas a Claude en el desarrollo de «Demo»/);
   assert.match(fs.readFileSync(path.join(t, 'entrada.txt'), 'utf8'), new RegExp(`${path.join(t, '.relevo', 'Demo', 'codex.md').replace(/\./g, '\\.')} un resumen`));
   const args = fs.readFileSync(path.join(t, 'args.txt'), 'utf8');
-  assert.match(args, /^--no-daemon -c mcp_servers=/);
-  assert.match(args, /exec -c default_permissions="nr" /);
+  assert.match(args, /^--no-daemon exec -c mcp_servers=/); // los -c van tras «exec»
+  assert.match(args, / -c default_permissions="nr" /);
+  assert.ok(args.indexOf('developer_instructions=') > args.indexOf(' exec ') && args.indexOf('default_permissions') > args.indexOf(' exec '));
   assert.match(args, /project_doc_fallback_filenames=.*CLAUDE.md/);
   assert.match(args, /developer_instructions=/);
   assert.ok(fs.existsSync(path.join(env.HOME, '.agents', 'skills', 'nullraptor-pc', 'SKILL.md')));
