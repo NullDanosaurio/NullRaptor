@@ -382,7 +382,7 @@ if ($LASTEXITCODE -eq 0 -and $copia) {
 $conSeccomp = if (Test-Path $perfilSeccomp) { @('--security-opt', "seccomp=$perfilSeccomp") } else { Write-Host 'Aviso: sin el perfil seccomp, Codex no podrá usar su sandbox.'; @() }
 $publica = if ($enRed -eq '1') { Abrir-Firewall; "${puerto}:4321" } else { "127.0.0.1:${puerto}:4321" }
 $publicaApps = @(foreach ($p in $puertosApps) { '-p'; "127.0.0.1:${p}:${p}" })
-docker run -d --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" --label "nullraptor.carpetas=$etiquetaCarpetas" `
+docker run -d --init --name $nombre --label "nullraptor.red=$enRed" --label "nullraptor.dominio=$dominio" --label "nullraptor.carpetas=$etiquetaCarpetas" `
   @conSeccomp -e AGENTE_CLAVE @conPuente -e "PANEL_RED=$enRed" -e "PANEL_DOMINIO=$dominio" -e NULLRAPTOR_LANZADOR=windows -e "NULLRAPTOR_CARPETAS=$etiquetaCarpetas" `
   -v nullraptor:/estado -v $montaCofre @montaCarpetas -p $publica @publicaApps $imagen node panel/servidor.mjs | Out-Null
 $codigo = $LASTEXITCODE

@@ -4,6 +4,7 @@ services:
   nullraptor:
     build: .
     image: nullraptor:dev
+    init: true # PID 1 con init: recoge los procesos zombis huérfanos
     volumes:
       - nullraptor:/estado
     ports:
