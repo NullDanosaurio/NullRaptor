@@ -112,3 +112,12 @@ test('sin CLAUDE_CONFIG_DIR se oculta $HOME/.claude y prepararSesionCodex crea l
   assert.ok(fs.existsSync(path.join(m.trabajo, '.mcp-agente.json')));
   assert.equal(tabla(argsSandboxCodex({ ruta: m.proyecto, env, trabajo: m.trabajo }))[path.join(m.trabajo, 'registros')], 'none');
 });
+
+test('el entorno de Codex pierde tokens, sesiones y NULLRAPTOR_*/AGENTE_*, pero conserva la identidad de git y rutas de trabajo', { skip: !hayCodex && 'codex sandbox no disponible' }, () => {
+  const args = argsSandboxCodex({ ruta: '/tmp', env: {}, trabajo: null });
+  const env = { PATH: process.env.PATH, HOME: process.env.HOME, TRABAJO_DIR: '/t', BOVEDA_DIR: '/b', CLAUDE_CONFIG_DIR: '/c', GIT_AUTHOR_NAME: 'Ana', GIT_AUTHOR_EMAIL: 'a@a', GIT_COMMITTER_NAME: 'Ana',
+    CLAUDE_CODE_SESSION_ID: 's', NULLRAPTOR_PUENTE: 'p', AGENTE_GIT_EMAIL: 'x', MI_COOKIE: 'c', X_BEARER: 'b', OAUTH_X: 'o', MI_PASSWD: 'p' };
+  const r = spawnSync('codex', ['sandbox', ...args, '--', 'sh', '-c', 'env | cut -d= -f1 | sort | tr "\\n" " "'], { encoding: 'utf8', env, timeout: 30000 }).stdout;
+  for (const queda of ['TRABAJO_DIR', 'BOVEDA_DIR', 'CLAUDE_CONFIG_DIR', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'PATH', 'HOME']) assert.match(r, new RegExp(`\\b${queda}\\b`), queda);
+  for (const sale of ['CLAUDE_CODE_SESSION_ID', 'NULLRAPTOR_PUENTE', 'AGENTE_GIT_EMAIL', 'MI_COOKIE', 'X_BEARER', 'OAUTH_X', 'MI_PASSWD']) assert.doesNotMatch(r, new RegExp(`\\b${sale}\\b`), sale);
+});

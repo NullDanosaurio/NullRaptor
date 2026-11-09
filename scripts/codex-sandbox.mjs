@@ -21,7 +21,8 @@ export function rutasProtegidas({ env, configDir, trabajo }) {
 
 /** Variables que no llegan a los comandos de Codex (tokens, claves, git por entorno). Con ellas fuera, Codex no puede
  * hacer push ni llamar a gh. Los MCP los lanza Codex con su propio entorno, no con esta política. */
-export const EXCLUIR_ENTORNO = ['*TOKEN*', '*KEY*', '*SECRET*', '*PASSWORD*', '*CLAVE*', '*CREDENCIAL*', 'GIT_CONFIG_*', 'GH_*', 'GITHUB_*'];
+export const EXCLUIR_ENTORNO = ['*TOKEN*', '*KEY*', '*SECRET*', '*PASSWORD*', '*CLAVE*', '*CREDENCIAL*', 'GIT_CONFIG_*', 'GH_*', 'GITHUB_*',
+  '*OAUTH*', 'AUTH_*', '*_AUTH', '*AUTHORIZATION*', '*COOKIE*', '*PASSWD*', '*SESSION*', '*BEARER*', 'NULLRAPTOR_*', 'AGENTE_*'];
 export const argsEntornoCodex = () => ['-c', 'shell_environment_policy.inherit="all"', '-c', `shell_environment_policy.exclude=${JSON.stringify(EXCLUIR_ENTORNO)}`];
 
 /** Credenciales del usuario fuera del alcance de Codex (gh, Copilot, Ruflo, historial de la shell, certificados).
