@@ -159,11 +159,12 @@ export async function ejecutar(proyecto, { trabajo, agente = AGENTE, env = proce
   const preparada = prepararSesionCodex({ agente, env, memoria: env.BOVEDA_DIR, trabajo });
   privada(dir);
   const dirCodex = path.join(dir, proyecto);
-  prepararCarpetaCodex(dirCodex); // sin enlaces ni restos: Codex solo escribirá aquí dentro
+  const avisoCarpeta = prepararCarpetaCodex(dirCodex); // sin enlaces ni restos: Codex solo escribirá aquí dentro
   quitarSiNoRegular(rutaDe(trabajo, proyecto, 'final.md'));
   guardarPrivado(briefing, briefingDe({ ...senal, resumen }, { trabajo, agente, env }));
   const log = fs.openSync(rutaDe(trabajo, proyecto, 'log'), 'a', 0o600);
   try { fs.fchmodSync(log, 0o600); } catch { /* Sin soporte: se deja. */ }
+  if (avisoCarpeta) { try { fs.writeSync(log, `AVISO: ${avisoCarpeta}\n`); } catch { /* El log es auxiliar. */ } }
   const inicio = new Date().toISOString();
   let sesionCodex = null;
   const sinSandbox = env.RELEVO_SIN_SANDBOX === '1';

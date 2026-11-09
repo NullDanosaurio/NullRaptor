@@ -94,3 +94,16 @@ test('nombres de proyecto: espacios sí; «..», barras, saltos de línea y comi
   assert.equal(notaDeVuelta('a/b', m.trabajo), null);
   return assert.rejects(ejecutar('a"b', { trabajo: m.trabajo, env: m.env, agente: m.trabajo }), /no válido/);
 });
+
+test('una subcarpeta 555 con contenido de solo lectura en .relevo/<P>/ no impide el siguiente relevo', async (t) => {
+  const m = montaje(t, { cuerpoFalso: 'ls -A "$DIR/$P" > "$DIR/../visto.txt"' });
+  const sub = path.join(m.dir, 'Demo', 'trampa');
+  fs.mkdirSync(path.join(sub, 'hondo'), { recursive: true });
+  fs.writeFileSync(path.join(sub, 'hondo', 'x'), 'x', { mode: 0o400 });
+  fs.chmodSync(path.join(sub, 'hondo'), 0o555);
+  fs.chmodSync(sub, 0o555);
+  t.after(() => { for (const d of [sub, path.join(sub, 'hondo')]) try { fs.chmodSync(d, 0o700); } catch { /* ya borrada */ } });
+  assert.equal(await ejecutar('Demo', { trabajo: m.trabajo, env: m.env, agente: m.trabajo }), 0);
+  assert.equal(fs.readFileSync(path.join(m.dir, '..', 'visto.txt'), 'utf8').trim(), '');
+  assert.ok(!fs.existsSync(sub));
+});

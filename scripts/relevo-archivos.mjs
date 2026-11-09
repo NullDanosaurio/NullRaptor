@@ -21,12 +21,34 @@ export function leerSeguro(ruta, max = 1 << 20) {
   } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ya cerrado */ } }
 }
 
-/** Deja `dir` como una carpeta real sin nada que no sea un archivo regular (borra enlaces y subcarpetas). */
+/** Da permisos de escritura a todo lo que cuelga de `ruta` sin seguir enlaces (Codex puede dejar carpetas 555). */
+function abrirPermisos(ruta) {
+  let st;
+  try { st = fs.lstatSync(ruta); } catch { return; }
+  if (st.isSymbolicLink()) return;
+  try { fs.chmodSync(ruta, st.isDirectory() ? 0o700 : 0o600); } catch { /* ajeno: lo intentará rmSync */ }
+  if (st.isDirectory()) for (const n of fs.readdirSync(ruta)) abrirPermisos(path.join(ruta, n));
+}
+
+/** Deja `dir` como una carpeta real sin nada que no sea un archivo regular (borra enlaces y subcarpetas). Si no se puede
+ * limpiar, aparta lo viejo a `.viejo-<nombre>-<n>` y sigue con una carpeta nueva. Devuelve un aviso o null; nunca lanza. */
 export function prepararCarpetaCodex(dir) {
-  try { if (!fs.lstatSync(dir).isDirectory()) fs.rmSync(dir, { force: true }); } catch { /* no existe */ }
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  fs.chmodSync(dir, 0o700);
-  for (const n of fs.readdirSync(dir)) if (!esRegular(path.join(dir, n))) fs.rmSync(path.join(dir, n), { recursive: true, force: true });
+  let aviso = null;
+  try {
+    abrirPermisos(dir);
+    try { if (!fs.lstatSync(dir).isDirectory()) fs.rmSync(dir, { force: true }); } catch { /* no existe */ }
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(dir, 0o700);
+    for (const n of fs.readdirSync(dir)) if (!esRegular(path.join(dir, n))) fs.rmSync(path.join(dir, n), { recursive: true, force: true });
+  } catch (e) {
+    try {
+      const viejo = path.join(path.dirname(dir), `.viejo-${path.basename(dir)}-${Date.now()}`);
+      fs.renameSync(dir, viejo);
+      fs.mkdirSync(dir, { mode: 0o700 });
+      aviso = `No se pudo limpiar ${dir} (${e.code ?? e.message}); lo anterior se apartó en ${viejo}.`;
+    } catch (e2) { aviso = `No se pudo preparar ${dir}: ${e2.message}.`; }
+  }
+  return aviso;
 }
 
 /** Si `ruta` existe y no es un archivo regular (p. ej. un enlace), la borra sin seguirla. */
