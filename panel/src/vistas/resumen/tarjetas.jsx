@@ -1,5 +1,5 @@
 // Tarjetas del Resumen: cada una recibe sus datos y se encarga de su aspecto.
-import { ArrowUpRight, ArrowRightLeft, BookOpen, DatabaseBackup, Gauge, ListChecks, Search, X } from 'lucide-react';
+import { ArrowUpRight, ArrowRightLeft, BookOpen, DatabaseBackup, FolderGit2, Gauge, ListChecks, MessagesSquare, Search, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../../api.js';
 import { Insignia, Punto, Tarjeta, Vacio } from '../../componentes/ui.jsx';
@@ -14,6 +14,18 @@ export function Cifra({ etiqueta, valor, detalle, icono: Icono, href }) {
       <p className="mt-2 text-[28px] font-semibold tabular-nums tracking-tight text-white">{valor}</p>
       <p className="truncate text-[12px] text-apagado">{detalle}</p>
     </a>
+  );
+}
+
+export function Cifras({ proyectos, boveda, chats, guardados }) {
+  const enCurso = proyectos.filter((p) => p.flujo?.bloqueo?.vivo);
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Cifra etiqueta="Proyectos" valor={proyectos.length} detalle={`${proyectos.filter((p) => p.local).length} en este equipo`} icono={FolderGit2} href="#/proyectos" />
+      <Cifra etiqueta="Flujo" valor={enCurso.length} detalle={enCurso.length ? enCurso.map((p) => p.nombre).join(', ') : 'Nada ejecutándose'} icono={Sparkles} href="#/proyectos" />
+      <Cifra etiqueta="Notas en la bóveda" valor={boveda?.notas ?? '—'} detalle={boveda?.cambios?.[0] ? `Último cambio ${haceCuanto(boveda.cambios[0].fecha)}` : 'Sin bóveda'} icono={BookOpen} href="#/boveda" />
+      <Cifra etiqueta="Chats" valor={chats.length} detalle={chats.length ? 'abiertos ahora' : `${guardados.length} guardados recientes`} icono={MessagesSquare} href="#/chat" />
+    </div>
   );
 }
 
@@ -160,21 +172,23 @@ export function Avance({ avance }) {
   if (!filas.length) return null;
   const tono = { trabajando: 'raptor', esperando: 'neutro', parada: 'aviso' };
   return (
-    <ul className="mb-4 space-y-2.5" aria-label="Avance por proyecto">
-      {filas.map(([p, a]) => (
-        <li key={p} className="flex items-center gap-3 px-2">
-          <span className="w-28 shrink-0 truncate text-[13px] text-texto">{p}</span>
-          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-elevado" role="progressbar" aria-valuemin={0} aria-valuemax={a.total} aria-valuenow={a.hechas}>
-            <div className="h-full rounded-full bg-raptor transition-all" style={{ width: `${a.total ? Math.round((a.hechas / a.total) * 100) : 0}%` }} />
-          </div>
-          <span className="w-9 shrink-0 text-right text-[12px] tabular-nums text-tenue">{a.hechas}/{a.total}</span>
-          <Insignia tono={tono[a.estado]} className="shrink-0">
-            {a.estado === 'trabajando' && <Punto tono="raptor" vivo />}
-            {a.estado === 'parada' ? `parada${a.hace != null ? ` hace ${Math.max(1, Math.round(a.hace / 60))} min` : ''}` : a.estado}
-          </Insignia>
-        </li>
-      ))}
-    </ul>
+    <Tarjeta titulo="Avance por proyecto" icono={ListChecks}>
+      <ul className="space-y-2.5" aria-label="Avance por proyecto">
+        {filas.map(([p, a]) => (
+          <li key={p} className="flex items-center gap-3 px-2">
+            <span className="w-28 shrink-0 truncate text-[13px] text-texto">{p}</span>
+            <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-elevado" role="progressbar" aria-valuemin={0} aria-valuemax={a.total} aria-valuenow={a.hechas}>
+              <div className="h-full rounded-full bg-raptor transition-all" style={{ width: `${a.total ? Math.round((a.hechas / a.total) * 100) : 0}%` }} />
+            </div>
+            <span className="w-9 shrink-0 text-right text-[12px] tabular-nums text-tenue">{a.hechas}/{a.total}</span>
+            <Insignia tono={tono[a.estado]} className="shrink-0">
+              {a.estado === 'trabajando' && <Punto tono="raptor" vivo />}
+              {a.estado === 'parada' ? `parada${a.hace != null ? ` hace ${Math.max(1, Math.round(a.hace / 60))} min` : ''}` : a.estado}
+            </Insignia>
+          </li>
+        ))}
+      </ul>
+    </Tarjeta>
   );
 }
 
@@ -183,18 +197,20 @@ export function Avisos({ avisos }) {
   if (!avisos?.length) return null;
   const tono = { espera: 'aviso', parada: 'aviso', terminada: 'neutro' };
   return (
-    <ul className="mb-4 space-y-2.5" aria-label="Avisos">
-      {avisos.map((a, i) => (
-        <li key={`${a.proyecto}-${a.tipo}-${a.en}-${i}`} className="min-w-0 px-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Insignia tono={tono[a.tipo]} className="shrink-0">{a.tipo}</Insignia>
-            <span className="min-w-0 break-words text-[13px] text-texto">{a.proyecto}</span>
-          </div>
-          <p className="mt-0.5 line-clamp-2 break-words text-[12px] text-tenue">{a.texto}</p>
-          <p className="mt-0.5 text-[11px] text-apagado">{haceCuanto(a.en)}</p>
-        </li>
-      ))}
-    </ul>
+    <Tarjeta titulo="Avisos" icono={ListChecks}>
+      <ul className="space-y-2.5" aria-label="Avisos">
+        {avisos.map((a, i) => (
+          <li key={`${a.proyecto}-${a.tipo}-${a.en}-${i}`} className="min-w-0 px-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Insignia tono={tono[a.tipo]} className="shrink-0">{a.tipo}</Insignia>
+              <span className="min-w-0 break-words text-[13px] text-texto">{a.proyecto}</span>
+            </div>
+            <p className="mt-0.5 line-clamp-2 break-words text-[12px] text-tenue">{a.texto}</p>
+            <p className="mt-0.5 text-[11px] text-apagado">{haceCuanto(a.en)}</p>
+          </li>
+        ))}
+      </ul>
+    </Tarjeta>
   );
 }
 
@@ -212,8 +228,6 @@ export function TareasIA({ tareas }) {
   );
   return (
     <Tarjeta titulo="Tareas de la IA" icono={ListChecks} accion={<span className="text-[11px] text-apagado">{tareas.hechasHoy} hechas hoy</span>}>
-      <Avance avance={tareas.avance} />
-      <Avisos avisos={tareas.avisos} />
       {tareas.totalAbiertas ? (
         <>
           <div className="mb-3 flex flex-wrap gap-1.5">

@@ -1,10 +1,10 @@
 // Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
 // chats, MCP del día, las tareas de la IA (Ruflo) y el relevo a Codex cuando Claude se queda sin tokens.
-import { BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, Sparkles, SquareTerminal } from 'lucide-react';
+import { BookOpen, FolderGit2, GitCommitHorizontal, MessagesSquare, MonitorSmartphone, Plug, SquareTerminal } from 'lucide-react';
 import { enlace, haceCuanto, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
 import { Avatar, Cabecera, Cargando, Fallo, Insignia, Punto, Tarjeta, Vacio } from '../componentes/ui.jsx';
-import { BuscarBoveda, Cifra, CopiaSeguridad, GastoIA, RelevoCodex, TareasIA, TarjetaProyecto } from './resumen/tarjetas.jsx';
+import { Avisos, Avance, BuscarBoveda, Cifras, CopiaSeguridad, GastoIA, RelevoCodex, TareasIA, TarjetaProyecto } from './resumen/tarjetas.jsx';
 
 function saludo() {
   const h = new Date().getHours();
@@ -17,7 +17,6 @@ export default function Resumen() {
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
   const { proyectos, boveda, mcp, chats, guardados, remoto = [], tareas = null, relevos = [], copias = null } = datos;
-  const enCurso = proyectos.filter((p) => p.flujo?.bloqueo?.vivo);
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -38,15 +37,12 @@ export default function Resumen() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Cifra etiqueta="Proyectos" valor={proyectos.length} detalle={`${proyectos.filter((p) => p.local).length} en este equipo`} icono={FolderGit2} href="#/proyectos" />
-          <Cifra etiqueta="Flujo" valor={enCurso.length} detalle={enCurso.length ? enCurso.map((p) => p.nombre).join(', ') : 'Nada ejecutándose'} icono={Sparkles} href="#/proyectos" />
-          <Cifra etiqueta="Notas en la bóveda" valor={boveda?.notas ?? '—'} detalle={boveda?.cambios?.[0] ? `Último cambio ${haceCuanto(boveda.cambios[0].fecha)}` : 'Sin bóveda'} icono={BookOpen} href="#/boveda" />
-          <Cifra etiqueta="Chats" valor={chats.length} detalle={chats.length ? 'abiertos ahora' : `${guardados.length} guardados recientes`} icono={MessagesSquare} href="#/chat" />
-        </div>
+        <Cifras proyectos={proyectos} boveda={boveda} chats={chats} guardados={guardados} />
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
           <div className="space-y-6">
+            <Avance avance={tareas?.avance} />
+            <Avisos avisos={tareas?.avisos} />
             <TareasIA tareas={tareas} />
             <Tarjeta titulo="Proyectos" icono={FolderGit2} accion={<a href="#/proyectos" className="text-[12px] text-apagado hover:text-raptor">Ver proyectos →</a>}>
               {proyectos.length ? (
