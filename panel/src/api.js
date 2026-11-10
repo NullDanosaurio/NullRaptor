@@ -43,6 +43,12 @@ export const post = (ruta, cuerpo) => fetch(ruta, {
   body: JSON.stringify(cuerpo ?? {}),
 }).then(respuesta);
 
+export const put = (ruta, cuerpo) => fetch(ruta, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json', 'X-Nullraptor': '1' },
+  body: JSON.stringify(cuerpo ?? {}),
+}).then(respuesta);
+
 /** Sube un archivo tal cual; su nombre va en X-Nombre (el servidor decide por la extensión y el contenido). */
 export const subir = (ruta, archivo, nombre = archivo.name ?? '') => fetch(ruta, {
   method: 'POST',
