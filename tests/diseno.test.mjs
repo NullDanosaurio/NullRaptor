@@ -42,6 +42,14 @@ test('guardar: devuelve el normalizado, se relee idéntico y no deja .tmp', () =
   assert.deepEqual(fs.readdirSync(d.dir), ['diseno.json']);
 });
 
+test('guardar: limpia el temporal si falla el renombrado', () => {
+  const trabajo = temporal();
+  const d = new Diseno({ trabajo });
+  fs.mkdirSync(d.archivo, { recursive: true });
+  assert.throws(() => d.guardar(['mcp']));
+  assert.deepEqual(fs.readdirSync(d.dir), ['diseno.json']);
+});
+
 function pedir(port, metodo, ruta, { cuerpo, cab = {} } = {}) {
   return new Promise((resolve, reject) => {
     const r = http.request({ host: '127.0.0.1', port, method: metodo, path: ruta, headers: { 'content-type': 'application/json', ...cab } }, (res) => {
@@ -67,6 +75,7 @@ test('ruta /api/diseno: sesión, cabecera, validación, tamaño, guardado y mét
 
   assert.equal((await pedir(port, 'GET', '/api/diseno', { cab: { host: '192.168.1.20:4321' } })).estado, 401);
   assert.equal((await pedir(port, 'PUT', '/api/diseno', { cuerpo: { orden: ['gasto'] }, cab: { host: 'localhost:4321', cookie } })).estado, 403);
+  assert.equal((await pedir(port, 'PUT', '/api/diseno', { cuerpo: 'null', cab: local })).estado, 400);
   assert.equal((await pedir(port, 'PUT', '/api/diseno', { cuerpo: { orden: ['inventado'] }, cab: local })).estado, 400);
   assert.equal((await pedir(port, 'PUT', '/api/diseno', { cuerpo: { orden: ['gasto', 'gasto'] }, cab: local })).estado, 400);
   assert.equal((await pedir(port, 'PUT', '/api/diseno', { cuerpo: { orden: 'gasto' }, cab: local })).estado, 400);

@@ -32,8 +32,13 @@ export class Diseno {
     const normal = this.normalizar(orden);
     fs.mkdirSync(this.dir, { recursive: true });
     const temporal = `${this.archivo}.${process.pid}.tmp`;
-    fs.writeFileSync(temporal, `${JSON.stringify({ orden: normal })}\n`);
-    fs.renameSync(temporal, this.archivo);
+    try {
+      fs.writeFileSync(temporal, `${JSON.stringify({ orden: normal })}\n`);
+      fs.renameSync(temporal, this.archivo);
+    } catch (error) {
+      fs.rmSync(temporal, { force: true });
+      throw error;
+    }
     return normal;
   }
 }

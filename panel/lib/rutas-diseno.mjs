@@ -10,7 +10,7 @@ export function crearRutasDiseno({ diseno, leerCuerpo, json }) {
     if (p !== '/api/diseno') return false;
     if (req.method === 'GET') { json(res, 200, diseno.leer()); return true; }
     if (req.method !== 'PUT') { json(res, 405, { error: 'Método no permitido.' }); return true; }
-    const { orden } = await leerCuerpo(req);
+    const { orden } = (await leerCuerpo(req)) ?? {};
     if (!valido(orden)) { json(res, 400, { error: 'El orden no es válido.' }); return true; }
     json(res, 200, { orden: diseno.guardar(orden) });
     return true;
