@@ -477,3 +477,10 @@
 ## 09/11 — Adjuntos grandes desde el móvil
 - El panel admite adjuntos de hasta 500 MB. El endpoint escribe el cuerpo por bloques a un temporal dentro de `adjuntos/`, valida firmas o UTF-8 desde disco y renombra el archivo solo después de validarlo; no acumula el cuerpo en memoria.
 - Verificado en la suite completa con un PDF de prueba funcional y un adjunto de texto de 21 MB validado por bloques. La prueba HTTP sube un PNG de 21 MB; no se ha medido una transferencia real de cientos de MB desde móvil.
+
+## 10/11 — Orden de tarjetas del Resumen y plan de vistas de componentes
+- AUD-3 cerrada: Óscar aprobó la re-revisión del puente MCP de Codex; el relevo no había cambiado nada. 261 pruebas.
+- Fase 1 de los widgets: `GET/PUT /api/diseno` (`01af732`, `cdc7a5e`, `8316f52`), tarjetas separadas en `resumen/` (`4091460`, `86c0d00`, `d388437`), orden y modo Reordenar (`c44d4a2`, `733314d`) y pulido de accesibilidad (`f49e6e1`, `bc85876`). Sara y Óscar aprobaron la API y Sara las tarjetas; Nora puntuó la UX.
+- Codex falló al aplicar parches en 4 de 6 encargos de front; en uno dio por pasadas pruebas en rojo porque un `| tail` tapaba el código de salida. Iker escribió o corrigió esos cambios.
+- Daniel amplió la visión a un motor de vistas con componentes (árbol de filas y columnas con pesos, instancias, fuentes de datos). Plan y entregas en `docs/vistas.md`; sin construir, pendiente de aprobar E1.
+- Sin comprobar: el Resumen reordenable en el navegador de Windows y el móvil real, el rollback ante un `PUT` fallido en vivo y `dnd-kit` con React 19.
