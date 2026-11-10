@@ -1,6 +1,6 @@
 # Vistas de componentes — visión y plan de cimientos
 
-Estado a 10/11/2026. **Nada de esto está construido salvo la fase 1** (orden de tarjetas del Resumen). Falta la aprobación de Daniel para empezar la entrega E1.
+Estado a 10/11/2026. **Construido: la fase 1 y la entrega E1** (motor mínimo: `/api/vistas`, `Motor.jsx`, Resumen sobre el árbol; commits dbad10e, f24d535, 7f9f647; aprobada por Sara y Óscar, UX 3,5/5 de Nora). Pendiente de E1: aviso al usuario cuando se ignora un `vistas.json` inválido (E2) y retirar el código muerto de `orden.js` (`mover`, `normalizar`, `ORDEN_POR_DEFECTO`, `visibles`) con sus pruebas. Siguiente: E2.
 
 ## Visión (Daniel)
 
@@ -45,7 +45,7 @@ Navegación de dos niveles (pestañas = vistas raíz; una vista abre otra encima
 Tres ejes de complejidad a la vez (árbol, enlaces, fuentes): E1 solo lleva el árbol. Lucía: no construir el editor completo antes de comprobar que se usa.
 
 ## Pendiente de decidir (Daniel)
-1. Aprobar la entrega E1.
+1. ~~Aprobar la entrega E1~~ (aprobada el 10/11).
 2. Si `diseno.json` queda como respaldo sin tocar (propuesta: sí).
 3. Pestañas (E3): vistas del usuario junto a las secciones fijas o en su lugar.
 4. Para la terminal (E5): repositorio heredado de la vista o mezclable; sesiones vivas tras cerrar la pestaña.
