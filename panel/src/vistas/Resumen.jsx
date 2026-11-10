@@ -28,7 +28,10 @@ export default function Resumen() {
     if (!focoPendiente.current) return;
     const { id, dir } = focoPendiente.current;
     focoPendiente.current = null;
-    document.querySelector(`[data-hoja="${id}"] [data-mando="${dir}"]`)?.focus();
+    const hoja = document.querySelector(`[data-hoja="${id}"]`);
+    const boton = hoja?.querySelector(`[data-mando="${dir}"]`);
+    const otro = hoja?.querySelector(`[data-mando="${dir === 'subir' ? 'bajar' : 'subir'}"]`);
+    (boton?.getAttribute('aria-disabled') === 'true' ? otro : boton)?.focus();
   });
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
@@ -58,7 +61,7 @@ export default function Resumen() {
             {reordenar ? <Check className="size-4" /> : <ArrowDownUp className="size-4" />}{reordenar ? 'Listo' : 'Reordenar'}
           </button>
         </Cabecera>
-        {reordenar && <p className="mt-2 text-[13px] text-tenue">Usa las flechas para ordenar las tarjetas. Los cambios se guardan solos</p>}
+        {reordenar && <p role="status" className="mt-2 mb-3 text-[13px] text-tenue">Usa las flechas para ordenar las tarjetas. Los cambios se guardan solos.</p>}
         <Fallo error={error} className="mb-4" />
         <Fallo error={errorGuardar} className="mb-4" />
         <RelevoCodex relevos={relevos} />

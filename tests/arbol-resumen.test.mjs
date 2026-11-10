@@ -57,3 +57,17 @@ test('el árbol que sirve el servidor pasa la validación local y mover lo sigue
   const movido = moverHoja(r, hojas(r)[1].id, 1);
   assert.equal(validarVistas({ version: 2, inicio: datos.inicio, vistas: [{ ...datos.vistas[0], raiz: movido }] }).error, undefined);
 });
+
+test('moverHoja: cada posición conserva sus pesos y el árbol sigue siendo válido', () => {
+  const h = (tipo, peso_h) => ({ t: 'w', tipo, peso_h });
+  const { datos } = validarVistas({ version: 2, vistas: [{ id: 'v_resumen', nombre: 'Resumen', raiz: { t: 'fila', hijos: [h('cifras', 8), h('gasto', 4), h('chats', 4)] } }] });
+  const r = datos.vistas[0].raiz;
+  const [a, b, c] = hojas(r).map((x) => x.id);
+  const pesos = (n) => n.hijos.map((x) => x.peso_h);
+  const m = moverHoja(r, a, 1);
+  assert.deepEqual(ids(m), [b, a, c]);
+  assert.deepEqual(pesos(m), [8, 4, 4], 'ancha↔estrecha: los anchos por posición no cambian');
+  assert.deepEqual(pesos(moverHoja(r, b, 1)), [8, 4, 4], 'mismo peso sigue igual');
+  assert.equal(moverHoja(r, c, 1), r, 'sin vecina, misma referencia');
+  assert.equal(validarVistas({ version: 2, inicio: datos.inicio, vistas: [{ ...datos.vistas[0], raiz: m }] }).error, undefined);
+});

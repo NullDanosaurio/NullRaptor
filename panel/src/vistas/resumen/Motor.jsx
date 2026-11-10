@@ -5,7 +5,7 @@ import { Component, useEffect, useState } from 'react';
 import { podar } from './arbol.js';
 import { WIDGETS } from './registro.jsx';
 
-const boton = 'grid size-11 place-items-center rounded-lg border border-borde bg-elevado text-tenue hover:text-raptor focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-raptor lg:size-9';
+const boton = 'grid size-11 shrink-0 place-items-center rounded-lg border border-borde bg-elevado text-tenue hover:text-raptor focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-raptor';
 const off = 'opacity-40 cursor-not-allowed hover:text-tenue';
 
 /** Aísla el fallo de una tarjeta para que no tire el Resumen entero. */
@@ -39,7 +39,7 @@ function useAncho() {
 
 function Mando({ id, titulo, primero, ultimo, onMover }) {
   return (
-    <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="mb-2 flex items-center justify-between gap-2 px-3 pt-2">
       <span className="text-[12px] text-tenue">{titulo}</span>
       <div className="flex gap-2">
         <button type="button" data-mando="subir" className={`${boton} ${primero ? off : ''}`} aria-disabled={primero} onClick={() => { if (!primero) onMover(id, -1); }} aria-label={`Subir la tarjeta ${titulo}`}><ArrowUp className="size-4" /></button>
@@ -69,7 +69,7 @@ function Nodo({ nodo, padre, ctx }) {
   if (nodo.t === 'w') return <Hoja hoja={nodo} ctx={ctx} estilo={estilo} />;
   const dir = nodo.t === 'fila' && ctx.ancho ? 'flex-row' : 'flex-col';
   return (
-    <div data-nodo={nodo.t} style={ctx.ancho ? estilo : undefined} className={`flex min-w-0 ${dir} gap-6`}>
+    <div data-nodo={nodo.t} style={ctx.ancho ? estilo : undefined} className={`flex min-w-0 ${dir} ${nodo.t === 'fila' && ctx.ancho ? 'items-stretch' : ''} gap-6`}>
       {nodo.hijos.map((h, i) => <Nodo key={h.id ?? i} nodo={h} padre={nodo.t} ctx={ctx} />)}
     </div>
   );

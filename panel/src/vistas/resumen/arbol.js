@@ -33,7 +33,7 @@ export function podar(nodo, visible) {
 
 /**
  * Intercambia la hoja `id` con la hoja vecina (`delta` -1 = anterior, 1 = siguiente en orden de lectura), dejando
- * los contenedores donde están. Con `visibles` (lista de ids), las demás hojas se saltan. Devuelve la misma
+ * los contenedores y los pesos de cada posición donde están. Con `visibles` (lista de ids), las demás hojas se saltan. Devuelve la misma
  * referencia si no hay nada que mover.
  */
 export function moverHoja(raiz, id, delta, visibles = null) {
@@ -44,7 +44,11 @@ export function moverHoja(raiz, id, delta, visibles = null) {
   const destino = origen && candidatas[candidatas.indexOf(origen) + delta];
   if (!destino) return raiz;
   const cambiar = (n) => {
-    if (n.t === 'w') return n === origen ? destino : n === destino ? origen : n;
+    if (n.t === 'w') {
+      // Cada posición conserva sus pesos; se intercambia el contenido (id, tipo, ajustes, fuentes).
+      const otro = n === origen ? destino : n === destino ? origen : null;
+      return otro ? { ...otro, peso_h: n.peso_h, peso_v: n.peso_v } : n;
+    }
     return { ...n, hijos: n.hijos.map(cambiar) };
   };
   return cambiar(raiz);
