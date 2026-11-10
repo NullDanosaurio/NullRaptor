@@ -1,8 +1,8 @@
 // Tarjetas del Resumen: cada una recibe sus datos y se encarga de su aspecto.
-import { ArrowUpRight, ArrowRightLeft, BookOpen, DatabaseBackup, FolderGit2, Gauge, ListChecks, MessagesSquare, Search, Sparkles, X } from 'lucide-react';
+import { ArrowUpRight, ArrowRightLeft, BookOpen, DatabaseBackup, FolderGit2, Gauge, GitCommitHorizontal, ListChecks, MessagesSquare, Plug, Search, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { enlace, haceCuanto, useDatos } from '../../api.js';
-import { Insignia, Punto, Tarjeta, Vacio } from '../../componentes/ui.jsx';
+import { Avatar, Insignia, Punto, Tarjeta, Vacio } from '../../componentes/ui.jsx';
 import { Busqueda } from '../Boveda.jsx';
 
 export function Cifra({ etiqueta, valor, detalle, icono: Icono, href }) {
@@ -249,5 +249,70 @@ export function TareasIA({ tareas }) {
         </>
       ) : <Vacio icono={ListChecks} titulo="Sin tareas abiertas">{tareas.hechasHoy ? `${tareas.hechasHoy} terminadas hoy.` : 'La IA apunta aquí lo que va haciendo.'}</Vacio>}
     </Tarjeta>
+  );
+}
+
+export function Proyectos({ proyectos }) {
+  return (
+    <Tarjeta titulo="Proyectos" icono={FolderGit2} accion={<a href="#/proyectos" className="text-[12px] text-apagado hover:text-raptor">Ver proyectos →</a>}>
+    {proyectos.length ? (
+      <div className="grid gap-3 sm:grid-cols-2">{proyectos.map((p) => <TarjetaProyecto key={p.nombre} p={p} />)}</div>
+    ) : <Vacio icono={FolderGit2} titulo="Aún no hay proyectos">Créalo o clónalo desde Proyectos → Traer.</Vacio>}
+  </Tarjeta>
+  );
+}
+
+export function McpRecomendados({ mcp }) {
+  return (
+    <Tarjeta titulo={`MCP recomendados · ${mcp.ultimaExploracion}`} icono={Plug} accion={<span className="text-[11px] text-apagado">Se instalan desde el menú («m»)</span>}>
+      <div className="grid gap-3 md:grid-cols-3">
+        {mcp.hoy.map((s) => (
+          <div key={s.id} className="flex flex-col gap-2 rounded-xl border border-borde bg-elevado/40 p-3.5">
+            <div className="flex items-start gap-2">
+              <p className="min-w-0 flex-1 font-medium leading-snug text-white">{s.titulo}</p>
+              {s.categoria && <Insignia tono={s.categoria === 'útil' ? 'raptor' : 'neutro'}>{s.categoria}</Insignia>}
+            </div>
+            <p className="line-clamp-4 text-[12px] leading-relaxed text-tenue">{s.porque ?? s.descripcion}</p>
+            {mcp.instalados.includes(s.id) && <Insignia tono="ok" className="self-start">instalado</Insignia>}
+          </div>
+        ))}
+      </div>
+    </Tarjeta>
+  );
+}
+
+export function CambiosBoveda({ boveda }) {
+  return (
+    <Tarjeta titulo="Bóveda: últimos cambios" icono={GitCommitHorizontal} cuerpo="p-2">
+    {boveda?.cambios?.length ? (
+      <ol>
+        {boveda.cambios.map((c) => (
+          <li key={c.hash}>
+            <a href={c.archivos[0] ? enlace('boveda', c.archivos.find((a) => a.endsWith('.md')) ?? '') : '#/boveda'} className="block rounded-xl px-3 py-2.5 hover:bg-elevado/70">
+              <p className="line-clamp-2 text-[13px] leading-snug text-texto">{c.asunto}</p>
+              <p className="mt-1 text-[11px] text-apagado"><span className="font-mono">{c.hash}</span> · {c.autor} · {haceCuanto(c.fecha)}</p>
+            </a>
+          </li>
+        ))}
+      </ol>
+    ) : <Vacio titulo="Sin cambios" />}
+  </Tarjeta>
+  );
+}
+
+export function Chats({ chats, guardados }) {
+  return (
+    <Tarjeta titulo="Chats" icono={MessagesSquare} cuerpo="p-2" accion={<a href="#/chat" className="text-[12px] text-apagado hover:text-raptor">Abrir chat →</a>}>
+    {chats.length + guardados.length ? (
+      <ul>
+        {chats.map((c) => (
+          <li key={c.id}><a href={enlace('chat', c.id)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 hover:bg-elevado/70"><Avatar quien={c.ia} className="size-5 text-[10px]" /><span className="flex-1 truncate text-[13px]">{c.proyecto}</span>{c.ocupado && <Punto tono="raptor" vivo />}<span className="text-[11px] text-apagado">{c.mensajes} mensajes</span></a></li>
+        ))}
+        {guardados.map((g) => (
+          <li key={g.archivo}><a href={enlace('chat', `guardado/${g.archivo}`)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 hover:bg-elevado/70"><Punto tono="apagado" /><span className="flex-1 truncate text-[13px] text-tenue">{g.proyecto}</span><span className="text-[11px] text-apagado">{haceCuanto(g.cambiado)}</span></a></li>
+        ))}
+      </ul>
+    ) : <Vacio titulo="Sin chats todavía">Habla con Claude o con Codex sobre un proyecto.</Vacio>}
+  </Tarjeta>
   );
 }
