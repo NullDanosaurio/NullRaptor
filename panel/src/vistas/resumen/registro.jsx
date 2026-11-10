@@ -5,16 +5,16 @@ import { Avance, Avisos, BuscarBoveda, CambiosBoveda, Chats, Cifras, GastoIA, Mc
 const siempre = () => true;
 
 export const WIDGETS = {
-  cifras: { ancho: 2, visible: siempre, Componente: ({ datos: d }) => <Cifras proyectos={d.proyectos} boveda={d.boveda} chats={d.chats} guardados={d.guardados} /> },
-  avance: { ancho: 2, visible: (d) => Object.keys(d.tareas?.avance ?? {}).length > 0, Componente: ({ datos: d }) => <Avance avance={d.tareas?.avance} /> },
-  avisos: { ancho: 2, visible: (d) => Boolean(d.tareas?.avisos?.length), Componente: ({ datos: d }) => <Avisos avisos={d.tareas?.avisos} /> },
-  tareas: { ancho: 2, visible: (d) => Boolean(d.tareas), Componente: ({ datos: d }) => <TareasIA tareas={d.tareas} /> },
-  proyectos: { ancho: 2, visible: siempre, Componente: ({ datos: d }) => <Proyectos proyectos={d.proyectos} /> },
-  mcp: { ancho: 2, visible: (d) => Boolean(d.mcp?.hoy?.length), Componente: ({ datos: d }) => <McpRecomendados mcp={d.mcp} /> },
-  gasto: { ancho: 1, visible: siempre, Componente: () => <GastoIA /> },
-  'boveda-buscar': { ancho: 1, visible: siempre, Componente: () => <BuscarBoveda /> },
-  'boveda-cambios': { ancho: 1, visible: siempre, Componente: ({ datos: d }) => <CambiosBoveda boveda={d.boveda} /> },
-  chats: { ancho: 1, visible: siempre, Componente: ({ datos: d }) => <Chats chats={d.chats} guardados={d.guardados} /> },
+  cifras: { titulo: 'Cifras', ancho: 2, visible: siempre, Componente: ({ datos: d }) => <Cifras proyectos={d.proyectos} boveda={d.boveda} chats={d.chats} guardados={d.guardados} /> },
+  avance: { titulo: 'Avance por proyecto', ancho: 2, visible: (d) => Object.keys(d.tareas?.avance ?? {}).length > 0, Componente: ({ datos: d }) => <Avance avance={d.tareas?.avance} /> },
+  avisos: { titulo: 'Avisos', ancho: 2, visible: (d) => Boolean(d.tareas?.avisos?.length), Componente: ({ datos: d }) => <Avisos avisos={d.tareas?.avisos} /> },
+  tareas: { titulo: 'Tareas de la IA', ancho: 2, visible: (d) => Boolean(d.tareas), Componente: ({ datos: d }) => <TareasIA tareas={d.tareas} /> },
+  proyectos: { titulo: 'Proyectos', ancho: 2, visible: siempre, Componente: ({ datos: d }) => <Proyectos proyectos={d.proyectos} /> },
+  mcp: { titulo: 'MCP recomendados', ancho: 2, visible: (d) => Boolean(d.mcp?.hoy?.length), Componente: ({ datos: d }) => <McpRecomendados mcp={d.mcp} /> },
+  gasto: { titulo: 'Gasto de la IA', ancho: 1, visible: siempre, Componente: () => <GastoIA /> },
+  'boveda-buscar': { titulo: 'Buscar en la bóveda', ancho: 1, visible: siempre, Componente: () => <BuscarBoveda /> },
+  'boveda-cambios': { titulo: 'Cambios de la bóveda', ancho: 1, visible: siempre, Componente: ({ datos: d }) => <CambiosBoveda boveda={d.boveda} /> },
+  chats: { titulo: 'Chats', ancho: 1, visible: siempre, Componente: ({ datos: d }) => <Chats chats={d.chats} guardados={d.guardados} /> },
 };
 
 export const ORDEN_POR_DEFECTO = ['cifras', 'avance', 'avisos', 'tareas', 'proyectos', 'mcp', 'gasto', 'boveda-buscar', 'boveda-cambios', 'chats'];

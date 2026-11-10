@@ -1,11 +1,11 @@
 // Resumen: todo de un vistazo — sesiones abiertas, proyectos y su flujo, la bóveda (buscar y últimos cambios),
 // chats, MCP del día, las tareas de la IA (Ruflo) y el relevo a Codex cuando Claude se queda sin tokens.
 import { ArrowDownUp, Check, MonitorSmartphone, SquareTerminal } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { put, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
 import { Cabecera, Cargando, Fallo } from '../componentes/ui.jsx';
-import { mover, normalizar } from './resumen/orden.js';
+import { guardarOptimista, mover, normalizar } from './resumen/orden.js';
 import Rejilla from './resumen/Rejilla.jsx';
 import { ORDEN_POR_DEFECTO, visibles } from './resumen/registro.jsx';
 import { CopiaSeguridad, RelevoCodex } from './resumen/tarjetas.jsx';
@@ -21,6 +21,14 @@ export default function Resumen() {
   const [local, setLocal] = useState(null);
   const [reordenar, setReordenar] = useState(false);
   const [errorGuardar, setErrorGuardar] = useState(null);
+  const focoPendiente = useRef(null);
+  // Tras mover una tarjeta, el foco vuelve al mismo botón de esa tarjeta (el reordenado del DOM lo pierde).
+  useLayoutEffect(() => {
+    if (!focoPendiente.current) return;
+    const { id, dir } = focoPendiente.current;
+    focoPendiente.current = null;
+    document.querySelector(`[data-widget="${id}"] [data-mando="${dir}"]`)?.focus();
+  });
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
@@ -32,12 +40,8 @@ export default function Resumen() {
   const onMover = (id, delta) => {
     const nuevo = mover(orden, id, delta, visibles(orden, datos));
     if (nuevo === orden) return;
-    setErrorGuardar(null);
-    setLocal(nuevo);
-    put('/api/diseno', { orden: nuevo }).catch((e) => {
-      setLocal((actual) => (actual === nuevo ? orden : actual));
-      setErrorGuardar(e);
-    });
+    focoPendiente.current = { id, dir: delta < 0 ? 'subir' : 'bajar' };
+    guardarOptimista({ orden, nuevo, guardar: (n) => put('/api/diseno', { orden: n }), setLocal, setError: setErrorGuardar });
   };
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -45,10 +49,11 @@ export default function Resumen() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
         <Cabecera titulo={`${saludo()}, Dano`} subtitulo={<span className="capitalize">{fecha}</span>}>
-          <button type="button" aria-pressed={reordenar} onClick={() => setReordenar((v) => !v)} className="flex min-h-9 items-center gap-1.5 rounded-lg border border-borde px-3 text-[13px] text-tenue hover:text-raptor">
+          <button type="button" aria-pressed={reordenar} onClick={() => setReordenar((v) => !v)} className={`flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] hover:text-raptor focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-raptor ${reordenar ? 'border-raptor bg-raptor/15 text-raptor' : 'border-borde text-tenue'}`}>
             {reordenar ? <Check className="size-4" /> : <ArrowDownUp className="size-4" />}{reordenar ? 'Listo' : 'Reordenar'}
           </button>
         </Cabecera>
+        {reordenar && <p className="mt-2 text-[13px] text-tenue">Usa las flechas para ordenar las tarjetas. Los cambios se guardan solos</p>}
         <Fallo error={error} className="mb-4" />
         <Fallo error={errorGuardar} className="mb-4" />
         <RelevoCodex relevos={relevos} />

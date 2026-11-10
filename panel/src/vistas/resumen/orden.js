@@ -1,5 +1,17 @@
 // Orden de las tarjetas del Resumen: funciones puras, sin React ni red.
 
+/** Guarda el nuevo orden de inmediato y lo revierte si falla el guardado. */
+export async function guardarOptimista({ orden, nuevo, guardar, setLocal, setError }) {
+  setError(null);
+  setLocal(nuevo);
+  try {
+    await guardar(nuevo);
+  } catch (e) {
+    setLocal((actual) => actual === nuevo ? orden : actual);
+    setError(e);
+  }
+}
+
 /** Descarta ids desconocidos y repetidos, y añade al final los que falten (misma regla que el servidor). */
 export function normalizar(orden, ids) {
   const vistos = new Set();
@@ -21,3 +33,4 @@ export function mover(orden, id, delta, visibles = null) {
   const en = resto.indexOf(destino) + (delta > 0 ? 1 : 0);
   return [...resto.slice(0, en), id, ...resto.slice(en)];
 }
+
