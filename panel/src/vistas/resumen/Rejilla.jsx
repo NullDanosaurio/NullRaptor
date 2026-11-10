@@ -7,7 +7,7 @@ const boton = 'grid size-9 place-items-center rounded-lg border border-borde bg-
 
 function Mando({ id, primero, ultimo, onMover }) {
   return (
-    <div className="absolute right-2 top-2 z-10 flex gap-1.5">
+    <div className="mb-2 flex justify-end gap-1.5">
       <button type="button" className={boton} disabled={primero} onClick={() => onMover(id, -1)} aria-label={`Subir la tarjeta ${id}`}><ArrowUp className="size-4" /></button>
       <button type="button" className={boton} disabled={ultimo} onClick={() => onMover(id, 1)} aria-label={`Bajar la tarjeta ${id}`}><ArrowDown className="size-4" /></button>
     </div>
@@ -21,9 +21,9 @@ export default function Rejilla({ orden, datos, reordenar = false, onMover }) {
       {lista.map((id, i) => {
         const { ancho, Componente } = WIDGETS[id];
         return (
-          <div key={id} data-widget={id} className={`relative min-w-0 ${ancho === 2 ? 'lg:col-span-2' : ''} ${reordenar ? 'rounded-2xl outline-dashed outline-1 outline-raptor/40' : ''}`}>
-            <Componente datos={datos} />
+          <div key={id} data-widget={id} className={`min-w-0 ${ancho === 2 ? 'lg:col-span-2' : ''} ${reordenar ? 'rounded-2xl outline-dashed outline-1 outline-raptor/40' : ''}`}>
             {reordenar && <Mando id={id} primero={i === 0} ultimo={i === lista.length - 1} onMover={onMover} />}
+            <Componente datos={datos} />
           </div>
         );
       })}

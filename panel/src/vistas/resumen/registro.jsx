@@ -6,8 +6,8 @@ const siempre = () => true;
 
 export const WIDGETS = {
   cifras: { ancho: 2, visible: siempre, Componente: ({ datos: d }) => <Cifras proyectos={d.proyectos} boveda={d.boveda} chats={d.chats} guardados={d.guardados} /> },
-  avance: { ancho: 2, visible: (d) => Boolean(d.tareas?.avance), Componente: ({ datos: d }) => <Avance avance={d.tareas?.avance} /> },
-  avisos: { ancho: 2, visible: (d) => Boolean(d.tareas?.avisos), Componente: ({ datos: d }) => <Avisos avisos={d.tareas?.avisos} /> },
+  avance: { ancho: 2, visible: (d) => Object.keys(d.tareas?.avance ?? {}).length > 0, Componente: ({ datos: d }) => <Avance avance={d.tareas?.avance} /> },
+  avisos: { ancho: 2, visible: (d) => Boolean(d.tareas?.avisos?.length), Componente: ({ datos: d }) => <Avisos avisos={d.tareas?.avisos} /> },
   tareas: { ancho: 2, visible: (d) => Boolean(d.tareas), Componente: ({ datos: d }) => <TareasIA tareas={d.tareas} /> },
   proyectos: { ancho: 2, visible: siempre, Componente: ({ datos: d }) => <Proyectos proyectos={d.proyectos} /> },
   mcp: { ancho: 2, visible: (d) => Boolean(d.mcp?.hoy?.length), Componente: ({ datos: d }) => <McpRecomendados mcp={d.mcp} /> },
