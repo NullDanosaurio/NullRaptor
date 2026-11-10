@@ -85,6 +85,7 @@ test('reanudar: la sesión empieza limpia y recupera el estado de Ruflo de su pr
   assert.match(aviso, /empieza limpia/);
   assert.match(aviso, /proyecto-Modelos3D/);
   assert.match(aviso, /\[Modelos3D\]/);
+  assert.match(aviso, /Proyectos\/Modelos3D\.md/); // también la nota de la bóveda
   const fuente = fs.readFileSync(new URL('../panel/servidor.mjs', import.meta.url), 'utf8');
   assert.ok(!/reanudada tras reiniciar', continuar: true/.test(fuente)); // nunca --continue al reanudar
 });

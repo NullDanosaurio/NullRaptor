@@ -23,11 +23,13 @@ Cuando Daniel pida un desarrollo (funcionalidad, arreglo o cambio de más de un 
 3. Si hay partes independientes y grandes, repártelas con los agentes de Ruflo (`swarm_init`, `agent_spawn`,
    `task_assign`); para lo pequeño, no hace falta.
 4. Commit pequeño por cada tarea terminada (con las pruebas del proyecto pasando): lo que está en commit no se pierde.
-5. Al terminar, `memory_store` con el resumen final y las tareas cerradas.
+5. Al terminar, `memory_store` con el resumen final y las tareas cerradas, **y actualiza la nota del proyecto en la
+   bóveda** (ver «Bóveda»): sin ese paso el desarrollo no está cerrado.
 
 **Al empezar en un proyecto** (y siempre que la sesión se reabra tras un reinicio), mira primero
 `task_list` (filtra las de `[<Proyecto>]`) y `memory_retrieve` (`proyecto-<Proyecto>` / `en-curso`). Si hay algo
-a medias, dile a Daniel dónde se quedó y propón seguir.
+a medias, dile a Daniel dónde se quedó y propón seguir. Lee además la nota del proyecto en la bóveda
+(`$BOVEDA_DIR/Proyectos/<Proyecto>.md`, ver «Bóveda»): ahí están las decisiones y el contexto que Ruflo no guarda.
 
 ## El contenedor
 
@@ -48,6 +50,9 @@ a medias, dile a Daniel dónde se quedó y propón seguir.
 
 - Memoria compartida (Obsidian) en `$BOVEDA_DIR`, rama `agente`; Daniel fusiona en `main`.
 - Ahí van las notas de cada proyecto (`Proyectos/<Proyecto>.md`) y las decisiones.
+- **Es la memoria fiable; Ruflo es el estado de trabajo.** Léela al empezar en un proyecto y, al cerrar un
+  desarrollo o tomar una decisión de Daniel, apúntala en la nota (formato de la nota: `[O]` hecho, `[U]` decisión
+  de Daniel, fecha) y haz commit en la rama `agente`. No esperes a que te lo pidan.
 - Sin `$BOVEDA_DIR`, no escribas en la bóveda.
 
 ## Herramientas

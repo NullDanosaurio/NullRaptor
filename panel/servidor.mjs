@@ -289,6 +289,7 @@ export function crearServidor({
  * entera en cada mensaje era la mayor parte del gasto de tokens; el estado vive en Ruflo y en los commits. */
 export const avisoReanudar = (proyecto) => `Nullraptor se ha reiniciado (actualización o parada) y esta sesión de ${proyecto} empieza limpia, sin la conversación anterior. `
   + `Recupera el estado sin leer de más: task_list de Ruflo (las de [${proyecto}]), memory_retrieve (namespace proyecto-${proyecto}, clave en-curso) y git log --oneline -5. `
+  + `Lee también la nota de la bóveda (Proyectos/${proyecto}.md en $BOVEDA_DIR, si existe) para las decisiones y el contexto. `
   + 'Si había algo a medias, di en una línea dónde se quedó y sigue con la siguiente tarea pendiente. Si no, no hagas nada y espera instrucciones.';
 
 const esPrincipal = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
