@@ -5,9 +5,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { put, useDatos } from '../api.js';
 import { enlaceTerminal } from '../componentes/Sesiones.jsx';
 import { Cabecera, Cargando, Fallo } from '../componentes/ui.jsx';
-import { guardarOptimista, mover, normalizar } from './resumen/orden.js';
-import Rejilla from './resumen/Rejilla.jsx';
-import { ORDEN_POR_DEFECTO, visibles } from './resumen/registro.jsx';
+import { hojas, moverHoja, validarLocal } from './resumen/arbol.js';
+import Motor from './resumen/Motor.jsx';
+import { guardarOptimista } from './resumen/orden.js';
+import { WIDGETS } from './resumen/registro.jsx';
 import { CopiaSeguridad, RelevoCodex } from './resumen/tarjetas.jsx';
 
 function saludo() {
@@ -17,7 +18,7 @@ function saludo() {
 
 export default function Resumen() {
   const { datos, error, cargando } = useDatos('/api/resumen', { cada: 5000 });
-  const diseno = useDatos('/api/diseno');
+  const vistas = useDatos('/api/vistas');
   const [local, setLocal] = useState(null);
   const [reordenar, setReordenar] = useState(false);
   const [errorGuardar, setErrorGuardar] = useState(null);
@@ -27,21 +28,25 @@ export default function Resumen() {
     if (!focoPendiente.current) return;
     const { id, dir } = focoPendiente.current;
     focoPendiente.current = null;
-    document.querySelector(`[data-widget="${id}"] [data-mando="${dir}"]`)?.focus();
+    document.querySelector(`[data-hoja="${id}"] [data-mando="${dir}"]`)?.focus();
   });
   if (cargando && !datos) return <div className="p-8"><Cargando /></div>;
   if (!datos) return <div className="p-8"><Fallo error={error} /></div>;
 
   const { remoto = [], relevos = [], copias = null } = datos;
-  // Si el GET de /api/diseno falla, el orden por defecto.
-  const orden = normalizar(local ?? diseno.datos?.orden ?? ORDEN_POR_DEFECTO, ORDEN_POR_DEFECTO);
+  const doc = vistas.datos;
+  const vista = doc?.vistas?.find((v) => v.id === doc.inicio) ?? doc?.vistas?.[0];
+  const raiz = local ?? vista?.raiz;
+  const invalida = raiz ? validarLocal(raiz) : null;
 
-  // Guardado optimista: se actualiza ya y, si el PUT falla, se vuelve al orden anterior.
+  // Guardado optimista: se actualiza ya y, si el PUT falla, se vuelve a la raíz anterior.
   const onMover = (id, delta) => {
-    const nuevo = mover(orden, id, delta, visibles(orden, datos));
-    if (nuevo === orden) return;
+    const ids = hojas(raiz).filter((h) => WIDGETS[h.tipo]?.visible(datos)).map((h) => h.id);
+    const nuevo = moverHoja(raiz, id, delta, ids);
+    if (nuevo === raiz) return;
     focoPendiente.current = { id, dir: delta < 0 ? 'subir' : 'bajar' };
-    guardarOptimista({ orden, nuevo, guardar: (n) => put('/api/diseno', { orden: n }), setLocal, setError: setErrorGuardar });
+    const guardar = (r) => put('/api/vistas', { ...doc, vistas: doc.vistas.map((v) => (v === vista ? { ...v, raiz: r } : v)) });
+    guardarOptimista({ orden: raiz, nuevo, guardar, setLocal, setError: setErrorGuardar });
   };
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -69,7 +74,12 @@ export default function Resumen() {
           </div>
         )}
 
-        <Rejilla orden={orden} datos={datos} reordenar={reordenar} onMover={onMover} />
+        {raiz && !invalida ? <Motor raiz={raiz} datos={datos} reordenar={reordenar} onMover={onMover} /> : (
+          <div className="mt-6">
+            {vistas.cargando && !vistas.datos ? <Cargando /> : <Fallo error={vistas.error ?? new Error(invalida ?? 'No se pudo cargar la vista.')} />}
+            {!vistas.cargando && <button type="button" onClick={vistas.recargar} className="mt-3 min-h-9 rounded-lg border border-borde px-3 text-[13px] text-tenue hover:text-raptor focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-raptor">Reintentar</button>}
+          </div>
+        )}
       </div>
     </div>
   );
