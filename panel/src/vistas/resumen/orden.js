@@ -33,4 +33,3 @@ export function mover(orden, id, delta, visibles = null) {
   const en = resto.indexOf(destino) + (delta > 0 ? 1 : 0);
   return [...resto.slice(0, en), id, ...resto.slice(en)];
 }
-

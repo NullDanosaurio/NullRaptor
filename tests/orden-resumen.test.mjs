@@ -18,8 +18,11 @@ test('mover: en los límites o con id desconocido devuelve la misma lista', () =
   assert.equal(mover(o, 'd', 1), o);
   assert.equal(mover(o, 'z', 1), o);
   assert.equal(mover(o, 'b', 0), o);
-  assert.equal(mover([], 'a', 1), mover([], 'a', 1));
-  assert.equal(mover(['a'], 'a', 1), mover(['a'], 'a', 1));
+  const vacia = [];
+  const sola = ['a'];
+  assert.equal(mover(vacia, 'a', 1), vacia);
+  assert.equal(mover(sola, 'a', 1), sola);
+  assert.equal(mover(sola, 'a', -1), sola);
 });
 
 test('mover: no modifica la entrada', () => {
@@ -46,33 +49,32 @@ test('el orden por defecto del panel coincide con IDS del servidor', () => {
   assert.deepEqual(JSON.parse(lista), IDS);
 });
 
-test('guardarOptimista: si falla, restaura el orden anterior y guarda el error', async () => {
-  const llamadas = [];
-  const fallo = new Error('falló el guardado');
-  await guardarOptimista({
-    orden: o,
-    nuevo: ['b', 'a', 'c', 'd'],
-    guardar: async () => { throw fallo; },
-    setLocal: (valor) => {
-      if (typeof valor === 'function') llamadas.push(valor(llamadas.at(-1) ?? null));
-      else llamadas.push(valor);
-    },
-    setError: (error) => llamadas.push(error),
-  });
-  assert.deepEqual(llamadas[0], ['b', 'a', 'c', 'd']);
-  assert.deepEqual(llamadas[1], o);
-  assert.equal(llamadas[2], fallo);
-});
-
-test('guardarOptimista: si tiene éxito, conserva el nuevo orden y limpia el error', async () => {
-  const llamadas = [];
+test('guardarOptimista: si falla, setLocal recibe el orden anterior y setError el fallo', async () => {
   const nuevo = ['b', 'a', 'c', 'd'];
+  const fallo = new Error('falló el guardado');
+  let local = null;
+  let error = 'sin tocar';
   await guardarOptimista({
     orden: o,
     nuevo,
-    guardar: async () => {},
-    setLocal: (valor) => llamadas.push(valor),
-    setError: (error) => llamadas.push(error),
+    guardar: async () => { throw fallo; },
+    setLocal: (v) => { local = typeof v === 'function' ? v(local) : v; },
+    setError: (e) => { error = e; },
   });
-  assert.deepEqual(llamadas, [nuevo, null]);
+  assert.equal(local, o);
+  assert.equal(error, fallo);
+});
+
+test('guardarOptimista: con éxito conserva el nuevo orden y limpia el error', async () => {
+  const nuevo = ['b', 'a', 'c', 'd'];
+  const llamadas = [];
+  let enviado;
+  await guardarOptimista({
+    orden: o, nuevo,
+    guardar: async (n) => { enviado = n; },
+    setLocal: (v) => llamadas.push(['local', v]),
+    setError: (e) => llamadas.push(['error', e]),
+  });
+  assert.equal(enviado, nuevo);
+  assert.deepEqual(llamadas, [['error', null], ['local', nuevo]]);
 });
