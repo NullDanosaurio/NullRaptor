@@ -27,6 +27,7 @@ Los subagentes no hablan con Daniel: si devuelven «PREGUNTAS PARA EL DIRECTOR»
 3. **Construcción**: tareas pequeñas; las independientes, en paralelo.
 4. **Revisión**: Calidad y Seguridad revisan por separado. Si hay un bloqueo, vuelve a Desarrollo.
 5. **Entrega**: informe breve con lo hecho, las pruebas (resultado real), los riesgos que quedan y lo siguiente.
+   La entrega incluye cerrar Ruflo y actualizar la nota del proyecto en la bóveda (reglas globales).
 
 **Nada está hecho sin `VEREDICTO: APROBADO` de Calidad**, ni sin el de Seguridad si el cambio toca entradas,
 permisos, secretos, red o dependencias.
